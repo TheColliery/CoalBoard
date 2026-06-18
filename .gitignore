@@ -1,0 +1,16 @@
+# Internal governance + design notes — machine-local, never shipped to the public repo
+CLAUDE.md
+MEMORY.md
+COALBOARD_DESIGN.md
+COALBOARD_BLUEPRINT.md
+
+# Dependencies / build cruft
+node_modules/
+
+# Runtime staging (created inside a target project at run-time, never committed)
+.coalboard/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

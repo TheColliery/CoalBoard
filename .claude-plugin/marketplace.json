@@ -1,0 +1,12 @@
+{
+  "name": "coalboard",
+  "owner": { "name": "TheColliery" },
+  "description": "CoalBoard — a consensus & debate board that convenes diverse lenses (with consent) to verify error-not-allowed work before it ships. Part of the TheColliery mining series.",
+  "plugins": [
+    {
+      "name": "coalboard",
+      "source": "./plugin",
+      "description": "Consensus & debate board for error-not-allowed work (security/crypto, migrations, high-precision math). With consent it convenes diverse epistemic lenses in parallel (empirical/source-grounded, formal, a show-me skeptic), a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Off ~90% of the time. Cross-agent (any subagent platform; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys. Beta."
+    }
+  ]
+}

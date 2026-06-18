@@ -1,0 +1,10 @@
+{
+  "name": "coalboard",
+  "version": "0.1.0-beta.1",
+  "description": "CoalBoard — a consensus & debate board for the error-not-allowed slice (security/crypto, migrations, high-precision math). On a critical task, with consent, it spawns diverse epistemic lenses in parallel — empirical (live source-grounding), formal (logic), and a show-me skeptic — a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Cross-agent (any subagent platform; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys.",
+  "author": { "name": "HetCreep" },
+  "homepage": "https://github.com/TheColliery/CoalBoard",
+  "repository": "https://github.com/TheColliery/CoalBoard",
+  "license": "MIT",
+  "keywords": ["consensus", "debate", "multi-agent", "code-review", "audit", "verification", "subagents", "source-grounding", "high-integrity", "skills", "hooks"]
+}
