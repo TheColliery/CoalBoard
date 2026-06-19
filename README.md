@@ -2,7 +2,7 @@
 
 > A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
 
-**Status: `v1.0.5` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
+**Status: `v1.0.6` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
 
 ## What it is
 
@@ -11,7 +11,7 @@ On an **error-not-allowed** task — security/crypto, a DB/financial migration, 
 - three **epistemic lenses** debate the task **in parallel, blind to each other** (so they don't anchor): an **empirical** lens that grounds claims in live, cross-referenced sources; a **formal** lens that reasons from logic and proof; and a **"show-me" skeptic** that turns every doubt into a concrete evidence-demand (*"show the date", "show it actually runs"*);
 - a **judge** synthesizes — on **verified** inputs, never on which answer sounds best;
 - on a deadlock, an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement;
-- everything is staged to `.coalboard/proposed/` and **you sign off** before a single live file changes.
+- every proposed change is staged to `.coalboard/proposed/` (reports land in `.coalboard/reports/`) and **you sign off** before a single live file changes.
 
 Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or run the `/coalboard:coalboard` plugin command) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
 
@@ -38,12 +38,14 @@ With the board vs without, on a fixed set of **error-not-allowed** tasks (each a
 
 ## Install
 
+**Claude Code** — one command (also enables hook auto-activation + the cheap-lenses / premium-judge cost discount, both CC-only):
+
 ```bash
 claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-(Cross-agent: runs on any platform with concurrent subagents. **Claude Code** additionally lets it run cheap lenses + a premium judge for a cost discount, and auto-activates via hooks.)
+**Other platforms** (Cursor, Codex, Copilot, Amp, Goose, …) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **Cross-agent operation is by design but VERIFIED on Claude Code only** — treat other platforms as supported-not-yet-proven, and re-verify subagent support on yours.
 
 ## Configure
 

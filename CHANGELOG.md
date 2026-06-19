@@ -2,6 +2,19 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.6] — 2026-06-20
+
+Continued dogfood — two errors found by READING the shipped artifacts (the report save-path, the README install block), both the class "the board audited SOUND but missed its own inconsistency". Fixed + sharpened so the board catches the class.
+
+### Fixed
+- **Staging-path inconsistency — the report location was undefined.** Docs said `.coalboard/proposed/` everywhere, but reports actually landed in `.coalboard/` root with no rule. Now explicit: `proposed/` holds ONLY changes-to-apply; the human-readable REPORT (audit / post-mortem) goes to `.coalboard/reports/<name>-<timestamp>.md` (a sibling of `proposed/`, never inside it). Synced across SKILL (Step 4.1 / 4.6 / audit-independence), PRIVACY, README.
+- **README install was Claude-Code-only under a cross-agent claim.** The Install section now splits **Claude Code** (one command; hook + cost-tiering are CC-only) vs **other platforms** (point the agent at the platform-neutral `skills/coalboard/SKILL.md`) and states plainly that cross-agent operation is by design but VERIFIED on Claude Code only.
+
+### Changed (audit sharpness)
+- **Claim-vs-docs mismatch is now an explicit audit finding:** docs that CLAIM "cross-platform / runs anywhere / works on X" while the install, examples, or config cover only ONE platform = a defect; the docs must document the others or scope the claim. (CoalBoard's own README was exactly this.)
+
+Deferred: sub4 per-rigor doc · heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.5] — 2026-06-20
 
 Round-4 self-audit (nasa, whole repo; verdict SOUND, 0 code defect) + queued dogfood points. Headline catches: a dead lens marked "Completed" (0 tokens — model unavailable) was silently counted as a voice; and the cross-platform "works everywhere" claim is a correlated blind spot a single-platform board cannot see.
