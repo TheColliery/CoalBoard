@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.7] — 2026-06-20
+
+Dogfood — the 2nd cost-gate reads like a pre-flight checkpoint but showed only the CONFIG (workers, models, gates, cost), never the TARGET. Added it.
+
+### Changed
+- **The cost-gate is now a TARGET + config + cost checkpoint.** Before spawning, it shows WHAT is under audit — repo/path, version read from the target's own `plugin.json` (not memory), source-repo vs transient install-clone (decides where the report lands), and any stale prior audit found there — alongside the final config and recomputed estimate. A wrong target (the clone not the source, a stale version) is caught AT the checkpoint, before the spend.
+- **Prior-audit handling:** a prior audit found in the target is de-dup context ONLY — re-verify every prior finding against the CURRENT source, version-check it (a report older than the target's version is suspect), never inherit its verdict; a root-level audit not under `reports/` is a pre-`reports/` leftover.
+
+Deferred: sub4 per-rigor doc · heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.6] — 2026-06-20
 
 Continued dogfood — two errors found by READING the shipped artifacts (the report save-path, the README install block), both the class "the board audited SOUND but missed its own inconsistency". Fixed + sharpened so the board catches the class.
