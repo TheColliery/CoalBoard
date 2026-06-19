@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.9] — 2026-06-20
+
+Dogfood — two issues: the SKILL leaned on CoalTipple as if always present (CoalBoard is standalone — a user may install only it), and a run announced "Step 1" twice (the pre-spawn prep, then the actual spawn).
+
+### Fixed
+- **CoalTipple is now explicitly OPTIONAL (no-external-assumption).** The board tiers models on the Claude Code alias floor (`haiku < sonnet < opus`) it knows directly, plus its own introspection + `lensTiers`; if CoalTipple is ALSO installed, its richer availability ranking is inherited as a BONUS. CoalBoard installed alone no longer reads as broken. (Fixed in Tiers, Bounds, and the grade-rubric reference.)
+- **Step 1 is announced ONCE.** The target enumeration (file-list for the scope count) + the report's version/commit/timestamp stamp are the Step-0 pre-flight (the checkpoint), NOT a second "Step 1"; Step 1 is purely the spawn.
+
+Deferred: sub4 per-rigor doc · heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.8] — 2026-06-20
 
 Dogfood — the per-lens model display regressed: a run condensed it to a bare slash-list ("haiku/sonnet/sonnet/opus") in the narration, and the spawn chips showed only "empirical lens" etc., so you could not tell which model each lens was running on.
