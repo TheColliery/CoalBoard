@@ -2,6 +2,11 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.1] — 2026-06-19
+
+### Added
+- **Audit mode — repo/release readiness.** Auditing a repo or a release (not just a diff) now also checks **cross-sibling parity** (CI workflows · security toggles like secret-scanning/push-protection/Dependabot · hygiene files), **live findings** (open code-scanning / Dependabot / Scorecard / secret-scanning alerts — triage each, never leave one silently open; query them, don't assume), and **showcase completeness** (the org landing / README / benchmarks index). Plus a **scope-honesty rule**: "NO ERROR FOUND" states *what* was audited — an un-audited dimension is "not checked", never "clean". Closes a real blind spot: a skill can be correct while its repo/org is not.
+
 ## [1.0.0] — 2026-06-19
 
 First **stable** release — the board's contract, config, and honest frame are settled, and it is benchmarked on two platforms.
