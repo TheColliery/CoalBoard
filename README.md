@@ -52,3 +52,5 @@ Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by proj
 CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
 
 Zero-dependency, offline, no API keys.
+
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Changelog](CHANGELOG.md)

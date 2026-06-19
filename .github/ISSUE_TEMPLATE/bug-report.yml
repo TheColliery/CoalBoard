@@ -1,0 +1,39 @@
+name: "Bug report"
+description: "The board, the conductor hook, or a script misbehaves"
+title: "[bug] <component>: <one-line summary>"
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - board behavior (SKILL.md — lenses / judge / sub4 / verify / consent)
+        - trigger / AND-gate (trigger.mjs)
+        - rigor preset (rigor.mjs)
+        - secret scrubber (secrets.mjs)
+        - conductor hook (coalboard-conductor.js)
+        - config schema (config-schema.mjs)
+        - verify gate (verify.mjs)
+        - plugin / packaging
+        - docs
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CoalBoard version + platform
+      placeholder: "v1.0.0 · Claude Code on Windows 11 (or Antigravity / Cursor / …)"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce + what happened
+      description: "Exact commands/inputs and exact output. For board behavior, the task you convened on and what the lenses/judge produced."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
