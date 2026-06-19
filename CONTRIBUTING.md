@@ -48,7 +48,7 @@ CoalBoard is **cross-agent** — it runs on any platform with concurrent subagen
 | `hooks/coalboard-conductor.js` | Phoenix-pure conductor hook (SessionStart + UserPromptSubmit). Auto-synced by the build. |
 | `plugin/` | Generated Claude Code plugin distribution. |
 | `platform-configs/.coalboard.json` | Commented factory default configuration. |
-| `eval/` | The with-the-board-vs-without benchmark (method + per-task scoring). |
+| (benchmark) | The with-the-board-vs-without benchmark lives in the series records — [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) — kept out of the clone (clean-clone: a skill repo carries only the skill). |
 
 ---
 

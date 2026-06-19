@@ -155,6 +155,11 @@ test('config-schema — validateValue enforces each type/bound; bad input fails 
   assert.ok(validateValue(byKey('coalboardMode'), 'bogus'), 'bad enum fails');
   assert.equal(validateValue(byKey('criticalPaths'), ['auth', 'crypto']), null);
   assert.ok(validateValue(byKey('criticalPaths'), [1, 2]), 'non-string array fails');
+  // lenses is a value-constrained strArr (audit E): only data/truth/feeling
+  assert.equal(validateValue(byKey('lenses'), ['data', 'truth']), null);
+  assert.ok(validateValue(byKey('lenses'), ['dat']), "a typo'd lens name fails");
+  assert.ok(validateValue(byKey('lenses'), ['data', 'bogus']), 'one bad lens in the list fails');
+  assert.equal(validateValue(byKey('criticalPaths'), ['anything', 'goes']), null, 'an unconstrained strArr still accepts any string');
   // sharpness-lever keys validate by type/bound
   assert.equal(validateValue(byKey('adversaryLens'), true), null);
   assert.ok(validateValue(byKey('adversaryLens'), 'yes'), 'non-bool fails');

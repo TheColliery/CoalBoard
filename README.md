@@ -2,7 +2,7 @@
 
 > A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
 
-**Status: `v1.0.2` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
+**Status: `v1.0.3` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
 
 ## What it is
 
@@ -13,7 +13,7 @@ On an **error-not-allowed** task — security/crypto, a DB/financial migration, 
 - on a deadlock, an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement;
 - everything is staged to `.coalboard/proposed/` and **you sign off** before a single live file changes.
 
-Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (`/coalboard`) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
+Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or run the `/coalboard:coalboard` plugin command) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
 
 ## What it guarantees (and what it doesn't)
 

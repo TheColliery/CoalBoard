@@ -2,6 +2,26 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.3] — 2026-06-19
+
+Round-2 self-audit (the board on its own repo) + the queued dogfood points. The board surfaced a real **HIGH** bug its own green gate + 19 tests missed — three lenses disagreed on the direction, the judge RAN it to adjudicate (and refuted a lens that mis-claimed the opposite).
+
+### Fixed
+- **conductor `hasNonLatin` false-fired on C0 control chars** — `\n`/`\t`/`\r` sit below the excluded U+0020, so a multi-line ENGLISH prompt wrongly received the "non-English" nudge (eroding the signal for genuinely non-English critical tasks). Now strips C0 controls before the test (a code-point filter — no control-char literal, no NUL byte). Regression test added.
+- **CONTRIBUTING** listed a removed `eval/` dir → now points at the org benchmarks (clean-clone).
+- **SECURITY** told users the `node --test <glob>` form the repo's own AGENTS.md records as broken on Node 24 → `node scripts/test.mjs` (the canonical runner).
+- **CI** (`ci.yml` / `codeql.yml`) blanket-ignored `**.md`, so a change to the shipped `SKILL.md` skipped CI and its `plugin/` dist-sync check → whitelist only the NON-shipped root docs.
+- **config-schema** `lenses` had no value constraint → a typo'd lens name passed verify and reached runtime; now enum-checked (`data`/`truth`/`feeling`) via a value-constrained `strArr`.
+- **factory config comment** overstated `relaxed` ("board off") and "locks nothing" → clarified (`coalboardMode:"off"` silences the conductor; `active`/`allDomainGates` are preset-semantic, not config keys).
+
+### Changed
+- **Convene consent now offers a per-run OVERRIDE via the question-box** — the `rigor` master dial (+ Audit scope) — tune a run without editing a config file; fine keys stay in `.coalboard.json`.
+- **CC cost bonus is now the DEFAULT, not a maybe** — `lensTiers` unset → cheap lenses (haiku) + premium judge (opus), not all-mid (sonnet).
+- **Audit scope = "every file, any extension"** — enumerate the actual files, not a fragile type list that silently misses `LICENSE` / dotfiles.
+- **Each lens keeps its OWN angle in Audit** — sub1 grounds claims in LIVE sources (not just reading files); never flatten the lenses to a generic "audit every surface".
+- **sub3 (feeling) is OPEN-ENDED** — the example feelings are SEEDS, not a closed menu; surface ANY feeling (incl OVERKILL / YAGNI), then make it concrete (uncertainty generates candidates; routing + verify resolve them).
+- **README** clarifies the manual command is `/coalboard:coalboard` (plugin-namespaced) or the "convene the board" chat phrase — bare `/coalboard` is not a registered slash command.
+
 ## [1.0.2] — 2026-06-19
 
 Self-audit (the board at nasa rigor, deepest scope) + the user's dogfood findings — all fixed and gated. The board found real bugs in its own repo (dogfood working); the judge caught one lens fabricating a finding (suspect-input-verified).

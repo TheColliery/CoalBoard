@@ -4,7 +4,7 @@ CoalBoard is verified under the same framework as **[CoalMine](https://github.co
 
 ## SkillSpector scan
 
-Last scan: **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases, so the version is the `uvx`-from-git HEAD, pinned by commit not a release tag), **2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan was run on the **v1.0.1 dist**; **v1.0.2 changed skill + lib content → a re-scan is pending** (per the rule above: an unscanned later version is not claimed scanned).
+Last scan: **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases, so the version is the `uvx`-from-git HEAD, pinned by commit not a release tag), **2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan was run on the **v1.0.1 dist**; **v1.0.2–v1.0.3 changed skill / hook / lib content → a re-scan is pending** (per the rule above: an unscanned later version is not claimed scanned).
 
 **Read the score in context.** The static stage scored **100/100**; the LLM **semantic** stage was rate-limited (HTTP 429) and fell back to **static-only**, which is pattern-match-based and false-positive-prone (it flags strings without the skill-contract context). **Every finding was verified false-positive** — re-run the semantic stage when the limit clears for a context-aware score. The verifications:
 
@@ -43,4 +43,4 @@ The board is built so that reviewing untrusted work cannot harm the host:
 
 ## Dist integrity
 
-The clean `plugin/` distribution is generated from source by `node scripts/build-plugin.mjs`; `node scripts/verify.mjs` checks the dist is in sync, the manifest is valid, and the config schema is well-formed. `node --test scripts/lib/*.test.mjs` runs the zero-dependency unit + hermetic-hook tests.
+The clean `plugin/` distribution is generated from source by `node scripts/build-plugin.mjs`; `node scripts/verify.mjs` checks the dist is in sync, the manifest is valid, and the config schema is well-formed. `node scripts/test.mjs` runs the zero-dependency unit + hermetic-hook tests (the canonical runner — the `node --test <glob>` form is avoided: it breaks on Node 24, MODULE_NOT_FOUND).

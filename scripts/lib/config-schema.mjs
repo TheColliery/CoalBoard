@@ -26,7 +26,7 @@ export const CONFIG_SCHEMA = [
   { key: 'triggerGradeFloor', type: 'int', min: 1, max: 5, flags: ['-g'], help: 'Board considered at >= this grade, or any sensitive task (reuses the CT grade rubric; default: 4)' },
   { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'Dirs the AND-gate skips so it never false-triggers on vendored code (default: node_modules, .git, dist, vendor, build)' },
   // — the board —
-  { key: 'lenses', type: 'strArr', lower: true, flags: ['--lenses'], help: 'Active epistemic lenses (default: data, truth, feeling)' },
+  { key: 'lenses', type: 'strArr', lower: true, values: ['data', 'truth', 'feeling'], flags: ['--lenses'], help: 'Active epistemic lenses — each must be one of: data, truth, feeling (adversary is additive via adversaryLens, NOT selectable here). Default: data, truth, feeling' },
   { key: 'consensusThreshold', type: 'int', min: 0, max: 100, flags: ['-t'], help: 'Below this worker-agreement % = deadlock -> summon the out-of-frame sub4 (default: 80)' },
   { key: 'observerOnMaxStakes', type: 'bool', flags: ['-o'], help: 'Summon the out-of-frame sub4 even on CONSENSUS (not just on deadlock). The rigor preset sets it (on under nasa, off under standard/high); set it here to force. Same-model agreement is weak evidence' },
   { key: 'maxRounds', type: 'int', min: 1, max: 5, flags: ['-r'], help: '1 = single-turn (max independence); >1 = multi-round cross-examination (less independence). Default 1' },
@@ -74,10 +74,15 @@ export function validateValue(spec, v) {
         : `must be one of: ${spec.values.join(', ')}`;
     case 'str':
       return typeof v === 'string' ? null : 'must be a string';
-    case 'strArr':
-      return Array.isArray(v) && v.every((x) => typeof x === 'string')
-        ? null
-        : 'must be an array of strings';
+    case 'strArr': {
+      if (!Array.isArray(v) || !v.every((x) => typeof x === 'string')) return 'must be an array of strings';
+      if (spec.values) {
+        const allowed = spec.values.map((s) => s.toLowerCase());
+        const bad = v.find((x) => !allowed.includes(x.toLowerCase()));
+        if (bad != null) return `contains '${bad}' — each item must be one of: ${spec.values.join(', ')}`;
+      }
+      return null;
+    }
     case 'obj':
       if (!(v && typeof v === 'object' && !Array.isArray(v))) return 'must be an object';
       return spec.validate ? spec.validate(v) : null;

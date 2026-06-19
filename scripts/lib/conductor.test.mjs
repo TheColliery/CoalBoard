@@ -68,6 +68,17 @@ test('non-English critical prompt -> the grade-by-meaning nudge fires', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('multi-line ENGLISH critical prompt -> CRITICAL signal but NO non-English nudge (C0 control-char guard, audit A)', () => {
+  const tmp = mk();
+  try {
+    // a newline used to make hasNonLatin false-fire (C0 controls sit below the excluded U+0020)
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug\nin the login flow' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /CRITICAL signal/);
+    assert.doesNotMatch(r.stdout, /non-English/, 'a multi-line English prompt must NOT receive the non-English nudge');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('coalboardMode:off -> fully silent on every event', () => {
   const tmp = mk();
   try {

@@ -67,7 +67,7 @@ function detect(prompt, cfg) {
 // Excludes Latin (U+0020-U+024F) + General Punctuation (U+2000-U+206F) + Supplemental
 // Punctuation (U+2E00-U+2E7F), so an em-dash / smart-quote in English never trips it.
 function hasNonLatin(s) {
-  return /[^ -ɏ -⁯⸀-⹿]/.test(String(s == null ? '' : s));
+  return /[^ -ɏ -⁯⸀-⹿]/.test(Array.from(String(s == null ? '' : s)).filter((c) => c.charCodeAt(0) >= 32).join(''));
 }
 
 // Self-update is kind-1 (plugin version): the HOOK only SCHEDULES (a throttled stamp);

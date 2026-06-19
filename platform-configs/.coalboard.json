@@ -203,11 +203,13 @@
   // ─── strictness preset (bundles the keys above; individual keys override) ───
 
   // ## A single dial that sets sensible DEFAULTS for the knobs above — 90% use just this, power users tune keys.
-  // ## relaxed = board off / bypass (non-critical) · standard = fire at grade≥4 or a failed verify, observer on
+  // ## relaxed = lowest rigor (lenses/gates minimal) — NOTE this only lowers the DEFAULTS; it does NOT silence the
+  // ##   conductor's SessionStart/prompt injection. To fully silence the board set "coalboardMode": "off". · standard = fire at grade≥4 or a failed verify, observer on
   // ## deadlock, standard verify, apply-gate · high = all critical paths, strict verify, pre + apply consent ·
   // ## nasa = maximum paranoia: board always on critical work, observer ALWAYS (even on consensus), strict + all
-  // ## domain gates, the human gate MANDATORY (pre + apply). The preset LOCKS NOTHING — any key you set explicitly
-  // ## overrides it.
+  // ## domain gates, the human gate MANDATORY (pre + apply). The preset LOCKS NOTHING — any config key above you set
+  // ## explicitly overrides it. (`active` and `allDomainGates` are preset-SEMANTIC — the agent applies them via the
+  // ## SKILL contract; they are NOT config-settable keys, so don't expect to set them here.)
   // ## ⚠️ "nasa" is the strictest PRESET NAME (trust-nothing, human-signs-off) — it is NOT a claim of NASA-grade
   // ##    10^-9 failure-rate or 0.01-defects-per-KLOC reliability. CoalBoard improves correctness; no LLM board
   // ##    delivers a proven reliability number. The name describes the paranoia level, not a guarantee.
