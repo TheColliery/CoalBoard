@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.10] — 2026-06-20
+
+Dogfood — the apply decision was asked TWICE: the Step-0 convene gate surfaced "report-only", and the Step-4 post-audit gate asked "fix what?" again. Deciding what to fix before any findings exist is premature; report-only belongs after the findings.
+
+### Fixed
+- **The apply / fix / report-only decision is now a SINGLE gate at Step 4 (after findings).** Step 0 decides convene + config + cost + report-LOCATION (source vs clone) only — it no longer asks the apply mode (no findings yet → premature + duplicated). If the user pre-declares report-only (config / at convene), Step 4 honors it without re-asking.
+
+Deferred: sub4 per-rigor doc · heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.9] — 2026-06-20
 
 Dogfood — two issues: the SKILL leaned on CoalTipple as if always present (CoalBoard is standalone — a user may install only it), and a run announced "Step 1" twice (the pre-spawn prep, then the actual spawn).
