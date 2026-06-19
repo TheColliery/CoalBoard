@@ -26,7 +26,7 @@ It **improves** correctness; it does **not** claim a defect rate or a reliabilit
 
 ## Benchmark
 
-With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19 — full method + per-task scoring in [`eval/`](eval/):
+With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19 — full method + per-task scoring in the series records, [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard):
 
 - **Reliability (Claude Code, Opus-class), repeated runs:** board **10/10** consistent vs an un-primed solo **~13/20 (~65%)**. A strong solo knows the textbook traps but is inconsistent where rigor must be forced — it shipped a wrong-cent figure, hedged a fetched date, missed a duplicate heading. The board makes the rigor automatic.
 - **Cross-vendor (Antigravity, Gemini 3.1 Pro Low):** solo **1/5 → board 4/5** — the board fixed the three *dangerous* errors a casual pass shipped (a timing side-channel, a stale version, a race condition). The lift is **larger on a weaker model**, and the discipline is **not Claude-specific**.
