@@ -2,9 +2,28 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.5] — 2026-06-20
+
+Round-4 self-audit (nasa, whole repo; verdict SOUND, 0 code defect) + queued dogfood points. Headline catches: a dead lens marked "Completed" (0 tokens — model unavailable) was silently counted as a voice; and the cross-platform "works everywhere" claim is a correlated blind spot a single-platform board cannot see.
+
+### Fixed
+- **doc-vs-code residuals:** PRIVACY.md scrub claim softened (`secrets.mjs` is dev-only, not shipped) + config path corrected to `.claude/.coalboard.json`; `commands/coalboard.md` "sandboxed" → "staged + contract-isolated"; factory rigor comments aligned to `rigor.mjs` (no phantom "failed verify" trigger; relaxed = `active:false`).
+- **conductor read project config via raw `process.cwd()`** → now walks UP from cwd to the nearest `.claude/.coalboard.json` (Phoenix #10 — a hook cwd may be a subdir; per-project config no longer silently ignored).
+- **`diversifyModels` no longer names "Fable 5"** (proven access-gated / unavailable) — spread across spawnable generations only; example + CHANGELOG softened.
+- **SECURITY SkillSpector framing** → re-scan is event-driven on a NEW SkillSpector version (the static rules are stable), not a per-CoalBoard-release "pending".
+
+### Changed (safety + sharpness)
+- **Dead-lens detection:** a lens that returns EMPTY / 0-tokens / "Completed in ~0s" is a FAILURE, not an empty vote (COMPLETED ≠ ANSWERED) — re-route, never silently count it (a phantom lens skews consensus + decorrelation).
+- **Consent — per-instance override is ephemeral** (never written to config) + a **2nd cost-gate**: recompute the token estimate for the FINAL (post-override) config and re-confirm BEFORE spawning the first worker (an override to nasa multiplies the cost).
+- **Cross-platform honesty:** cross-agent BY DESIGN, VERIFIED on Claude Code only; never state "works on X" unverified. Auditing CoalBoard itself, that is an unverified self-claim sub1/sub3 must challenge (single-platform blind spot; the human on another platform is the out-of-frame check).
+- **Audit lens-angle:** sub1 follows the work's OWN links/citations + reads facts from the TARGET files, never from loaded MEMORY.
+- **Audit-independence + report:** run a self-audit from a neutral context; write the report to a PERMANENT path (not the transient install clone) with a TIMESTAMPED unique filename (no same-day collision).
+
+Deferred: sub4 per-rigor doc table · objective heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.4] — 2026-06-20
 
-Round-3 self-audit (nasa, whole repo) — the board again caught a bug its green gate + 20 tests missed (the non-English nudge false-firing on emoji) and REFUTED its own "Fable 5 is fictional" lens by ground truth (the re-route failure proved the model exists; data + feeling shared a training-cutoff blind spot — the Knight-Leveson case the README itself describes).
+Round-3 self-audit (nasa, whole repo) — the board again caught a bug its green gate + 20 tests missed (the non-English nudge false-firing on emoji) and REFUTED its own "Fable 5 is fictional" lens by ground truth (the re-route failure proved the model is real but access-gated — known ≠ usable; data + feeling shared a training-cutoff blind spot — the Knight-Leveson case the README itself describes).
 
 ### Fixed
 - **conductor `hasNonLatin` false-fired on emoji** (and any supplementary / symbol char) → the "non-English" nudge fired on plain English. Rewritten to flag only a non-LATIN LETTER (Unicode property escapes; strips Latin + every non-letter incl emoji + C0). Regression test added.

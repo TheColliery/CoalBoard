@@ -137,8 +137,9 @@
   // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
   // "contestedRound": false,
 
-  // ## When lensTiers is UNSET, deliberately spread the lenses across model GENERATIONS (e.g. Fable 5 alongside the
-  // ## Claude 4.x line) — different training runs share fewer blind spots, so it is real (if partial) decorrelation,
+  // ## When lensTiers is UNSET, deliberately spread the lenses across the model GENERATIONS AVAILABLE at spawn-time
+  // ## (different training runs share fewer blind spots) — pick only from spawnable generations, never a named model
+  // ## that may be access-gated/unavailable; a dead pick re-routes to an available one. Real (if partial) decorrelation,
   // ## not just a cost knob. Honest ceiling: less than cross-provider independence. The rigor preset sets it on under nasa.
   // # Setting type: Boolean
   // # Default value: false (rigor:standard/high); nasa turns it on via the preset
@@ -207,7 +208,7 @@
 
   // ## A single dial that sets sensible DEFAULTS for the knobs above — 90% use just this, power users tune keys.
   // ## relaxed = lowest rigor (lenses/gates minimal) — NOTE this only lowers the DEFAULTS; it does NOT silence the
-  // ##   conductor's SessionStart/prompt injection. To fully silence the board set "coalboardMode": "off". · standard = fire at grade≥4 or a failed verify, observer on
+  // ##   conductor's SessionStart/prompt injection (set "coalboardMode": "off" to fully silence it; relaxed = active:false = auto-board OFF). · standard = fire at grade≥4 via the AND-gate, observer on
   // ## deadlock, standard verify, apply-gate · high = all critical paths, strict verify, pre + apply consent ·
   // ## nasa = maximum paranoia: board always on critical work, observer ALWAYS (even on consensus), strict + all
   // ## domain gates, the human gate MANDATORY (pre + apply). The preset LOCKS NOTHING — any config key above you set

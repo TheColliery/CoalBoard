@@ -101,6 +101,19 @@ test('coalboardMode:off -> fully silent on every event', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('project config read from a PARENT when cwd is a subdir (cwd walk-up, round-4 #2)', () => {
+  const root = mk();
+  const home = mk(); // a DIFFERENT home so the GLOBAL read finds nothing — only the walk-up can supply the config
+  try {
+    writeCfg(root, { coalboardMode: 'off' });           // config at the project ROOT
+    const sub = path.join(root, 'pkg', 'src');
+    fs.mkdirSync(sub, { recursive: true });
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, sub, home);
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout, '', 'coalboardMode:off at the root is found by walking up from a subdir cwd -> silent');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-silent)', () => {
   const tmp = mk();
   try {

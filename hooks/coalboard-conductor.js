@@ -34,15 +34,36 @@ function parseJsonc(text) {
   } catch { return {}; }
 }
 
+// Find the nearest project .coalboard.json by walking UP from cwd (a CC hook cwd may be a
+// SUBDIR, not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
+// Skip the home dir (it is the GLOBAL config, already read) so it is not double-counted as project.
+function findProjectCfg() {
+  try {
+    const home = os.homedir();
+    let dir = process.cwd();
+    for (let i = 0; i < 40; i++) {
+      if (dir !== home) {
+        const f = path.join(dir, '.claude', '.coalboard.json');
+        if (fs.existsSync(f)) return f;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {}
+  return null;
+}
+
 function readCfg() {
   const out = {};
   const files = [];
   try { files.push(path.join(os.homedir(), '.claude', '.coalboard.json')); } catch {}
-  try { files.push(path.join(process.cwd(), '.claude', '.coalboard.json')); } catch {}
+  const proj = findProjectCfg();
+  if (proj) files.push(proj); // project overlays global; found by walking UP (cwd may be a subdir)
   for (const f of files) {
     try { if (fs.existsSync(f)) Object.assign(out, parseJsonc(fs.readFileSync(f, 'utf8'))); } catch {}
   }
-  return out; // project overlays global (project file read last -> wins per key)
+  return out; // project overlays global (project read last -> wins per key)
 }
 
 function boardOff(cfg) {
