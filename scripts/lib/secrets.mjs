@@ -32,15 +32,17 @@ const PATTERNS = [
   // backtracks to the LAST '@' before the path, so a password containing a literal '@'
   // (e.g. pass@word) is fully redacted, not partially.
   [/(:\/\/[^\s:/@]+:)[^\s/]+(@)/g, '$1[REDACTED]$2'],
-  // key=value / key: value for a sensitive name — keep the name, drop the value. Two fixes
+  // key=value / key: value for a sensitive name — keep the name, drop the value. Fixes
   // over a naive \bsecret\b: (1) a lookbehind + an underscore/hyphen-delimited prefix/suffix
   // so a keyword EMBEDDED in a compound name matches (AWS_SECRET_ACCESS_KEY=, DB_PASSWORD=);
-  // (2) the value branch accepts a QUOTED multi-word value ("my secret pw") as well as an
-  // unquoted token. The {0,8} reps bound the work (no catastrophic backtracking).
-  // The value branch carries an OPTIONAL auth-scheme prefix (Bearer/Basic/…) so the WHOLE
-  // credential is redacted, not just the scheme word — `Authorization: Bearer <short-token>`
-  // (a token under the standalone-Bearer 12-char floor) used to leave the token exposed.
-  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})(\s*[:=]\s*)(?:(?:bearer|basic|digest|token)\s+)?(?:"[^"]*"|'[^']*'|[^\s"']+)/gi, '$1$2[REDACTED]'],
+  // (2) the separator tolerates a JSON closing-quote on the key (`"password": "v"`) — a quote
+  // between the name and the `:`/`=` used to defeat the whole match (JSON is the dominant
+  // diff/config format); (3) the value branch takes a QUOTED multi-word value ("my secret pw")
+  // OR an unquoted value to END-OF-LINE, so a multi-word passphrase (PASSWORD=correct horse …)
+  // is fully redacted, not leaked after word 1. The {0,8} reps + the [^\n] class stay linear
+  // (no catastrophic backtracking). The value branch carries an OPTIONAL auth-scheme prefix
+  // (Bearer/Basic/…) so the WHOLE credential is redacted, not just the scheme word.
+  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})(\s*["']?\s*[:=]\s*)(?:(?:bearer|basic|digest|token)\s+)?(?:"[^"]*"|'[^']*'|[^\n"']+)/gi, '$1$2[REDACTED]'],
 ];
 
 // Redact credential-shaped substrings in `text`. Returns a scrubbed copy.

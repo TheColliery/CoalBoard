@@ -7,6 +7,9 @@ import { detectStatic, detectFileWrite, isExcluded } from './trigger.mjs';
 import { rigorPreset, applyRigor } from './rigor.mjs';
 import { scrub, hasSecret } from './secrets.mjs';
 import { CONFIG_SCHEMA, validateValue } from './config-schema.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 test('trigger.detectStatic — hits a critical signal, ignores benign', () => {
   assert.equal(detectStatic('fix the auth crypto timing bug').hit, true);
@@ -68,6 +71,20 @@ test('rigor — sharpness levers are tiered by preset, explicit key overrides', 
   assert.equal(applyRigor({ rigor: 'nasa', tier2Verify: false }).tier2Verify, false, 'force a lever OFF at nasa');
 });
 
+test('rigor — the shipped factory config does NOT neuter the preset (copy + rigor:nasa stays nasa) [audit #1]', () => {
+  const factoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'platform-configs', '.coalboard.json');
+  const raw = fs.readFileSync(factoryPath, 'utf8');
+  // strip JSONC comments (strings preserved) — same approach as the conductor's parseJsonc
+  const factory = JSON.parse(raw.replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : '')));
+  const eff = applyRigor({ ...factory, rigor: 'nasa' });
+  assert.equal(eff.adversaryLens, true, 'factory + rigor:nasa still enables the adversary lens');
+  assert.equal(eff.tier2Verify, true, 'factory + rigor:nasa still enables ground-truth verify');
+  assert.equal(eff.observerOnMaxStakes, true, 'factory + rigor:nasa still observer-always');
+  assert.equal(eff.diversifyModels, true, 'factory + rigor:nasa still diversifies models');
+  assert.equal(eff.contestedRound, true, 'factory + rigor:nasa still runs the contested round');
+  assert.equal(eff.qaStrictness, 'strict', 'factory + rigor:nasa still strict verify');
+});
+
 test('secrets.scrub — redacts keys, JWTs, Bearer (space + colon), key=value; leaves prose', () => {
   assert.match(scrub('api_key: sk-abcdefghij0123456789xyz'), /\[REDACTED\]/);
   assert.match(scrub('Authorization: Bearer abcdefghijklmnop1234'), /\[REDACTED\]/);
@@ -108,6 +125,19 @@ test('secrets.scrub — board-audit gaps closed (compound env-var, quoted, token
   assert.ok(!/abc123/.test(scrub('Authorization: Bearer abc123')), 'short bearer token not leaked');
   assert.match(scrub('Authorization: Bearer abc123'), /Authorization: \[REDACTED\]/);
   assert.ok(!/YTpiYzpk/.test(scrub('Authorization: Basic YTpiYzpk')), 'short basic token not leaked');
+});
+
+test('secrets.scrub — JSON quoted-key + unquoted multi-word passphrase (audit #2)', () => {
+  // JSON "key": "value" — the dominant diff/config format; the closing key-quote used to defeat the separator
+  assert.match(scrub('"password": "Pr0d!Master2026"'), /"password": \[REDACTED\]/);
+  assert.ok(!/Pr0d!Master2026/.test(scrub('"password": "Pr0d!Master2026"')), 'JSON value fully redacted');
+  assert.equal(hasSecret('"password": "Pr0d!Master2026"'), true, 'hasSecret no longer asserts a JSON secret is clean');
+  assert.match(scrub('"apiKey": "live_abc123def456ghi789"'), /"apiKey": \[REDACTED\]/);
+  // unquoted multi-word passphrase — used to leak after word 1
+  assert.match(scrub('ADMIN_PASSWORD = correct horse battery staple'), /ADMIN_PASSWORD = \[REDACTED\]/);
+  assert.ok(!/horse battery staple/.test(scrub('ADMIN_PASSWORD = correct horse battery staple')), 'whole passphrase redacted, no word-2+ leak');
+  // regression: a keyword with NO separator stays untouched (the ["']? separator addition must not over-match)
+  assert.equal(hasSecret('the password rotates per policy'), false, 'prose without a separator untouched');
 });
 
 test('secrets.scrub — no catastrophic backtracking (ReDoS guard: returns, does not hang)', () => {

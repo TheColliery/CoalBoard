@@ -62,6 +62,27 @@ check('plugin/ dist in sync with source', () => {
   return null;
 });
 
+// Both-direction (scripts-quality §1): SHIP above is source->dist; this walks the WHOLE
+// dist tree so a 7th shipped file (a new command/skill/asset) cannot ship UNVERIFIED —
+// every dist file must have an in-sync source. (build-plugin cpSyncs whole dirs, so a
+// dist file's source is root/<same relative path>.)
+check('plugin/ dist has no orphan (every dist file has an in-sync source)', () => {
+  const distRoot = path.join(root, 'plugin');
+  if (!fs.existsSync(distRoot)) return 'plugin/ missing — run scripts/build-plugin.mjs';
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) { const r = walk(abs); if (r) return r; continue; }
+      const rel = path.relative(distRoot, abs).replace(/\\/g, '/');
+      const src = path.join(root, rel);
+      if (!fs.existsSync(src)) return `plugin/${rel} is a dist ORPHAN (no source) — it would ship unverified`;
+      if (Buffer.compare(fs.readFileSync(src), fs.readFileSync(abs)) !== 0) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
+    }
+    return null;
+  };
+  return walk(distRoot);
+});
+
 check('conductor inline detect lists match trigger.mjs (no silent drift)', () => {
   const src = fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8');
   const grab = (name) => {

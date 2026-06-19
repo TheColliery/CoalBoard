@@ -4,7 +4,7 @@ CoalBoard is verified under the same framework as **[CoalMine](https://github.co
 
 ## SkillSpector scan
 
-Last scan: **NVIDIA SkillSpector v2.2.3, 2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan covers the **current shipped dist** (the max-sharpness + anti-zombie hardening included); at the `1.0.0` tag only `plugin.json`'s version and the README change, neither a scanned surface.
+Last scan: **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases, so the version is the `uvx`-from-git HEAD, pinned by commit not a release tag), **2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan was run on the **v1.0.1 dist**; **v1.0.2 changed skill + lib content → a re-scan is pending** (per the rule above: an unscanned later version is not claimed scanned).
 
 **Read the score in context.** The static stage scored **100/100**; the LLM **semantic** stage was rate-limited (HTTP 429) and fell back to **static-only**, which is pattern-match-based and false-positive-prone (it flags strings without the skill-contract context). **Every finding was verified false-positive** — re-run the semantic stage when the limit clears for a context-aware score. The verifications:
 

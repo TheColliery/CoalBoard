@@ -61,9 +61,10 @@
   // ## The active epistemic lenses — the decorrelation mechanism. Each lens reasons from a DIFFERENT basis so a
   // ## shared-model blind spot is less likely to be shared by all: data = empirical, LIVE multi-source-grounded
   // ## (fetches authoritative sources at runtime, never one source, never frozen memory); truth = formal/logical
-  // ## (invariants, first-principles, no fetch); feeling = a "SHOW ME" skeptic (converts a vague smell into a
-  // ## concrete evidence DEMAND — "show the data's date", "show it actually RUNS", "show the proof step"; a demand
-  // ## that cannot be satisfied IS the finding). They run IN PARALLEL, blind to each other (independence). Removing
+  // ## (invariants, first-principles, no fetch); feeling = a FULL-SPECTRUM "SHOW ME" skeptic — turns EVERY gut-feeling
+  // ## into a concrete demand/flag: correctness ("show the date / that it RUNS / the source / the proof") AND design
+  // ## ("OVERKILL / over-engineered / redundant?", "why exist — YAGNI?", "smells wrong — where?"); unprovable = a flagged gap.
+  // ## They run IN PARALLEL, blind to each other (independence). Removing
   // ## a lens weakens decorrelation; the three are the floor for error-not-allowed work.
   // # Setting type: String[] (data, truth, feeling)
   // # Default value: data, truth, feeling
@@ -79,8 +80,9 @@
   // ## (ON under nasa, off under standard/high); set it here to force either way. Same-model agreement is weak
   // ## evidence (a shared blind spot LOOKS like agreement), so the most critical work gets the independent check.
   // # Setting type: Boolean
-  // # Default value: false (matches the shipped rigor:standard; rigor:nasa flips it on via the preset)
-  "observerOnMaxStakes": false,
+  // # Default value: false (rigor:standard); rigor:nasa flips it on via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE a fixed value (overrides rigor).
+  // "observerOnMaxStakes": false,
 
   // ## Debate rounds. 1 = single-turn parallel = MAXIMUM independence (each lens works blind, never anchors on
   // ## another's answer) — recommended for critical work. >1 = multi-round cross-examination (round 2 sees the
@@ -120,22 +122,25 @@
   // ## skeptic (it HUNTS the breaking case, not just demands evidence). Adds a worker. The rigor preset sets it on
   // ## under high/nasa; setting it here forces it either way.
   // # Setting type: Boolean
-  // # Default value: false (matches rigor:standard; high/nasa turn it on via the preset)
-  "adversaryLens": false,
+  // # Default value: false (rigor:standard); high/nasa turn it on via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "adversaryLens": false,
 
   // ## On a DEADLOCK, run ONE surgical cross-exam on the contested point BEFORE summoning sub4: feed the two
   // ## disagreeing lenses only the counter-claim (never their full answers) — "defend or concede." Cross-examination
   // ## on the contested point without re-anchoring the whole board. The rigor preset sets it on under high/nasa.
   // # Setting type: Boolean
-  // # Default value: false (matches rigor:standard; high/nasa turn it on)
-  "contestedRound": false,
+  // # Default value: false (rigor:standard); high/nasa turn it on via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "contestedRound": false,
 
   // ## When lensTiers is UNSET, deliberately spread the lenses across model GENERATIONS (e.g. Fable 5 alongside the
   // ## Claude 4.x line) — different training runs share fewer blind spots, so it is real (if partial) decorrelation,
   // ## not just a cost knob. Honest ceiling: less than cross-provider independence. The rigor preset sets it on under nasa.
   // # Setting type: Boolean
-  // # Default value: false (matches rigor:standard/high; nasa turns it on)
-  "diversifyModels": false,
+  // # Default value: false (rigor:standard/high); nasa turns it on via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "diversifyModels": false,
 
   // ─── verify / apply ───
 
@@ -143,8 +148,9 @@
   // ## lets a worker grade itself). strict = exhaustive (all domain gates); standard = the core gates; off = trust
   // ## (skip the merge-verify).
   // # Setting type: String (strict, standard, off)
-  // # Default value: standard
-  "qaStrictness": "standard",
+  // # Default value: standard (rigor:standard); high/nasa raise it to strict via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "qaStrictness": "standard",
 
   // ## OPTIONAL per-domain verify gate list — overrides the built-in defaults (code: compile/test/sast · math:
   // ## substitute-back/simulate · text: completeness/term-consistency · research: every-claim-sourced).
@@ -163,8 +169,9 @@
   // ## translation) + mutation (is the test suite itself any good?). A fuzzer finds the input-space corner finite
   // ## reasoning misses. The rigor preset sets it on under high/nasa.
   // # Setting type: Boolean
-  // # Default value: false (matches rigor:standard; high/nasa turn it on)
-  "tier2Verify": false,
+  // # Default value: false (rigor:standard); high/nasa turn it on via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "tier2Verify": false,
 
   // ## Hard per-run cap (seconds) on each property/fuzz run so tier2Verify stays BOUNDED-COST — "max sharpness that
   // ## still converges", never an unbounded fuzz.
@@ -183,8 +190,9 @@
   // ## an API call, a deploy) — before writing to live files. The human gating the apply IS the load-bearing safety
   // ## node; turning this off removes it.
   // # Setting type: Boolean
-  // # Default value: true
-  "applyConsent": true,
+  // # Default value: true (rigor:standard/high/nasa); rigor:relaxed turns it off via the preset
+  // ← rigor-preset-controlled: LEFT COMMENTED so the preset can set it. Uncomment ONLY to FORCE (overrides rigor).
+  // "applyConsent": true,
 
   // ## The staging sandbox path (relative to the project) where the board writes its proposal. Nothing reaches live
   // ## files until verify passes AND you approve the diff — discarding this dir rolls back every staged FILE change.
