@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONFIG_SCHEMA } from './lib/config-schema.mjs';
+import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +80,37 @@ check('conductor inline detect lists match trigger.mjs (no silent drift)', () =>
 check('shipped hook has no NUL byte (control-char/BOM hazard)', () => {
   const buf = fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'));
   return buf.includes(0) ? 'a 0x00 byte is present in coalboard-conductor.js (build it from char codes, never typed literals)' : null;
+});
+
+// Strip // and /* */ comments, string-aware, so the JSONC factory config parses as JSON.
+function stripJsonc(src) {
+  let out = '', inStr = false, esc = false, inLine = false, inBlock = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i], n = src[i + 1];
+    if (inLine) { if (c === '\n') { inLine = false; out += c; } continue; }
+    if (inBlock) { if (c === '*' && n === '/') { inBlock = false; i++; } continue; }
+    if (inStr) { out += c; if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') { inStr = true; out += c; continue; }
+    if (c === '/' && n === '/') { inLine = true; i++; continue; }
+    if (c === '/' && n === '*') { inBlock = true; i++; continue; }
+    out += c;
+  }
+  return out;
+}
+
+check('factory config valid against schema', () => {
+  const raw = fs.readFileSync(path.join(root, 'platform-configs', '.coalboard.json'), 'utf8');
+  let cfg;
+  try { cfg = JSON.parse(stripJsonc(raw)); }
+  catch (e) { return `platform-configs/.coalboard.json is not valid JSONC: ${e && e.message ? e.message : e}`; }
+  const byKey = new Map(CONFIG_SCHEMA.map((s) => [s.key, s]));
+  for (const [k, v] of Object.entries(cfg)) {
+    const spec = byKey.get(k);
+    if (!spec) return `unknown key '${k}' in .coalboard.json (not in config-schema.mjs)`;
+    const err = validateValue(spec, v);
+    if (err) return `.coalboard.json '${k}' ${err}`;
+  }
+  return null;
 });
 
 for (const o of oks) console.log(`  ok   ${o}`);

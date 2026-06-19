@@ -1,12 +1,12 @@
 ---
 name: coalboard
 description: >-
-  Consensus & debate board for the error-not-allowed slice — security/crypto, DB/financial migrations, high-precision math, anything where one mistake is catastrophic. With the user's consent it convenes diverse epistemic lenses (empirical/source-grounded, formal/logical, a show-me skeptic) debating IN PARALLEL; a judge synthesizes on VERIFIED inputs; an independent out-of-frame solver breaks ties; the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging) — it improves correctness, it does not claim a reliability number. Off ~90% of the time. Triggers: "/coalboard", "convene the board", a critical-task signal, or a CoalTipple escalation hand-off. Cross-agent (any platform with concurrent subagents; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys.
+  Consensus & debate board. Its primary AUTO-trigger is the error-not-allowed slice — security/crypto, DB/financial migrations, high-precision math, anything catastrophic-on-error — but convened MANUALLY ("/coalboard") it generalizes to any hard problem worth several diverse perspectives (a thorny design call, a high-stakes review, a hard judgment). With the user's consent it convenes diverse epistemic lenses (empirical/source-grounded, formal/logical, a show-me skeptic) debating IN PARALLEL; a judge synthesizes on VERIFIED inputs; an independent out-of-frame solver breaks ties; the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging) — it improves correctness, it does not claim a reliability number. Off ~90% of the time. Triggers: "/coalboard", "convene the board", a critical-task signal, or a CoalTipple escalation hand-off. Cross-agent (any platform with concurrent subagents; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys.
 ---
 
 # CoalBoard — the consensus & debate board
 
-> **Honest frame (do not overstate):** CoalBoard is NASA-INSPIRED in STRUCTURE (redundancy + design-diversity + human-in-the-loop + trigger-only-on-critical), NOT in NUMBERS. It guarantees **bounded cost** and **zero-breakage**; it IMPROVES correctness; it does NOT prove it or claim a defect/reliability figure. It is for the error-not-allowed slice ONLY — never routine work.
+> **Honest frame (do not overstate):** CoalBoard is NASA-INSPIRED in STRUCTURE (redundancy + design-diversity + human-in-the-loop + trigger-only-on-critical), NOT in NUMBERS. It guarantees **bounded cost** and **zero-breakage**; it IMPROVES correctness; it does NOT prove it or claim a defect/reliability figure. Its AUTO-trigger is the error-not-allowed slice; convened MANUALLY (`/coalboard`) it generalizes to any hard problem worth several diverse lenses — but never routine work (a board is several agents).
 
 You are **main** (depth-0): you decide whether to convene, you orchestrate, you judge, and you (and the human) own the apply. The lens-workers are **leaves** — bounded by their task-contract, they RETURN, never spawn.
 
@@ -14,13 +14,13 @@ You are **main** (depth-0): you decide whether to convene, you orchestrate, you 
 
 ## Step 0 — Convene? (the gate + consent)
 
-Convene the board ONLY for an **error-not-allowed** task, and ONLY with consent. Activation signals (any one):
+Convene the board with consent. **Two scopes:** the AUTO signals fire only on **error-not-allowed** work (the cost discipline — the board sleeps ~90%); a **manual `/coalboard`** convenes on ANY genuinely hard problem worth several diverse lenses (you decide — error-not-allowed, or a thorny design call / high-stakes review / hard non-code judgment). Activation signals (any one):
 - the conductor injected a **CRITICAL signal** (the AND-gate Layer-1 static hit) — you then judge the semantic Layer 2 **by intent** (a non-English prompt fires no English keyword, so grade by MEANING, never require an English word);
 - a **CoalTipple escalation hand-off** (CoalBoard is CT's top escalation rung);
-- a **manual `/coalboard`** invocation;
+- a **manual `/coalboard`** invocation (any hard problem the user judges worth a board — NOT limited to error-not-allowed);
 - your own read that the task is genuinely error-not-allowed (security/crypto, a DB/financial migration, high-precision math/physics, or any catastrophic-on-error change).
 
-**Convene only above the bar:** clear `triggerConfidence` (default 90 — your semantic confidence that it truly IS error-not-allowed) AND `triggerGradeFloor` (default 4 — grade the task on the CoalTipple rubric; a sensitive task always qualifies). Below the bar → do not convene.
+**Convene only above the bar (the AUTO path):** clear `triggerConfidence` (default 90 — your semantic confidence that it truly IS error-not-allowed) AND `triggerGradeFloor` (default 4 — grade the task on the CoalTipple rubric; a sensitive task always qualifies). Below the bar → do not auto-convene. (A manual `/coalboard` is user-initiated — these auto-bars do not gate it; just sanity-check it is non-trivial and worth the spend, then consent-gate the cost.)
 
 **Consent — honor `coalboardMode` (default `ask`):** `ask` → before convening, ask the user via the question-box, showing the risk reason + an estimated token cost + the model tiers; `auto` → convene without asking; `off` → never convene (work normally). Convening spawns several workers — it is the single biggest spend here, so default to ASK.
 

@@ -1,0 +1,183 @@
+{
+  // CoalBoard — consensus & debate board config. Every value is tunable. // and /* */ comments are allowed.
+  // Every key is validated against scripts/lib/config-schema.mjs (verify.mjs checks it — a typo'd key = fail loud).
+  //
+  // CoalBoard is OFF ~90% of the time. It convenes only on the error-not-allowed slice (security/crypto, DB/
+  // financial migrations, high-precision math) WITH your consent. Its honest guarantees are BOUNDED COST
+  // (no whack-a-mole token-bleed) + ZERO-BREAKAGE (work is staged, never touches live files until verified +
+  // approved). It IMPROVES correctness; it does NOT claim a reliability number.
+  //
+  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.coalboard.json (per-project,
+  // overrides global). Absent = these defaults apply. The conductor + skill read the merged config.
+
+  // ─── activation / trigger ───
+
+  // ## What happens when a critical (error-not-allowed) task is detected. EXPENSIVE (3-4 agents) → default ASK each
+  // ## time. ask = per-instance consent (shows why-flagged + an est. token cost, you approve before the board runs);
+  // ## auto = standing opt-in (convene without asking); off = never convene (the board's master off-switch).
+  // # Setting type: String (ask, auto, off)
+  // # Default value: ask
+  "coalboardMode": "ask",
+
+  // ## AND-gate Layer-1 path fragments — a file/task path containing one of these is a danger SIGNAL (half the gate).
+  // ## The board fires only when a path/import signal AND the Layer-2 semantic classifier (triggerConfidence) BOTH hit.
+  // # Setting type: String[] (array of path fragments)
+  // # Default value: auth, payment, migration, security, crypto
+  "criticalPaths": ["auth", "payment", "migration", "security", "crypto"],
+
+  // ## AND-gate Layer-1 import names — importing one of these is the other half of the path signal.
+  // # Setting type: String[]
+  // # Default value: crypto, bcrypt, jsonwebtoken, child_process
+  "criticalImports": ["crypto", "bcrypt", "jsonwebtoken", "child_process"],
+
+  // ## AND-gate Layer-2 — the semantic-classifier confidence (0-100) the task must clear to count as critical.
+  // ## HIGHER = fewer false triggers (the board stays asleep unless it is quite sure), but more false-negatives
+  // ## (a borderline-critical task slips through — the manual /coalboard + the CoalTipple escalate-handoff are the
+  // ## safety valves). LOWER = catches more, convenes more often (costlier). 90 = conservative-by-design.
+  // # Setting type: Integer 0-100
+  // # Default value: 90
+  "triggerConfidence": 90,
+
+  // ## The board is considered at or above this task grade, OR on any sensitive task — reusing CoalTipple's deterministic
+  // ## grade rubric (1 read/format … 5 crypto/concurrency/proof). 4 = sensitive-path / large / multi-file work and up.
+  // # Setting type: Integer 1-5
+  // # Default value: 4
+  "triggerGradeFloor": 4,
+
+  // ## Dirs the AND-gate SKIPS so it never false-triggers on vendored / generated code you did not write.
+  // # Setting type: String[]
+  // # Default value: node_modules, .git, dist, vendor, build
+  "excludePaths": ["node_modules", ".git", "dist", "vendor", "build"],
+
+  // ─── the board ───
+
+  // ## The active epistemic lenses — the decorrelation mechanism. Each lens reasons from a DIFFERENT basis so a
+  // ## shared-model blind spot is less likely to be shared by all: data = empirical, LIVE multi-source-grounded
+  // ## (fetches authoritative sources at runtime, never one source, never frozen memory); truth = formal/logical
+  // ## (invariants, first-principles, no fetch); feeling = a "SHOW ME" skeptic (converts a vague smell into a
+  // ## concrete evidence DEMAND — "show the data's date", "show it actually RUNS", "show the proof step"; a demand
+  // ## that cannot be satisfied IS the finding). They run IN PARALLEL, blind to each other (independence). Removing
+  // ## a lens weakens decorrelation; the three are the floor for error-not-allowed work.
+  // # Setting type: String[] (data, truth, feeling)
+  // # Default value: data, truth, feeling
+  "lenses": ["data", "truth", "feeling"],
+
+  // ## Worker-agreement % below which the board is DEADLOCKED → it summons the out-of-frame solver (the observer,
+  // ## "sub4") to break the tie by solving the spec BLIND and diffing. Higher = summon the observer more readily.
+  // # Setting type: Integer 0-100
+  // # Default value: 80
+  "consensusThreshold": 80,
+
+  // ## Summon the out-of-frame observer EVEN on apparent consensus when rigor = nasa. Same-model agreement is weak
+  // ## evidence (a shared blind spot LOOKS like agreement), so the most critical work gets the independent check
+  // ## regardless of whether the lenses agreed.
+  // # Setting type: Boolean
+  // # Default value: true
+  "observerOnMaxStakes": true,
+
+  // ## Debate rounds. 1 = single-turn parallel = MAXIMUM independence (each lens works blind, never anchors on
+  // ## another's answer) — recommended for critical work. >1 = multi-round cross-examination (round 2 sees the
+  // ## others) — refines against each other but REINTRODUCES anchoring; choose only when that trade is worth it.
+  // # Setting type: Integer 1-5
+  // # Default value: 1
+  "maxRounds": 1,
+
+  // ## Per-worker / per-round debate soft cap in seconds. Matters most when maxRounds > 1; in the single-turn
+  // ## default the hard stall-reap (subagentTimeoutSeconds) is what actually bounds wall-clock.
+  // # Setting type: Integer (range 5-600)
+  // # Default value: 60
+  "debateTimeoutSeconds": 60,
+
+  // ## Hard stall-reap: a silent worker past this many seconds is treated as FAILED (no zombies) and the board
+  // ## proceeds with a flag or re-spawns once. The real wall-clock bound on a single-turn round.
+  // # Setting type: Integer (range 5-3600)
+  // # Default value: 150
+  "subagentTimeoutSeconds": 150,
+
+  // ## Concurrent worker cap — the lenses share one rate limit. The board needs 3-4 (3 lenses + maybe the observer).
+  // # Setting type: Integer (range 1-16)
+  // # Default value: 4
+  "maxConcurrentSubagents": 4,
+
+  // ## OPTIONAL per-role tier/model pin — overrides the inherit-from-CoalTipple default (cheap lenses + a premium
+  // ## judge, the Claude-Code cost bonus). A value is a model alias or a priority chain. Unset = inherit the
+  // ## alias-floor (the platform resolves the best current model at spawn-time; no hardcoded model IDs to rot).
+  // # Setting type: Object { data | truth | feeling | observer | judge : "model" | ["priority", "chain"] }
+  // # Default value: unset (inherit CoalTipple's alias-floor + pins)
+  // "lensTiers": { "data": "haiku", "truth": "sonnet", "feeling": "haiku", "observer": "opus", "judge": "opus" },
+
+  // ─── verify / apply ───
+
+  // ## How rigorously the JUDGE verifies the synthesized result before staging (the judge RUNS the check — never
+  // ## lets a worker grade itself). strict = exhaustive (all domain gates); standard = the core gates; off = trust
+  // ## (skip the merge-verify).
+  // # Setting type: String (strict, standard, off)
+  // # Default value: standard
+  "qaStrictness": "standard",
+
+  // ## OPTIONAL per-domain verify gate list — overrides the built-in defaults (code: compile/test/sast · math:
+  // ## substitute-back/simulate · text: completeness/term-consistency · research: every-claim-sourced).
+  // # Setting type: Object { code | math | text | research : ["gate", "names"] }
+  // # Default value: unset (the built-in domain gates)
+  // "verifyGates": { "code": ["compile", "test", "sast"], "math": ["substitute-back", "simulate"], "text": ["completeness", "term-consistency"], "research": ["every-claim-sourced"] },
+
+  // ## OPTIONAL external SAST command for the code-security gate. Empty (default) = NO hard dependency: the judge
+  // ## does a model security-review instead. Present = run it (present-use / absent-degrade, never hard-require).
+  // # Setting type: String (a shell command, or "" for none)
+  // # Default value: "" (model security-review, no external tool required)
+  "sastCommand": "",
+
+  // ## Require the SECOND consent gate — the staged diff + a warning for any irreversible side-effect (a migration,
+  // ## an API call, a deploy) — before writing to live files. The human gating the apply IS the load-bearing safety
+  // ## node; turning this off removes it.
+  // # Setting type: Boolean
+  // # Default value: true
+  "applyConsent": true,
+
+  // ## The staging sandbox path (relative to the project) where the board writes its proposal. Nothing reaches live
+  // ## files until verify passes AND you approve the diff — discarding this dir rolls back every staged FILE change.
+  // # Setting type: String (a project-relative path)
+  // # Default value: .coalboard/proposed/
+  "stagingDir": ".coalboard/proposed/",
+
+  // ─── strictness preset (bundles the keys above; individual keys override) ───
+
+  // ## A single dial that sets sensible DEFAULTS for the knobs above — 90% use just this, power users tune keys.
+  // ## relaxed = board off / bypass (non-critical) · standard = fire at grade≥4 or a failed verify, observer on
+  // ## deadlock, standard verify, apply-gate · high = all critical paths, strict verify, pre + apply consent ·
+  // ## nasa = maximum paranoia: board always on critical work, observer ALWAYS (even on consensus), strict + all
+  // ## domain gates, the human gate MANDATORY (pre + apply). The preset LOCKS NOTHING — any key you set explicitly
+  // ## overrides it.
+  // ## ⚠️ "nasa" is the strictest PRESET NAME (trust-nothing, human-signs-off) — it is NOT a claim of NASA-grade
+  // ##    10^-9 failure-rate or 0.01-defects-per-KLOC reliability. CoalBoard improves correctness; no LLM board
+  // ##    delivers a proven reliability number. The name describes the paranoia level, not a guarantee.
+  // # Setting type: String (relaxed, standard, high, nasa)
+  // # Default value: standard
+  "rigor": "standard",
+
+  // ─── self-update (orthogonal to the board — its own off-switch) ───
+
+  // ## How CoalBoard keeps itself current. Silent until a check is due (every updateCheckDays). ask = on the first
+  // ## due session, ask ONCE how to handle updates (then save auto/remind/off); auto = the agent web-checks the
+  // ## latest tag vs the installed version and offers `claude plugin update` (standing consent — the only spend,
+  // ## ~1-2K/check); remind = a free periodic reminder, you run it; off = silent. The HOOK never networks/spends —
+  // ## the version check lives only in the /coalboard:update agent procedure. Independent of the board.
+  // # Setting type: String (ask, auto, remind, off)
+  // # Default value: ask
+  "updateMode": "ask",
+
+  // ## Days between self-update checks/reminders — the throttle window (a persistent stamp fires the nudge at most
+  // ## once per window). Pairs with updateMode (off = no checks regardless of this value).
+  // # Setting type: Integer (range 1-365)
+  // # Default value: 14
+  "updateCheckDays": 14,
+
+  // ─── shared ───
+
+  // ## The language for the consent box, the post-mortem, and the final synthesis (the surfaced result). The lens
+  // ## debate itself runs in English (the workers read the English contract); only the surfaced output is localized.
+  // ## Technical terms (commands, paths, identifiers, model/tier names) stay verbatim in any language.
+  // # Setting type: String (auto, th, en, ja, zh, es)
+  // # Default value: auto (heuristic detection from the environment + project docs)
+  "language": "auto"
+}

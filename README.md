@@ -13,7 +13,7 @@ On an **error-not-allowed** task — security/crypto, a DB/financial migration, 
 - on a deadlock, an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement;
 - everything is staged to `.coalboard/proposed/` and **you sign off** before a single live file changes.
 
-It is **off ~90% of the time** — it engages only on the critical slice, behind a consent gate.
+Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (`/coalboard`) on any hard problem worth several diverse perspectives. Always behind a consent gate.
 
 ## What it guarantees (and what it doesn't)
 
@@ -35,10 +35,10 @@ claude plugin install coalboard@coalboard
 
 ## Configure
 
-Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by project `.claude/`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) Key groups: activation (`coalboardMode`, `criticalPaths`, `triggerConfidence`), the board (`lenses`, `consensusThreshold`, `maxRounds`), verify (`qaStrictness`, `sastCommand`, `applyConsent`), and self-update. See the skill contract for the full set.
+Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by project `.claude/`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) Key groups: activation (`coalboardMode`, `criticalPaths`, `triggerConfidence`), the board (`lenses`, `consensusThreshold`, `maxRounds`), verify (`qaStrictness`, `sastCommand`, `applyConsent`), and self-update. See the skill contract for the full set. A fully-commented template ships at [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json) — copy it to `~/.claude/.coalboard.json` (or your project's `.claude/`) and edit.
 
 ## Part of TheColliery
 
-CoalBoard is the **governance** layer of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
+CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
 
 Zero-dependency, offline, no API keys.

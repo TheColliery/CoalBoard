@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Added
+- **Factory config** (`platform-configs/.coalboard.json`): a fully-commented template for every config key (copy to `~/.claude/.coalboard.json` to tune). `verify.mjs` now validates it against the schema.
+
+### Changed
+- **Scope reframed** — CoalBoard is a general diverse-lens consensus board: the error-not-allowed slice is the primary **auto-trigger** (still cost-disciplined, ~90% asleep), but a **manual `/coalboard`** convenes on any hard problem worth several diverse perspectives. Updated SKILL, command, README, and plugin/marketplace descriptions.
+- Dropped the "governance layer" self-label in the README — it is a consensus & debate board.
+
 ## [0.1.0-beta.1] — 2026-06-19
 
 First public **beta** of the consensus & debate board.
