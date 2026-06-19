@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.8] — 2026-06-20
+
+Dogfood — the per-lens model display regressed: a run condensed it to a bare slash-list ("haiku/sonnet/sonnet/opus") in the narration, and the spawn chips showed only "empirical lens" etc., so you could not tell which model each lens was running on.
+
+### Changed
+- **Each lens's model is now mandated VISIBLE on its spawn.** Lead the worker's label / description with the model (+ effort) — `[haiku] empirical lens`, `[opus] adversary` — so the platform chip shows it (the chip shows the description, not the model). The per-lens → model mapping must be explicit and named, never a bare slash-list divorced from the lens names. (Mirrors the CoalTipple spawn-label rule.)
+
+Deferred: sub4 per-rigor doc · heading-order check · language re-flag · CONTRIBUTING emoji-strip.
+
 ## [1.0.7] — 2026-06-20
 
 Dogfood — the 2nd cost-gate reads like a pre-flight checkpoint but showed only the CONFIG (workers, models, gates, cost), never the TARGET. Added it.
