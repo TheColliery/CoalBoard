@@ -10,6 +10,9 @@ node_modules/
 # Runtime staging (created inside a target project at run-time, never committed)
 .coalboard/
 
+# SkillSpector scan reports (provenance recorded in SECURITY.md; the raw JSON is not shipped)
+skillspector-*.json
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

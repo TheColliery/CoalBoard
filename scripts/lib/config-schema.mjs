@@ -21,22 +21,30 @@ export const CONFIG_SCHEMA = [
   { key: 'coalboardMode', type: 'enum', values: ['ask', 'auto', 'off'], flags: ['-m'], help: 'On a critical task: ask (default — per-instance consent) | auto (activate without asking) | off (never)' },
   { key: 'criticalPaths', type: 'strArr', lower: true, flags: ['--paths'], help: 'AND-gate Layer-1 path fragments (default: auth, payment, migration, security, crypto)' },
   { key: 'criticalImports', type: 'strArr', lower: true, flags: ['--imports'], help: 'AND-gate Layer-1 import names (default: crypto, bcrypt, jsonwebtoken, child_process)' },
+  { key: 'criticalKeywords', type: 'strArr', lower: true, flags: ['--keywords'], help: 'EXTRA Layer-1 keywords ADDED to the built-in seed (additive, never a replacement) — domain terms the seed misses, e.g. "surgical", "trajectory" (default: none added)' },
   { key: 'triggerConfidence', type: 'int', min: 0, max: 100, flags: ['-c'], help: 'AND-gate Layer-2 semantic-classifier threshold 0-100 (default: 90)' },
   { key: 'triggerGradeFloor', type: 'int', min: 1, max: 5, flags: ['-g'], help: 'Board considered at >= this grade, or any sensitive task (reuses the CT grade rubric; default: 4)' },
   { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'Dirs the AND-gate skips so it never false-triggers on vendored code (default: node_modules, .git, dist, vendor, build)' },
   // — the board —
   { key: 'lenses', type: 'strArr', lower: true, flags: ['--lenses'], help: 'Active epistemic lenses (default: data, truth, feeling)' },
   { key: 'consensusThreshold', type: 'int', min: 0, max: 100, flags: ['-t'], help: 'Below this worker-agreement % = deadlock -> summon the out-of-frame sub4 (default: 80)' },
-  { key: 'observerOnMaxStakes', type: 'bool', flags: ['-o'], help: 'Summon sub4 even on consensus when rigor=nasa — same-model agreement is weak evidence (default: true)' },
+  { key: 'observerOnMaxStakes', type: 'bool', flags: ['-o'], help: 'Summon the out-of-frame sub4 even on CONSENSUS (not just on deadlock). The rigor preset sets it (on under nasa, off under standard/high); set it here to force. Same-model agreement is weak evidence' },
   { key: 'maxRounds', type: 'int', min: 1, max: 5, flags: ['-r'], help: '1 = single-turn (max independence); >1 = multi-round cross-examination (less independence). Default 1' },
   { key: 'debateTimeoutSeconds', type: 'int', min: 5, max: 600, flags: ['-d'], help: 'Per-worker/round debate soft cap in seconds (default: 60)' },
   { key: 'subagentTimeoutSeconds', type: 'int', min: 5, max: 3600, flags: ['-s'], help: 'Hard stall-reap: a silent worker past this is treated as failed (default: 150)' },
   { key: 'maxConcurrentSubagents', type: 'int', min: 1, max: 16, flags: ['--concurrency'], help: 'Concurrent worker cap — they share one rate limit (board needs 3-4; default: 4)' },
   { key: 'lensTiers', type: 'obj', noFlag: true, validate: validateLensTiers, help: 'Optional per-role tier/model pin { data | truth | feeling | observer | judge: "model" | ["priority","chain"] }; overrides the inherit-CT default' },
+  // — sharpness levers (the rigor preset sets these; an explicit key overrides) —
+  { key: 'adversaryLens', type: 'bool', flags: ['--adversary'], help: 'Spawn the red-team falsification lens — "find the ONE input that breaks it; could-not-break-it is your only failure" (sharper recall than the show-me skeptic). Adds a worker; rigor sets it (on under high/nasa). Default off' },
+  { key: 'contestedRound', type: 'bool', flags: ['--contested'], help: 'On deadlock, run ONE surgical cross-exam on the CONTESTED point only (feed the counter-claim, not full answers) before sub4 — cross-examination without global anchoring. rigor sets it (on under high/nasa). Default off' },
+  { key: 'diversifyModels', type: 'bool', flags: ['--diversify'], help: 'When lensTiers is unset, spread lenses across model GENERATIONS (e.g. Fable 5 + Claude 4.x) for partial decorrelation, not just cost. rigor sets it (on under nasa). Honest: less than cross-provider. Default off' },
   // — verify / apply —
   { key: 'qaStrictness', type: 'enum', values: ['strict', 'standard', 'off'], flags: ['-q'], help: 'Verify rigor: strict | standard (default) | off' },
   { key: 'verifyGates', type: 'obj', noFlag: true, validate: validateVerifyGates, help: 'Per-domain gate list { code | math | text | research: ["compile","test",...] }; overrides the defaults' },
   { key: 'sastCommand', type: 'str', flags: ['--sast'], help: 'OPTIONAL external SAST command; empty (default) = a model security-review instead (no hard dependency)' },
+  { key: 'tier2Verify', type: 'bool', flags: ['--tier2'], help: 'Ground-truth verification beyond example tests: property-based + fuzz (timeboxed) + differential (vs sub4 blind impl) + metamorphic (no-oracle domains) + mutation (test quality) — non-model ground-truth beats correlated agreement. rigor sets it (on under high/nasa). Default off' },
+  { key: 'fuzzTimeboxSeconds', type: 'int', min: 5, max: 3600, flags: ['--fuzz-timebox'], help: 'Hard per-run cap so tier2Verify stays bounded-cost (default: 60)' },
+  { key: 'formalCommand', type: 'str', flags: ['--formal'], help: 'OPTIONAL external formal-methods command (TLA+/Alloy/SPARK) for the most critical checkable properties; empty (default) = skip (no hard dependency — present-use/absent-degrade)' },
   { key: 'applyConsent', type: 'bool', flags: ['-a'], help: 'Require the 2nd consent gate (the staged diff) before writing to live files (default: true)' },
   { key: 'stagingDir', type: 'str', flags: ['--staging'], help: 'Staging sandbox path, relative to the project (default: .coalboard/proposed/)' },
   // — strictness preset (bundles the above; individual keys override) —
@@ -84,9 +92,9 @@ function validateLensTiers(pins) {
   for (const role of Object.keys(pins)) {
     if (!roles.includes(role)) return `lensTiers: unknown role '${role}' (use ${roles.join('/')})`;
     const val = pins[role];
-    const okString = typeof val === 'string';
-    const okChain = Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string');
-    if (!okString && !okChain) return `lensTiers.${role} must be a model string or a non-empty array of strings`;
+    const okString = typeof val === 'string' && val.trim().length > 0;
+    const okChain = Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string' && m.trim().length > 0);
+    if (!okString && !okChain) return `lensTiers.${role} must be a non-empty model string or a non-empty array of non-empty strings`;
   }
   return null;
 }
@@ -97,7 +105,7 @@ function validateVerifyGates(gates) {
   for (const domain of Object.keys(gates)) {
     if (!domains.includes(domain)) return `verifyGates: unknown domain '${domain}' (use ${domains.join('/')})`;
     const list = gates[domain];
-    if (!Array.isArray(list) || !list.every((g) => typeof g === 'string')) return `verifyGates.${domain} must be an array of gate-name strings`;
+    if (!Array.isArray(list) || list.length === 0 || !list.every((g) => typeof g === 'string' && g.trim().length > 0)) return `verifyGates.${domain} must be a non-empty array of non-empty gate-name strings`;
   }
   return null;
 }

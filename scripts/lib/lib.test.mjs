@@ -29,6 +29,19 @@ test('trigger.isExcluded — vendored/build dirs are excluded', () => {
   assert.equal(isExcluded('src/auth/jwt.ts'), false);
 });
 
+test('trigger — config-robustness: additive keywords, empty-array guards, timing-attack space', () => {
+  // criticalKeywords is ADDITIVE: a custom keyword fires AND the built-in seed still fires
+  assert.equal(detectStatic('process the surgical approval', { criticalKeywords: ['surgical'] }).hit, true, 'custom keyword fires');
+  assert.equal(detectStatic('fix the auth bug', { criticalKeywords: ['surgical'] }).hit, true, 'default seed still fires alongside a custom list');
+  assert.equal(detectStatic('list the readme files', { criticalKeywords: ['surgical'] }).hit, false, 'benign stays benign');
+  // excludePaths: [] must NOT disable exclusions (empty -> fall back to defaults)
+  assert.equal(detectFileWrite('node_modules/auth/x.js', 'import crypto', { excludePaths: [] }).hit, false, 'empty excludePaths -> defaults, node_modules still excluded');
+  // criticalPaths: [''] must NOT disable the gate (empty -> fall back to defaults)
+  assert.equal(detectFileWrite('src/auth/jwt.ts', 'import jsonwebtoken from "x"', { criticalPaths: [''] }).hit, true, "empty-string criticalPaths -> defaults, gate still fires");
+  // "timing attack" (space form — natural language) now fires
+  assert.equal(detectStatic('prevent a timing attack on the login').hit, true, 'space form of timing attack');
+});
+
 test('rigor — presets + explicit override + unknown falls to standard', () => {
   assert.equal(rigorPreset('nasa').observerOnMaxStakes, true);
   assert.equal(rigorPreset('relaxed').active, false);
@@ -36,6 +49,23 @@ test('rigor — presets + explicit override + unknown falls to standard', () => 
   // an explicit key overrides the preset
   assert.equal(applyRigor({ rigor: 'nasa', applyConsent: false }).applyConsent, false);
   assert.equal(applyRigor({ rigor: 'nasa' }).applyConsent, true);
+});
+
+test('rigor — sharpness levers are tiered by preset, explicit key overrides', () => {
+  // standard = cheap default: no extra workers/compute
+  assert.equal(rigorPreset('standard').adversaryLens, false);
+  assert.equal(rigorPreset('standard').tier2Verify, false);
+  // high turns on the adversary lens, ground-truth verify, and the contested round
+  assert.equal(rigorPreset('high').adversaryLens, true);
+  assert.equal(rigorPreset('high').tier2Verify, true);
+  assert.equal(rigorPreset('high').contestedRound, true);
+  assert.equal(rigorPreset('high').diversifyModels, false, 'generation-spread is nasa-only');
+  // nasa = everything, including model-generation diversity
+  assert.equal(rigorPreset('nasa').diversifyModels, true);
+  assert.equal(rigorPreset('nasa').adversaryLens, true);
+  // explicit keys win both ways
+  assert.equal(applyRigor({ rigor: 'standard', adversaryLens: true }).adversaryLens, true, 'force a lever ON at standard');
+  assert.equal(applyRigor({ rigor: 'nasa', tier2Verify: false }).tier2Verify, false, 'force a lever OFF at nasa');
 });
 
 test('secrets.scrub — redacts keys, JWTs, Bearer (space + colon), key=value; leaves prose', () => {
@@ -50,6 +80,42 @@ test('secrets.scrub — redacts keys, JWTs, Bearer (space + colon), key=value; l
   assert.equal(hasSecret('AIzaSyA0123456789abcdefghijklmnopqrstuv0'), true, 'google AIza key');
 });
 
+test('secrets.scrub — board-audit gaps closed (compound env-var, quoted, token-keys, URL-@, JWT-pad, providers)', () => {
+  // CRITICAL: compound underscore env-var names (the \b-boundary miss)
+  assert.match(scrub('AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY'), /AWS_SECRET_ACCESS_KEY=\[REDACTED\]/);
+  assert.match(scrub('DB_PASSWORD=hunter2'), /DB_PASSWORD=\[REDACTED\]/);
+  assert.match(scrub('API_SECRET=abc123def456'), /API_SECRET=\[REDACTED\]/);
+  // HIGH: quoted multi-word value (fully redacted, no inner leak)
+  assert.match(scrub('password="my secret password"'), /password=\[REDACTED\]/);
+  assert.match(scrub("client_secret='multi word value'"), /client_secret=\[REDACTED\]/);
+  assert.ok(!/my secret password/.test(scrub('password="my secret password"')), 'quoted value fully redacted');
+  // HIGH: standalone token: / refresh_token: / oauth_token:
+  assert.match(scrub('token: ya29.a0AfH6SMBxxxxxxabcdef'), /token: \[REDACTED\]/);
+  assert.match(scrub('refresh_token: 1//abcdefghijklmno'), /refresh_token: \[REDACTED\]/);
+  assert.match(scrub('oauth_token: ya29.xxxxxxabcdef'), /oauth_token: \[REDACTED\]/);
+  // HIGH: URL userinfo password containing a literal '@' (no partial leak)
+  assert.match(scrub('postgres://u:pass@word@host/db'), /u:\[REDACTED\]@host/);
+  assert.ok(!/pass@word/.test(scrub('postgres://u:pass@word@host/db')), 'no partial password leak');
+  // MED: JWT with base64 '=' padding
+  assert.match(scrub('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0=.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV'), /\[REDACTED:jwt\]/);
+  // MED: missing provider prefixes
+  assert.match(scrub('hf_abcdefghijklmnopqrstuvwxyz12345678'), /\[REDACTED:hf-token\]/);
+  assert.match(scrub('r8_abcdefghijklmnopqrstuvwxyz1234567890'), /\[REDACTED:replicate-token\]/);
+  assert.match(scrub('GOCSPX-abcdefghijklmnopqrstuvwxyz12'), /\[REDACTED:google-oauth-secret\]/);
+  // no over-redaction of plain prose (no separator+value)
+  assert.equal(hasSecret('the access token rotates daily per policy'), false, 'prose untouched');
+  // HIGH: Authorization: Bearer/Basic with a SHORT token (under the standalone 12-char floor) — no leak
+  assert.ok(!/abc123/.test(scrub('Authorization: Bearer abc123')), 'short bearer token not leaked');
+  assert.match(scrub('Authorization: Bearer abc123'), /Authorization: \[REDACTED\]/);
+  assert.ok(!/YTpiYzpk/.test(scrub('Authorization: Basic YTpiYzpk')), 'short basic token not leaked');
+});
+
+test('secrets.scrub — no catastrophic backtracking (ReDoS guard: returns, does not hang)', () => {
+  assert.equal(typeof scrub('A_'.repeat(20000) + '=value'), 'string');
+  assert.equal(typeof scrub('-----BEGIN X PRIVATE KEY-----' + 'A'.repeat(50000)), 'string');
+  assert.equal(typeof scrub('SECRET'.repeat(5000) + '=x'), 'string');
+});
+
 test('config-schema — validateValue enforces each type/bound; bad input fails loud', () => {
   const byKey = (k) => CONFIG_SCHEMA.find((s) => s.key === k);
   assert.equal(validateValue(byKey('triggerConfidence'), 90), null);
@@ -59,6 +125,14 @@ test('config-schema — validateValue enforces each type/bound; bad input fails 
   assert.ok(validateValue(byKey('coalboardMode'), 'bogus'), 'bad enum fails');
   assert.equal(validateValue(byKey('criticalPaths'), ['auth', 'crypto']), null);
   assert.ok(validateValue(byKey('criticalPaths'), [1, 2]), 'non-string array fails');
+  // sharpness-lever keys validate by type/bound
+  assert.equal(validateValue(byKey('adversaryLens'), true), null);
+  assert.ok(validateValue(byKey('adversaryLens'), 'yes'), 'non-bool fails');
+  assert.equal(validateValue(byKey('tier2Verify'), false), null);
+  assert.equal(validateValue(byKey('fuzzTimeboxSeconds'), 60), null);
+  assert.ok(validateValue(byKey('fuzzTimeboxSeconds'), 4), 'below-min fuzz timebox fails');
+  assert.equal(validateValue(byKey('formalCommand'), ''), null);
+  assert.ok(validateValue(byKey('formalCommand'), 5), 'non-string formal command fails');
 });
 
 test('config-schema — lensTiers + verifyGates validators', () => {
@@ -69,4 +143,9 @@ test('config-schema — lensTiers + verifyGates validators', () => {
   const verifyGates = CONFIG_SCHEMA.find((s) => s.key === 'verifyGates');
   assert.equal(validateValue(verifyGates, { code: ['compile', 'test'] }), null);
   assert.ok(validateValue(verifyGates, { bogusDomain: ['x'] }), 'unknown domain fails');
+  // empty / empty-string entries are NOT usable — must fail loud, not pass as "valid"
+  assert.ok(validateValue(lensTiers, { judge: [''] }), 'empty-string chain entry fails');
+  assert.ok(validateValue(lensTiers, { judge: '' }), 'empty-string pin fails');
+  assert.ok(validateValue(verifyGates, { code: [] }), 'empty gate list fails');
+  assert.ok(validateValue(verifyGates, { code: [''] }), 'empty-string gate fails');
 });

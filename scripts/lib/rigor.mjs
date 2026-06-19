@@ -5,12 +5,16 @@
 
 export const RIGOR_PRESETS = {
   // active: does the board engage on a critical task at all
-  // sub4Trigger: when the out-of-frame solver is summoned
+  // observerOnMaxStakes: summon the out-of-frame sub4 even on CONSENSUS (not just on deadlock)
   // allDomainGates: run every domain verify gate (vs the default subset)
-  relaxed:  { active: false, qaStrictness: 'off',      applyConsent: false, observerOnMaxStakes: false, sub4Trigger: 'off',      allDomainGates: false },
-  standard: { active: true,  qaStrictness: 'standard', applyConsent: true,  observerOnMaxStakes: false, sub4Trigger: 'deadlock', allDomainGates: false },
-  high:     { active: true,  qaStrictness: 'strict',   applyConsent: true,  observerOnMaxStakes: false, sub4Trigger: 'deadlock', allDomainGates: false },
-  nasa:     { active: true,  qaStrictness: 'strict',   applyConsent: true,  observerOnMaxStakes: true,  sub4Trigger: 'always',   allDomainGates: true },
+  // adversaryLens: spawn the red-team falsification lens (find-the-breaking-input)
+  // tier2Verify: property/fuzz/differential/metamorphic/mutation ground-truth gates
+  // contestedRound: one surgical contested-point cross-exam on deadlock before sub4
+  // diversifyModels: spread lenses across model generations when lensTiers unset
+  relaxed:  { active: false, qaStrictness: 'off',      applyConsent: false, observerOnMaxStakes: false, allDomainGates: false, adversaryLens: false, tier2Verify: false, contestedRound: false, diversifyModels: false },
+  standard: { active: true,  qaStrictness: 'standard', applyConsent: true,  observerOnMaxStakes: false, allDomainGates: false, adversaryLens: false, tier2Verify: false, contestedRound: false, diversifyModels: false },
+  high:     { active: true,  qaStrictness: 'strict',   applyConsent: true,  observerOnMaxStakes: false, allDomainGates: false, adversaryLens: true,  tier2Verify: true,  contestedRound: true,  diversifyModels: false },
+  nasa:     { active: true,  qaStrictness: 'strict',   applyConsent: true,  observerOnMaxStakes: true,  allDomainGates: true,  adversaryLens: true,  tier2Verify: true,  contestedRound: true,  diversifyModels: true },
 };
 
 export function rigorPreset(name) {
@@ -21,7 +25,10 @@ export function rigorPreset(name) {
 // Resolve the rigor-controlled knobs: start from the preset, then let an explicit
 // config key win (preset = default, explicit override). Keys NOT controlled by rigor
 // (consensusThreshold, maxRounds, …) come straight from the merged config elsewhere.
-const RIGOR_CONTROLLED = ['qaStrictness', 'applyConsent', 'observerOnMaxStakes'];
+// `active` + `allDomainGates` are preset-SEMANTIC — the agent applies them via the SKILL
+// contract, so they are intentionally NOT config keys and NOT in RIGOR_CONTROLLED
+// (active ≈ coalboardMode, allDomainGates ≈ qaStrictness:strict — a key would just duplicate those).
+const RIGOR_CONTROLLED = ['qaStrictness', 'applyConsent', 'observerOnMaxStakes', 'adversaryLens', 'tier2Verify', 'contestedRound', 'diversifyModels'];
 
 export function applyRigor(cfg = {}) {
   const eff = { ...rigorPreset(cfg.rigor) };

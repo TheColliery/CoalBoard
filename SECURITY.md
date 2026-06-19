@@ -2,7 +2,22 @@
 
 CoalBoard is verified under the same framework as **[CoalMine](https://github.com/HetCreep/CoalMine)** and **[CoalTipple](https://github.com/TheColliery/CoalTipple)**: the execution hook follows the [Phoenix-13 commandments](https://github.com/TheColliery/.github/blob/main/hooks-safety.md), the build is reproducible from source, and the design is security-first.
 
-> **Beta note (`v0.1.0-beta.1`):** the primary assurance below is **structural**. An independent NVIDIA SkillSpector scan has **not** been run on this beta yet — it will be run and its provenance recorded here before the first stable (`1.0`) release. We do not claim a scan that has not happened.
+## SkillSpector scan
+
+Last scan: **NVIDIA SkillSpector v2.2.3, 2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan covers the **current shipped dist** (the max-sharpness + anti-zombie hardening included); at the `1.0.0` tag only `plugin.json`'s version and the README change, neither a scanned surface.
+
+**Read the score in context.** The static stage scored **100/100**; the LLM **semantic** stage was rate-limited (HTTP 429) and fell back to **static-only**, which is pattern-match-based and false-positive-prone (it flags strings without the skill-contract context). **Every finding was verified false-positive** — re-run the semantic stage when the limit clears for a context-aware score. The verifications:
+
+| finding(s) | why it is a false positive |
+|---|---|
+| RA1 ×6 — *self-modification* (self-update) | The series self-update is consent-gated: the **hook only schedules** (never networks), the **agent** offers the platform's own `claude plugin update`. The skill never rewrites its own files. |
+| TM1 — *tool-parameter abuse* (`rm -rf`) | The matched text **instructs the agent to lint-for and skip-flag** `rm -rf` in reviewed code — a defensive rule, the opposite of using it. |
+| RA2 — *session persistence* (`.coalboard/proposed/`) | The staging dir is the **propose-not-execute** safety mechanism (nothing reaches live until the human approves), not attacker persistence. |
+| EA2 — *autonomous decision* | The cited snippet itself mandates **"default ASK, via the question-box"** — the human consent gate is present. |
+| EA3 ×2 — *scope creep* ("not limited to") | The manual `/coalboard` breadth is the **deliberate, consent-gated** two-scope design (auto narrow, manual broad). |
+| SQP-1/2, SDI-2 ×2 | `/coalboard` is a **manual** command (not accidentally triggerable); "no executable code" is wrong (`hooks/coalboard-conductor.js` ships in the dist); the git tag-check is a read-only, by-design lookup. |
+
+(Exact per-category counts shift slightly between static runs — the latest re-scan returned 11 findings; the categories above and the all-false-positive verdict are stable.) This matches the family baseline (CoalMine 58/100, CoalTipple 10/100 — likewise all-false-positive). The report JSON is not shipped.
 
 ## Reporting a vulnerability
 

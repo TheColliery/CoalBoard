@@ -2,14 +2,20 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [1.0.0] — 2026-06-19
+
+First **stable** release — the board's contract, config, and honest frame are settled, and it is benchmarked on two platforms.
 
 ### Added
-- **Factory config** (`platform-configs/.coalboard.json`): a fully-commented template for every config key (copy to `~/.claude/.coalboard.json` to tune). `verify.mjs` now validates it against the schema.
+- **Max-sharpness levers** (rigor-gated; bounded-cost preserved): `adversaryLens` (a red-team falsification lens), `tier2Verify` (property / fuzz / differential / metamorphic / mutation ground-truth gates) with `fuzzTimeboxSeconds`, `formalCommand` (optional TLA+/Alloy/SPARK), `contestedRound` (one surgical contested-point cross-exam on deadlock), and `diversifyModels` (spread lenses across model generations). The `rigor` preset tiers them (standard off · high/nasa on). Plus always-on judge discipline: calibrated lens output, a domain failure-taxonomy checklist, a disconfirmation + pre-mortem judge, a completeness critic, and honest-ceiling routing.
+- **Factory config** (`platform-configs/.coalboard.json`): a fully-commented template for every key; `verify.mjs` validates it against the schema.
+- **Benchmark** (`eval/`): with-the-board vs without on both Claude Code (reliability) and Antigravity (cross-vendor), with an honest method + per-task scoring.
+- **SkillSpector scan** recorded in `SECURITY.md` (every finding verified false-positive).
 
 ### Changed
-- **Scope reframed** — CoalBoard is a general diverse-lens consensus board: the error-not-allowed slice is the primary **auto-trigger** (still cost-disciplined, ~90% asleep), but a **manual `/coalboard`** convenes on any hard problem worth several diverse perspectives. Updated SKILL, command, README, and plugin/marketplace descriptions.
-- Dropped the "governance layer" self-label in the README — it is a consensus & debate board.
+- **Scope reframed** — a general diverse-lens consensus board: the error-not-allowed slice is the primary **auto-trigger** (cost-disciplined, ~90% asleep); a **manual `/coalboard`** convenes on any hard problem worth several diverse perspectives.
+- **No-zombie hardening** — each lens is collected then explicitly released; a returned-but-still-running worker is a zombie and is stopped, and the judge confirms none is alive before proceeding (a worker legitimately awaiting a permission is not reaped).
+- Dropped the "governance layer" self-label.
 
 ## [0.1.0-beta.1] — 2026-06-19
 

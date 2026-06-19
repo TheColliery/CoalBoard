@@ -7,7 +7,7 @@
   // (no whack-a-mole token-bleed) + ZERO-BREAKAGE (work is staged, never touches live files until verified +
   // approved). It IMPROVES correctness; it does NOT claim a reliability number.
   //
-  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.coalboard.json (per-project,
+  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.claude/.coalboard.json (per-project,
   // overrides global). Absent = these defaults apply. The conductor + skill read the merged config.
 
   // ─── activation / trigger ───
@@ -29,6 +29,13 @@
   // # Setting type: String[]
   // # Default value: crypto, bcrypt, jsonwebtoken, child_process
   "criticalImports": ["crypto", "bcrypt", "jsonwebtoken", "child_process"],
+
+  // ## EXTRA Layer-1 keywords ADDED to the built-in seed — ADDITIVE: your entries extend the
+  // ## defaults, they never replace them (a config can never silently drop a built-in keyword).
+  // ## Use for domain terms the English seed misses (e.g. "surgical", "trajectory", "actuarial").
+  // # Setting type: String[]
+  // # Default value: [] (nothing added; the built-in seed applies)
+  "criticalKeywords": [],
 
   // ## AND-gate Layer-2 — the semantic-classifier confidence (0-100) the task must clear to count as critical.
   // ## HIGHER = fewer false triggers (the board stays asleep unless it is quite sure), but more false-negatives
@@ -68,12 +75,12 @@
   // # Default value: 80
   "consensusThreshold": 80,
 
-  // ## Summon the out-of-frame observer EVEN on apparent consensus when rigor = nasa. Same-model agreement is weak
-  // ## evidence (a shared blind spot LOOKS like agreement), so the most critical work gets the independent check
-  // ## regardless of whether the lenses agreed.
+  // ## Summon the out-of-frame sub4 EVEN on apparent consensus (not just on deadlock). The rigor preset sets it
+  // ## (ON under nasa, off under standard/high); set it here to force either way. Same-model agreement is weak
+  // ## evidence (a shared blind spot LOOKS like agreement), so the most critical work gets the independent check.
   // # Setting type: Boolean
-  // # Default value: true
-  "observerOnMaxStakes": true,
+  // # Default value: false (matches the shipped rigor:standard; rigor:nasa flips it on via the preset)
+  "observerOnMaxStakes": false,
 
   // ## Debate rounds. 1 = single-turn parallel = MAXIMUM independence (each lens works blind, never anchors on
   // ## another's answer) — recommended for critical work. >1 = multi-round cross-examination (round 2 sees the
@@ -106,6 +113,30 @@
   // # Default value: unset (inherit CoalTipple's alias-floor + pins)
   // "lensTiers": { "data": "haiku", "truth": "sonnet", "feeling": "haiku", "observer": "opus", "judge": "opus" },
 
+  // ─── sharpness levers (the rigor preset sets these; set a key here to force it either way) ───
+
+  // ## Spawn the red-team FALSIFICATION lens alongside the epistemic lenses. Its mandate: find the ONE input/case/
+  // ## sequence where the work FAILS — "could not break it" is its only failure mode. Sharper recall than the show-me
+  // ## skeptic (it HUNTS the breaking case, not just demands evidence). Adds a worker. The rigor preset sets it on
+  // ## under high/nasa; setting it here forces it either way.
+  // # Setting type: Boolean
+  // # Default value: false (matches rigor:standard; high/nasa turn it on via the preset)
+  "adversaryLens": false,
+
+  // ## On a DEADLOCK, run ONE surgical cross-exam on the contested point BEFORE summoning sub4: feed the two
+  // ## disagreeing lenses only the counter-claim (never their full answers) — "defend or concede." Cross-examination
+  // ## on the contested point without re-anchoring the whole board. The rigor preset sets it on under high/nasa.
+  // # Setting type: Boolean
+  // # Default value: false (matches rigor:standard; high/nasa turn it on)
+  "contestedRound": false,
+
+  // ## When lensTiers is UNSET, deliberately spread the lenses across model GENERATIONS (e.g. Fable 5 alongside the
+  // ## Claude 4.x line) — different training runs share fewer blind spots, so it is real (if partial) decorrelation,
+  // ## not just a cost knob. Honest ceiling: less than cross-provider independence. The rigor preset sets it on under nasa.
+  // # Setting type: Boolean
+  // # Default value: false (matches rigor:standard/high; nasa turns it on)
+  "diversifyModels": false,
+
   // ─── verify / apply ───
 
   // ## How rigorously the JUDGE verifies the synthesized result before staging (the judge RUNS the check — never
@@ -126,6 +157,27 @@
   // # Setting type: String (a shell command, or "" for none)
   // # Default value: "" (model security-review, no external tool required)
   "sastCommand": "",
+
+  // ## Ground-truth verification beyond example tests (non-model evidence beats a correlated vote): property-based +
+  // ## fuzz (timeboxed) + differential (diff outputs vs sub4's blind impl) + metamorphic (no-oracle domains: math/ML/
+  // ## translation) + mutation (is the test suite itself any good?). A fuzzer finds the input-space corner finite
+  // ## reasoning misses. The rigor preset sets it on under high/nasa.
+  // # Setting type: Boolean
+  // # Default value: false (matches rigor:standard; high/nasa turn it on)
+  "tier2Verify": false,
+
+  // ## Hard per-run cap (seconds) on each property/fuzz run so tier2Verify stays BOUNDED-COST — "max sharpness that
+  // ## still converges", never an unbounded fuzz.
+  // # Setting type: Integer (range 5-3600)
+  // # Default value: 60
+  "fuzzTimeboxSeconds": 60,
+
+  // ## OPTIONAL external formal-methods command (TLA+/Alloy model-check, SPARK proof) for the most critical CHECKABLE
+  // ## properties — the guarantee then comes FROM the tool, not the vote. Empty = skip (no hard dependency:
+  // ## present-use / absent-degrade, like sastCommand). Typically used only at rigor:nasa.
+  // # Setting type: String (a shell command, or "" for none)
+  // # Default value: "" (no formal tool; the board's debate + ground-truth gates apply)
+  "formalCommand": "",
 
   // ## Require the SECOND consent gate — the staged diff + a warning for any irreversible side-effect (a migration,
   // ## an API call, a deploy) — before writing to live files. The human gating the apply IS the load-bearing safety

@@ -7,8 +7,8 @@
 const PATTERNS = [
   // PEM private keys (whole block)
   [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, '[REDACTED:private-key]'],
-  // JWTs (three base64url segments)
-  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED:jwt]'],
+  // JWTs (three base64url segments; '=' allowed so base64-PADDED segments still match)
+  [/\beyJ[A-Za-z0-9_=-]{8,}\.[A-Za-z0-9_=-]{8,}\.[A-Za-z0-9_=-]{8,}/g, '[REDACTED:jwt]'],
   // Authorization-header form: a scheme followed by a SPACE then the credential
   // (the `key=value` pattern below only catches `:`/`=` separators).
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi, '$1 [REDACTED]'],
@@ -24,10 +24,23 @@ const PATTERNS = [
   [/\bAIza[0-9A-Za-z_-]{35}/g, '[REDACTED:google-key]'],
   // GitHub fine-grained PAT
   [/\bgithub_pat_[0-9A-Za-z_]{40,}\b/g, '[REDACTED:gh-pat]'],
-  // A credential in a URL userinfo (DB connection string / basic-auth-in-URL) — redact the password
-  [/(:\/\/[^\s:/@]+:)[^\s@/]+(@)/g, '$1[REDACTED]$2'],
-  // key=value / key: value for sensitive names (keep the name, drop the value)
-  [/\b(bearer|authorization|api[_-]?key|access[_-]?token|secret|client[_-]?secret|password|passwd|pwd)\b(\s*[:=]\s*)(["']?)[^\s"']+\3/gi, '$1$2[REDACTED]'],
+  // HuggingFace, Replicate, Google OAuth client-secret prefixes
+  [/\bhf_[A-Za-z0-9]{20,}\b/g, '[REDACTED:hf-token]'],
+  [/\br8_[A-Za-z0-9]{20,}\b/g, '[REDACTED:replicate-token]'],
+  [/\bGOCSPX-[A-Za-z0-9_-]{20,}/g, '[REDACTED:google-oauth-secret]'],
+  // A credential in a URL userinfo — redact the password. `[^\s/]+` (greedy, allows '@')
+  // backtracks to the LAST '@' before the path, so a password containing a literal '@'
+  // (e.g. pass@word) is fully redacted, not partially.
+  [/(:\/\/[^\s:/@]+:)[^\s/]+(@)/g, '$1[REDACTED]$2'],
+  // key=value / key: value for a sensitive name — keep the name, drop the value. Two fixes
+  // over a naive \bsecret\b: (1) a lookbehind + an underscore/hyphen-delimited prefix/suffix
+  // so a keyword EMBEDDED in a compound name matches (AWS_SECRET_ACCESS_KEY=, DB_PASSWORD=);
+  // (2) the value branch accepts a QUOTED multi-word value ("my secret pw") as well as an
+  // unquoted token. The {0,8} reps bound the work (no catastrophic backtracking).
+  // The value branch carries an OPTIONAL auth-scheme prefix (Bearer/Basic/…) so the WHOLE
+  // credential is redacted, not just the scheme word — `Authorization: Bearer <short-token>`
+  // (a token under the standalone-Bearer 12-char floor) used to leave the token exposed.
+  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})(\s*[:=]\s*)(?:(?:bearer|basic|digest|token)\s+)?(?:"[^"]*"|'[^']*'|[^\s"']+)/gi, '$1$2[REDACTED]'],
 ];
 
 // Redact credential-shaped substrings in `text`. Returns a scrubbed copy.

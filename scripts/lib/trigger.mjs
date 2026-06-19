@@ -16,7 +16,7 @@ export const DEFAULT_CRITICAL_IMPORTS = ['crypto', 'bcrypt', 'jsonwebtoken', 'ch
 // A small built-in seed (English). The model does the real, language-agnostic read.
 export const DEFAULT_CRITICAL_KEYWORDS = [
   'auth', 'authentication', 'authorization', 'crypto', 'encrypt', 'decrypt', 'password',
-  'secret', 'token', 'session', 'migration', 'ledger', 'payment', 'timing-attack',
+  'secret', 'token', 'session', 'migration', 'ledger', 'payment', 'timing-attack', 'timing attack',
   'constant-time', 'race condition', 'mutex', 'deadlock', 'rocket', 'trajectory', 'proof',
 ];
 const DEFAULT_EXCLUDE = ['node_modules', '.git', 'dist', 'vendor', 'build'];
@@ -27,22 +27,41 @@ function matched(text, list) {
   return list.filter((f) => f && t.includes(String(f).toLowerCase()));
 }
 
+// Resolve a config list: use it ONLY if it has >=1 non-empty entry, else the default.
+// An empty array or an all-'' array means "fall back to defaults", never "match nothing" —
+// so `excludePaths: []` cannot silently disable exclusions and `criticalPaths: ['']`
+// cannot silently disable the gate.
+function cfgList(v, dflt) {
+  if (!Array.isArray(v)) return dflt;
+  const clean = v.filter(Boolean);
+  return clean.length ? clean : dflt;
+}
+
+// Critical keywords are ADDITIVE: a user's `criticalKeywords` EXTEND the built-in seed
+// (a config cannot silently DROP a default keyword by overriding the list).
+function keywordList(v) {
+  const extra = Array.isArray(v) ? v.filter(Boolean) : [];
+  return extra.length ? [...DEFAULT_CRITICAL_KEYWORDS, ...extra] : DEFAULT_CRITICAL_KEYWORDS;
+}
+
 // Is this file path inside an excluded dir? (so the gate never fires on vendored code)
 export function isExcluded(filePath, excludePaths = DEFAULT_EXCLUDE) {
+  const list = cfgList(excludePaths, DEFAULT_EXCLUDE);
   const p = String(filePath || '').replace(/\\/g, '/').toLowerCase();
-  return excludePaths.some((d) => d && (p.includes(`/${String(d).toLowerCase()}/`) || p.startsWith(`${String(d).toLowerCase()}/`)));
+  return list.some((d) => d && (p.includes(`/${String(d).toLowerCase()}/`) || p.startsWith(`${String(d).toLowerCase()}/`)));
 }
 
 // Detect the Layer-1 static signal in a piece of text (a prompt, or a file's content).
-// `cfg` may carry criticalPaths / criticalImports / excludePaths / language overrides.
+// `cfg` may carry criticalPaths / criticalImports / criticalKeywords / excludePaths / language overrides.
 // Returns { hit: boolean, reasons: string[] } — reasons are short, human-readable.
 export function detectStatic(text, cfg = {}) {
-  const paths = Array.isArray(cfg.criticalPaths) ? cfg.criticalPaths : DEFAULT_CRITICAL_PATHS;
-  const imports = Array.isArray(cfg.criticalImports) ? cfg.criticalImports : DEFAULT_CRITICAL_IMPORTS;
+  const paths = cfgList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
+  const imports = cfgList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
+  const keywords = keywordList(cfg.criticalKeywords);
   const reasons = [];
   const pHit = matched(text, paths);
   const iHit = matched(text, imports);
-  const kHit = matched(text, DEFAULT_CRITICAL_KEYWORDS);
+  const kHit = matched(text, keywords);
   if (pHit.length) reasons.push(`critical path: ${pHit.join(', ')}`);
   if (iHit.length) reasons.push(`critical import: ${iHit.join(', ')}`);
   if (kHit.length) reasons.push(`critical keyword: ${[...new Set(kHit)].slice(0, 6).join(', ')}`);
@@ -53,11 +72,11 @@ export function detectStatic(text, cfg = {}) {
 // critical PATH *and* a critical IMPORT together (a higher-confidence Layer-1 hit than
 // a prompt keyword). Returns { hit, reasons } where hit requires BOTH path and import.
 export function detectFileWrite(filePath, content, cfg = {}) {
-  if (isExcluded(filePath, Array.isArray(cfg.excludePaths) ? cfg.excludePaths : DEFAULT_EXCLUDE)) {
+  if (isExcluded(filePath, cfg.excludePaths)) {
     return { hit: false, reasons: [] };
   }
-  const paths = Array.isArray(cfg.criticalPaths) ? cfg.criticalPaths : DEFAULT_CRITICAL_PATHS;
-  const imports = Array.isArray(cfg.criticalImports) ? cfg.criticalImports : DEFAULT_CRITICAL_IMPORTS;
+  const paths = cfgList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
+  const imports = cfgList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
   const pHit = matched(filePath, paths);
   const iHit = matched(content, imports);
   if (pHit.length && iHit.length) {

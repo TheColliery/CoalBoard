@@ -15,11 +15,14 @@ const path = require('path');
 
 const D_PATHS = ['auth', 'payment', 'migration', 'security', 'crypto'];
 const D_IMPORTS = ['crypto', 'bcrypt', 'jsonwebtoken', 'child_process'];
-const D_KEYWORDS = ['auth', 'authentication', 'authorization', 'crypto', 'encrypt', 'decrypt', 'password', 'secret', 'token', 'session', 'migration', 'ledger', 'payment', 'timing-attack', 'constant-time', 'race condition', 'mutex', 'deadlock', 'rocket', 'trajectory', 'proof'];
+const D_KEYWORDS = ['auth', 'authentication', 'authorization', 'crypto', 'encrypt', 'decrypt', 'password', 'secret', 'token', 'session', 'migration', 'ledger', 'payment', 'timing-attack', 'timing attack', 'constant-time', 'race condition', 'mutex', 'deadlock', 'rocket', 'trajectory', 'proof'];
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
 function lc(s) { return String(s == null ? '' : s).toLowerCase(); }
 function matched(text, list) { const t = lc(text); return list.filter((f) => f && t.includes(lc(f))); }
+// Empty/all-'' config list -> fall back to the default (never "match nothing"); keywords are ADDITIVE.
+function cfgList(v, d) { if (!Array.isArray(v)) return d; const c = v.filter(Boolean); return c.length ? c : d; }
+function kwList(v) { const e = Array.isArray(v) ? v.filter(Boolean) : []; return e.length ? D_KEYWORDS.concat(e) : D_KEYWORDS; }
 
 // String-aware JSONC strip (the CoalMine #12 fix: a value ending in a backslash before a
 // later // must not desync the comment stripper). Guards the result to a plain object.
@@ -47,15 +50,15 @@ function boardOff(cfg) {
 }
 
 function detect(prompt, cfg) {
-  const paths = Array.isArray(cfg.criticalPaths) ? cfg.criticalPaths : D_PATHS;
-  const imports = Array.isArray(cfg.criticalImports) ? cfg.criticalImports : D_IMPORTS;
+  const paths = cfgList(cfg.criticalPaths, D_PATHS);
+  const imports = cfgList(cfg.criticalImports, D_IMPORTS);
   const reasons = [];
   const p = matched(prompt, paths);
   const i = matched(prompt, imports);
-  const k = matched(prompt, D_KEYWORDS);
+  const k = matched(prompt, kwList(cfg.criticalKeywords));
   if (p.length) reasons.push('path:' + p.join('/'));
   if (i.length) reasons.push('import:' + i.join('/'));
-  if (k.length) reasons.push('keyword:' + Array.from(new Set(k)).slice(0, 5).join('/'));
+  if (k.length) reasons.push('keyword:' + Array.from(new Set(k)).slice(0, 6).join('/'));
   return reasons;
 }
 
@@ -100,7 +103,7 @@ function main() {
   }
 
   // SessionStart (and any non-prompt event): the board contract + self-update when due.
-  let msg = "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved.";
+  let msg = "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
     msg += ' [self-update due] Offer the /coalboard:update check (compare the latest git tag to the installed version, then offer `claude plugin update`). Consent-gated; the hook only scheduled it.';
   }
