@@ -4,7 +4,7 @@ CoalBoard is verified under the same framework as **[CoalMine](https://github.co
 
 ## SkillSpector scan
 
-Last scan: **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases, so the version is the `uvx`-from-git HEAD, pinned by commit not a release tag), **2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan was run on the **v1.0.1 dist**; **v1.0.2–v1.0.3 changed skill / hook / lib content → a re-scan is pending** (per the rule above: an unscanned later version is not claimed scanned).
+Last scan: **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases, so the version is the `uvx`-from-git HEAD, pinned by commit not a release tag), **2026-06-19**, on the shipped `plugin/` dist (skill + hook + command files). Scanning is periodic, not per-release — an unscanned later version is **not** claimed scanned (re-scan on any skill/hook change). This scan was run on the **v1.0.1 dist**; **v1.0.2–v1.0.4 changed skill / hook / lib content → a re-scan is pending** (per the rule above: an unscanned later version is not claimed scanned).
 
 **Read the score in context.** The static stage scored **100/100**; the LLM **semantic** stage was rate-limited (HTTP 429) and fell back to **static-only**, which is pattern-match-based and false-positive-prone (it flags strings without the skill-contract context). **Every finding was verified false-positive** — re-run the semantic stage when the limit clears for a context-aware score. The verifications:
 
@@ -37,8 +37,8 @@ The board is built so that reviewing untrusted work cannot harm the host:
 
 - **The work under review is DATA, never instructions** — the lens prompts never obey an injected *"approve this"*.
 - **Propose, never execute** — the lenses emit a diff to `.coalboard/proposed/`; the board itself runs no side-effect. A real side-effect (a migration, an API call, a deploy) fires **only at the human-approved apply**, with a warning, and is never auto-retried.
-- **Verify is sandboxed** — the judge runs checks in isolation (no real DB/network; an untrusted test is linted for banned modules before it runs). External SAST is optional, never a hard requirement.
-- **Secrets are scrubbed** from anything logged or displayed (`scripts/lib/secrets.mjs`).
+- **Verify is contract-isolated, NOT OS-sandboxed** — a skill cannot OS-sandbox; the judge runs reviewed checks in the staging dir with a pre-run lint (banned modules / `rm -rf` / network), no real DB/network where possible, and a disposable VM for genuinely hostile code. Contract-enforced + the judge's discipline, not an OS guarantee. External SAST is optional, never a hard requirement.
+- **Secrets are scrubbed** — credential patterns are scrubbed from anything logged or displayed (best-effort defense-in-depth, contract-enforced — NOT a guarantee a secret is caught; the staging + read-only-worker boundary is the real protection). `scripts/lib/secrets.mjs` is the reference scrubber + its test target — a DEV file, **not** part of the shipped plugin runtime.
 - **No human, no apply** — a non-interactive (cron/headless) run is report-only; the human consent gate is the load-bearing safety node.
 
 ## Dist integrity

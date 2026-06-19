@@ -2,7 +2,7 @@
 
 > A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
 
-**Status: `v1.0.3` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
+**Status: `v1.0.4` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
 
 ## What it is
 
@@ -21,6 +21,8 @@ CoalBoard is **NASA-inspired in structure** (redundancy + design-diversity + hum
 
 1. **Bounded cost** — a solo agent thrashing on a hard bug is an unbounded token-bleed; the board converges (single-turn, judge-final, human-escape), so its cost is high but **predictable and capped**. Pay a known premium to cap the tail.
 2. **Zero-breakage** — staging + propose-not-execute means the live workspace is never touched until verified *and* approved (a side-effect — a run migration, an API call — is gated behind your approval, never executed during the debate).
+
+Both guarantees are **contract-enforced** — the board's staging discipline + your sign-off — **not** an OS sandbox; a skill cannot OS-enforce. The human gate is the load-bearing node.
 
 It **improves** correctness; it does **not** claim a defect rate or a reliability figure (an LLM ensemble is probabilistic, not formally proven — and `10⁻⁹` is unverifiable by any system). It gets *more accurate as the underlying models improve*, for free — the structure is model-agnostic.
 

@@ -159,6 +159,7 @@ test('config-schema — validateValue enforces each type/bound; bad input fails 
   assert.equal(validateValue(byKey('lenses'), ['data', 'truth']), null);
   assert.ok(validateValue(byKey('lenses'), ['dat']), "a typo'd lens name fails");
   assert.ok(validateValue(byKey('lenses'), ['data', 'bogus']), 'one bad lens in the list fails');
+  assert.ok(validateValue(byKey('lenses'), []), 'empty lenses list fails — a value-constrained strArr must be non-empty (no empty board)');
   assert.equal(validateValue(byKey('criticalPaths'), ['anything', 'goes']), null, 'an unconstrained strArr still accepts any string');
   // sharpness-lever keys validate by type/bound
   assert.equal(validateValue(byKey('adversaryLens'), true), null);

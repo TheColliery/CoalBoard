@@ -25,7 +25,8 @@
   // # Default value: auth, payment, migration, security, crypto
   "criticalPaths": ["auth", "payment", "migration", "security", "crypto"],
 
-  // ## AND-gate Layer-1 import names — importing one of these is the other half of the path signal.
+  // ## Layer-1 import names — a danger signal. In the (optional) file-write backstop it pairs WITH a critical path
+  // ## (path AND import); in a PROMPT it counts on its own (OR with paths/keywords).
   // # Setting type: String[]
   // # Default value: crypto, bcrypt, jsonwebtoken, child_process
   "criticalImports": ["crypto", "bcrypt", "jsonwebtoken", "child_process"],
@@ -52,6 +53,8 @@
   "triggerGradeFloor": 4,
 
   // ## Dirs the AND-gate SKIPS so it never false-triggers on vendored / generated code you did not write.
+  // ## NOTE: applies ONLY to the OPTIONAL PreToolUse file-write backstop — NOT wired by the default hooks.json
+  // ## (the default board triggers on the PROMPT, not file-writes). RESERVED until you wire that backstop.
   // # Setting type: String[]
   // # Default value: node_modules, .git, dist, vendor, build
   "excludePaths": ["node_modules", ".git", "dist", "vendor", "build"],

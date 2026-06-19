@@ -79,6 +79,17 @@ test('multi-line ENGLISH critical prompt -> CRITICAL signal but NO non-English n
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('emoji in an English prompt -> CRITICAL signal but NO non-English nudge (emoji guard, round-3 #7)', () => {
+  const tmp = mk();
+  try {
+    // emoji built from a code point (no literal in source); only non-Latin LETTERS should trigger the nudge
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug ' + String.fromCodePoint(0x1F600) }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /CRITICAL signal/);
+    assert.doesNotMatch(r.stdout, /non-English/, 'an emoji must NOT trigger the non-English nudge (only non-Latin letters do)');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('coalboardMode:off -> fully silent on every event', () => {
   const tmp = mk();
   try {

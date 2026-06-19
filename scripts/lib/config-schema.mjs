@@ -77,6 +77,7 @@ export function validateValue(spec, v) {
     case 'strArr': {
       if (!Array.isArray(v) || !v.every((x) => typeof x === 'string')) return 'must be an array of strings';
       if (spec.values) {
+        if (v.length === 0) return `must list at least one of: ${spec.values.join(', ')} (an empty list = no board)`;
         const allowed = spec.values.map((s) => s.toLowerCase());
         const bad = v.find((x) => !allowed.includes(x.toLowerCase()));
         if (bad != null) return `contains '${bad}' — each item must be one of: ${spec.values.join(', ')}`;

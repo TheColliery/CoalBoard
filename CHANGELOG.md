@@ -2,6 +2,26 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.4] — 2026-06-20
+
+Round-3 self-audit (nasa, whole repo) — the board again caught a bug its green gate + 20 tests missed (the non-English nudge false-firing on emoji) and REFUTED its own "Fable 5 is fictional" lens by ground truth (the re-route failure proved the model exists; data + feeling shared a training-cutoff blind spot — the Knight-Leveson case the README itself describes).
+
+### Fixed
+- **conductor `hasNonLatin` false-fired on emoji** (and any supplementary / symbol char) → the "non-English" nudge fired on plain English. Rewritten to flag only a non-LATIN LETTER (Unicode property escapes; strips Latin + every non-letter incl emoji + C0). Regression test added.
+- **`updateDue` reported "due" every session when `~/.claude` was absent** — the stamp write failed silently. Now `mkdirSync` first.
+- **`lenses: []` passed the schema → empty board.** A value-constrained `strArr` (lenses) must now be non-empty. Test added.
+- **docs vs code (SECURITY.md / README):** "verify is sandboxed" → **contract-isolated, NOT OS-sandboxed**; "secrets scrubbed (`secrets.mjs`)" clarified — `secrets.mjs` is a DEV reference file, not shipped runtime; both guarantees labeled contract-enforced, not OS-enforced.
+- **`excludePaths` documented as RESERVED** — it feeds only the optional PreToolUse backstop, which the default `hooks.json` does not wire.
+- **`verify.mjs` now cross-checks** that the `plugin.json` version has a matching CHANGELOG entry (a doc-transition gate).
+
+### Changed
+- **Worker spawn-failure is now CLASSIFIED:** a GONE / unavailable model → re-route immediately; a rate-limit / quota → wait for the reset then retry (bounded), else re-route — never let a lens silently die, never re-pick a known-unavailable model (the Fable-5 lesson). diversifyModels falls back to an available generation.
+- **Cross-key safety rule:** `applyConsent:false` under `coalboardMode:auto` (no human gate) is refused; `rigor:relaxed` wins over auto for auto-engagement.
+- **Step 4 wording:** run reviewed checks from the staging / temp dir; the fail-escape climbs ONCE.
+- factory config comment clarity (`excludePaths` scope; `criticalImports` AND-in-the-backstop vs OR-in-a-prompt).
+
+Honest: SkillSpector re-scan still pending (v1.0.1 baseline). 4 README claims (a model name, two links, the install syntax, the org-landing version) flagged unverified — need a live fetch.
+
 ## [1.0.3] — 2026-06-19
 
 Round-2 self-audit (the board on its own repo) + the queued dogfood points. The board surfaced a real **HIGH** bug its own green gate + 19 tests missed — three lenses disagreed on the direction, the judge RAN it to adjudicate (and refuted a lens that mis-claimed the opposite).

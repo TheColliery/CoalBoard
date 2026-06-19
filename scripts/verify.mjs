@@ -43,6 +43,14 @@ check('marketplace.json valid + points at ./plugin', () => {
   return null;
 });
 
+// Doc-transition gate: a version bump that forgets the CHANGELOG silently rots (scripts-quality
+// per-version checklist). Assert the plugin.json version has a matching CHANGELOG heading.
+check('CHANGELOG has an entry for the plugin.json version', () => {
+  if (!version) return null; // the plugin.json check already reported the real failure
+  const cl = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  return cl.includes(`## [${version}]`) ? null : `CHANGELOG.md has no '## [${version}]' entry — add one before tagging`;
+});
+
 const SHIP = [
   'skills/coalboard/SKILL.md',
   'hooks/coalboard-conductor.js',

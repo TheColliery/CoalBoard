@@ -62,12 +62,12 @@ function detect(prompt, cfg) {
   return reasons;
 }
 
-// Non-Latin script present? Built from explicit code-point escapes (NEVER typed literals —
-// a typed control/BOM char silently embeds a NUL in source; AGENTS.md: build from char codes).
-// Excludes Latin (U+0020-U+024F) + General Punctuation (U+2000-U+206F) + Supplemental
-// Punctuation (U+2E00-U+2E7F), so an em-dash / smart-quote in English never trips it.
+// Non-Latin script present? TRUE iff a non-Latin LETTER appears. Strip Latin-script chars + every
+// NON-letter (digits, punctuation, symbols, EMOJI, C0 controls, whitespace) -> what remains is a
+// non-Latin letter (Thai/Arabic/CJK/Cyrillic/etc.). Unicode property escapes (u flag); no typed
+// control char (AGENTS.md NUL-byte hazard). Supersedes the old negated-range + emoji/C0 false-fires.
 function hasNonLatin(s) {
-  return /[^ -ɏ -⁯⸀-⹿]/.test(Array.from(String(s == null ? '' : s)).filter((c) => c.charCodeAt(0) >= 32).join(''));
+  return String(s == null ? '' : s).replace(/[\p{Script=Latin}\P{L}]/gu, '').length > 0;
 }
 
 // Self-update is kind-1 (plugin version): the HOOK only SCHEDULES (a throttled stamp);
@@ -81,7 +81,7 @@ function updateDue(cfg) {
     try { last = Number(String(fs.readFileSync(stamp, 'utf8')).trim()) || 0; } catch {}
     const now = Date.now();
     if (last && now - last < days * 86400000) return false; // inside the window: not due
-    try { fs.writeFileSync(stamp, String(now)); } catch {} // schedule: stamp the check now
+    try { fs.mkdirSync(path.dirname(stamp), { recursive: true }); fs.writeFileSync(stamp, String(now)); } catch {} // schedule: stamp the check now
     return true; // due — first run (last === 0) or the window has elapsed
   } catch { return false; }
 }
