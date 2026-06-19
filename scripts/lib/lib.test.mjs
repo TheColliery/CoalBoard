@@ -162,6 +162,15 @@ test('secrets.scrub — v1.0.11 added formats (npm/gitlab/sendgrid/square/azure)
   assert.ok(!/AAAAA/.test(over), 'over-length google key fully redacted, no tail leak');
 });
 
+test('secrets.scrub — v1.0.12: over-length token run fully redacted ({N,}) + AccountKey casing preserved', () => {
+  // {N,} not {N}+\b: an over-length token-shaped run is fully redacted, never leaked whole
+  const glOver = scrub('glpat' + '-' + 'a'.repeat(40));
+  assert.match(glOver, /\[REDACTED:gitlab-token\]/);
+  assert.ok(!/aaaaa/.test(glOver), 'over-length gitlab token fully redacted (exact {N} would leak the whole run)');
+  // AccountKey replacement preserves the original key casing (no re-case of a lowercase key)
+  assert.match(scrub('accountkey' + '=' + 'b'.repeat(24)), /accountkey=\[REDACTED\]/);
+});
+
 test('config-schema — validateValue enforces each type/bound; bad input fails loud', () => {
   const byKey = (k) => CONFIG_SCHEMA.find((s) => s.key === k);
   assert.equal(validateValue(byKey('triggerConfidence'), 90), null);

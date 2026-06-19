@@ -28,12 +28,15 @@ const PATTERNS = [
   [/\bhf_[A-Za-z0-9]{20,}\b/g, '[REDACTED:hf-token]'],
   [/\br8_[A-Za-z0-9]{20,}\b/g, '[REDACTED:replicate-token]'],
   [/\bGOCSPX-[A-Za-z0-9_-]{20,}/g, '[REDACTED:google-oauth-secret]'],
-  // npm / GitLab / SendGrid / Square tokens; Azure storage AccountKey (not caught by the name-list below)
-  [/\bnpm_[A-Za-z0-9]{36}\b/g, '[REDACTED:npm-token]'],
-  [/\bglpat-[A-Za-z0-9_-]{20}\b/g, '[REDACTED:gitlab-token]'],
-  [/\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/g, '[REDACTED:sendgrid-key]'],
-  [/\bsq0atp-[A-Za-z0-9_-]{22}\b/g, '[REDACTED:square-token]'],
-  [/\bAccountKey=[^;\s]+/gi, 'AccountKey=[REDACTED]'],
+  // npm / GitLab / SendGrid / Square tokens; Azure storage AccountKey. Use {N,} (open-ended, like
+  // EVERY pattern above) — an exact {N} + trailing \b fails the boundary on an over-length run and
+  // would leak the WHOLE token; {N,} redacts it. AccountKey CAPTURES the key so its original casing
+  // is preserved (a hardcoded replacement re-cased a lowercase `accountkey=`).
+  [/\bnpm_[A-Za-z0-9]{36,}\b/g, '[REDACTED:npm-token]'],
+  [/\bglpat-[A-Za-z0-9_-]{20,}\b/g, '[REDACTED:gitlab-token]'],
+  [/\bSG\.[A-Za-z0-9_-]{22,}\.[A-Za-z0-9_-]{43,}\b/g, '[REDACTED:sendgrid-key]'],
+  [/\bsq0atp-[A-Za-z0-9_-]{22,}\b/g, '[REDACTED:square-token]'],
+  [/\b(AccountKey=)[^;\s]+/gi, '$1[REDACTED]'],
   // A credential in a URL userinfo — redact the password. `[^\s/]+` (greedy, allows '@')
   // backtracks to the LAST '@' before the path, so a password containing a literal '@'
   // (e.g. pass@word) is fully redacted, not partially.

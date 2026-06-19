@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.12] — 2026-06-20
+
+The session-end rot-canary caught two LOW issues in the v1.0.11 scrubber additions (the scrubber's own rot).
+
+### Fixed
+- **scrubber over-length leak (same class as the google-key fix):** the v1.0.11 npm / GitLab / SendGrid / Square patterns used exact `{N}` + trailing `\b`, so an OVER-LENGTH token-shaped run fails the boundary and leaks the WHOLE token. Switched to `{N,}` (every pre-existing pattern already used it). +test.
+- **AccountKey re-casing:** the Azure pattern hardcoded `AccountKey=` in the replacement, so a lowercase `accountkey=` was re-cased in the output. Now captures the key (`$1[REDACTED]`) to preserve the original casing. +test.
+
+(Both LOW, in the DEV-only `secrets.mjs`; caught by rot-canary at session end, not the gate.) Gate: build + verify PASS + 25 tests.
+
 ## [1.0.11] — 2026-06-20
 
 Consolidated pass — executes the board's v1.0.9 re-audit findings (top open = scrubber gaps + SECURITY scan honesty) as ONE release, plus the report-location scope fix. No catastrophic findings; core safety held throughout.
