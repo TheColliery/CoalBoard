@@ -114,6 +114,17 @@ test('project config read from a PARENT when cwd is a subdir (cwd walk-up, round
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+test('non-SessionStart non-UPS event -> fully silent (over-fire guard, v1.0.11)', () => {
+  const tmp = mk();
+  try {
+    for (const ev of ['PreToolUse', 'PostToolUse', 'Notification', 'Stop']) {
+      const r = run({ hook_event_name: ev }, tmp, tmp);
+      assert.equal(r.status, 0, `exit 0 for ${ev}`);
+      assert.equal(r.stdout, '', `${ev} must be silent (only SessionStart + UserPromptSubmit emit)`);
+    }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-silent)', () => {
   const tmp = mk();
   try {

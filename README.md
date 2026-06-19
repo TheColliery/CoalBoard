@@ -2,7 +2,7 @@
 
 > A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
 
-**Status: `v1.0.10` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
+**Status: `v1.0.11` — stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)).
 
 ## What it is
 

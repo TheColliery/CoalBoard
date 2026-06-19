@@ -24,7 +24,7 @@ export const CONFIG_SCHEMA = [
   { key: 'criticalKeywords', type: 'strArr', lower: true, flags: ['--keywords'], help: 'EXTRA Layer-1 keywords ADDED to the built-in seed (additive, never a replacement) — domain terms the seed misses, e.g. "surgical", "trajectory" (default: none added)' },
   { key: 'triggerConfidence', type: 'int', min: 0, max: 100, flags: ['-c'], help: 'AND-gate Layer-2 semantic-classifier threshold 0-100 (default: 90)' },
   { key: 'triggerGradeFloor', type: 'int', min: 1, max: 5, flags: ['-g'], help: 'Board considered at >= this grade, or any sensitive task (reuses the CT grade rubric; default: 4)' },
-  { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'Dirs the AND-gate skips so it never false-triggers on vendored code (default: node_modules, .git, dist, vendor, build)' },
+  { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'RESERVED — dirs the OPTIONAL PreToolUse file-write backstop (detectFileWrite) would skip; the default hooks.json wires only SessionStart + UserPromptSubmit, so this key is INERT until that backstop is enabled (default: node_modules, .git, dist, vendor, build)' },
   // — the board —
   { key: 'lenses', type: 'strArr', lower: true, values: ['data', 'truth', 'feeling'], flags: ['--lenses'], help: 'Active epistemic lenses — each must be one of: data, truth, feeling (adversary is additive via adversaryLens, NOT selectable here). Default: data, truth, feeling' },
   { key: 'consensusThreshold', type: 'int', min: 0, max: 100, flags: ['-t'], help: 'Below this worker-agreement % = deadlock -> summon the out-of-frame sub4 (default: 80)' },
@@ -37,7 +37,7 @@ export const CONFIG_SCHEMA = [
   // — sharpness levers (the rigor preset sets these; an explicit key overrides) —
   { key: 'adversaryLens', type: 'bool', flags: ['--adversary'], help: 'Spawn the red-team falsification lens — "find the ONE input that breaks it; could-not-break-it is your only failure" (sharper recall than the show-me skeptic). Adds a worker; rigor sets it (on under high/nasa). Default off' },
   { key: 'contestedRound', type: 'bool', flags: ['--contested'], help: 'On deadlock, run ONE surgical cross-exam on the CONTESTED point only (feed the counter-claim, not full answers) before sub4 — cross-examination without global anchoring. rigor sets it (on under high/nasa). Default off' },
-  { key: 'diversifyModels', type: 'bool', flags: ['--diversify'], help: 'When lensTiers is unset, spread lenses across model GENERATIONS (e.g. Fable 5 + Claude 4.x) for partial decorrelation, not just cost. rigor sets it (on under nasa). Honest: less than cross-provider. Default off' },
+  { key: 'diversifyModels', type: 'bool', flags: ['--diversify'], help: 'When lensTiers is unset, spread lenses across the model GENERATIONS available at spawn-time for partial decorrelation, not just cost (pick only spawnable ones — a dead pick re-routes). rigor sets it (on under nasa). Honest: less than cross-provider. Default off' },
   // — verify / apply —
   { key: 'qaStrictness', type: 'enum', values: ['strict', 'standard', 'off'], flags: ['-q'], help: 'Verify rigor: strict | standard (default) | off' },
   { key: 'verifyGates', type: 'obj', noFlag: true, validate: validateVerifyGates, help: 'Per-domain gate list { code | math | text | research: ["compile","test",...] }; overrides the defaults' },

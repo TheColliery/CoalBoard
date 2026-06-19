@@ -6,7 +6,7 @@
 
 const PATTERNS = [
   // PEM private keys (whole block)
-  [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, '[REDACTED:private-key]'],
+  [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/gi, '[REDACTED:private-key]'],
   // JWTs (three base64url segments; '=' allowed so base64-PADDED segments still match)
   [/\beyJ[A-Za-z0-9_=-]{8,}\.[A-Za-z0-9_=-]{8,}\.[A-Za-z0-9_=-]{8,}/g, '[REDACTED:jwt]'],
   // Authorization-header form: a scheme followed by a SPACE then the credential
@@ -20,14 +20,20 @@ const PATTERNS = [
   [/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED:aws-key]'],
   // Stripe / underscore-prefixed keys (the `sk-` pattern above only catches the hyphen form)
   [/\b(?:sk|pk|rk)_(?:live|test)_[0-9A-Za-z]{10,}\b/g, '[REDACTED:stripe-key]'],
-  // Google API key
-  [/\bAIza[0-9A-Za-z_-]{35}/g, '[REDACTED:google-key]'],
+  // Google API key (open-ended {35,} so an over-length run is fully redacted, never leaving a leaked tail)
+  [/\bAIza[0-9A-Za-z_-]{35,}/g, '[REDACTED:google-key]'],
   // GitHub fine-grained PAT
   [/\bgithub_pat_[0-9A-Za-z_]{40,}\b/g, '[REDACTED:gh-pat]'],
   // HuggingFace, Replicate, Google OAuth client-secret prefixes
   [/\bhf_[A-Za-z0-9]{20,}\b/g, '[REDACTED:hf-token]'],
   [/\br8_[A-Za-z0-9]{20,}\b/g, '[REDACTED:replicate-token]'],
   [/\bGOCSPX-[A-Za-z0-9_-]{20,}/g, '[REDACTED:google-oauth-secret]'],
+  // npm / GitLab / SendGrid / Square tokens; Azure storage AccountKey (not caught by the name-list below)
+  [/\bnpm_[A-Za-z0-9]{36}\b/g, '[REDACTED:npm-token]'],
+  [/\bglpat-[A-Za-z0-9_-]{20}\b/g, '[REDACTED:gitlab-token]'],
+  [/\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/g, '[REDACTED:sendgrid-key]'],
+  [/\bsq0atp-[A-Za-z0-9_-]{22}\b/g, '[REDACTED:square-token]'],
+  [/\bAccountKey=[^;\s]+/gi, 'AccountKey=[REDACTED]'],
   // A credential in a URL userinfo — redact the password. `[^\s/]+` (greedy, allows '@')
   // backtracks to the LAST '@' before the path, so a password containing a literal '@'
   // (e.g. pass@word) is fully redacted, not partially.

@@ -2,6 +2,23 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.11] — 2026-06-20
+
+Consolidated pass — executes the board's v1.0.9 re-audit findings (top open = scrubber gaps + SECURITY scan honesty) as ONE release, plus the report-location scope fix. No catastrophic findings; core safety held throughout.
+
+### Fixed
+- **secret-scrubber (`secrets.mjs`) format gaps:** added npm (`npm_`), GitLab (`glpat-`), SendGrid (`SG.`), Square (`sq0atp-`), and Azure storage `AccountKey=`; the Google-key pattern is now open-ended (`{35,}`) so an over-length run is FULLY redacted (was `{35}` → leaked the tail); the PEM block match is case-insensitive. (This is the DEV reference scrubber — defense-in-depth, not shipped in the runtime.)
+- **`diversifyModels` example still named "Fable 5" in `config-schema.mjs`** — v1.0.5 dropped it from the SKILL + factory but MISSED the schema SOT → generalized to "available generations".
+- **conductor over-fired on non-SessionStart events:** the SessionStart branch now gates on `event === 'SessionStart'`; any other non-prompt event stays silent (Phoenix #13). +test.
+- **SECURITY.md scan note clarified:** separates the actual scanned version (v1.0.1), the re-scan policy, and an explicit "later versions not re-scanned" honest scope (no all-versions guarantee).
+- **`excludePaths` schema help marked RESERVED** (it feeds only the optional, unwired PreToolUse backstop — the factory already said so; the schema text now matches).
+- **CONTRIBUTING.md** headers de-emojified (series doc-standard).
+
+### Changed
+- **Report location is now scope-aware:** the report goes INTO the part that was scanned (`X/.coalboard/reports/` for subproject X), never a parent / umbrella / catch-all root — scope decides location.
+
+Tests: 24 (+scrubber formats, +conductor over-fire guard).
+
 ## [1.0.10] — 2026-06-20
 
 Dogfood — the apply decision was asked TWICE: the Step-0 convene gate surfaced "report-only", and the Step-4 post-audit gate asked "fix what?" again. Deciding what to fix before any findings exist is premature; report-only belongs after the findings.

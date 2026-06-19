@@ -123,7 +123,10 @@ function main() {
     return;
   }
 
-  // SessionStart (and any non-prompt event): the board contract + self-update when due.
+  // SessionStart ONLY: the board contract + self-update when due. Any OTHER non-prompt event
+  // stays silent (Phoenix #13 zero-noise — the hook is wired to SessionStart + UserPromptSubmit;
+  // never emit on an unexpected/unknown event).
+  if (event !== 'SessionStart') return;
   let msg = "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
     msg += ' [self-update due] Offer the /coalboard:update check (compare the latest git tag to the installed version, then offer `claude plugin update`). Consent-gated; the hook only scheduled it.';

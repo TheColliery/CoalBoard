@@ -146,6 +146,22 @@ test('secrets.scrub — no catastrophic backtracking (ReDoS guard: returns, does
   assert.equal(typeof scrub('SECRET'.repeat(5000) + '=x'), 'string');
 });
 
+test('secrets.scrub — v1.0.11 added formats (npm/gitlab/sendgrid/square/azure) + google over-length fully redacted', () => {
+  // secret-shaped fixtures are ASSEMBLED at runtime (prefix split from body) so the SOURCE carries
+  // no contiguous token literal — otherwise GitHub push-protection flags the fixture and blocks the push.
+  assert.match(scrub('npm' + '_' + 'a'.repeat(36)), /\[REDACTED:npm-token\]/);
+  assert.match(scrub('glpat' + '-' + 'a'.repeat(20)), /\[REDACTED:gitlab-token\]/);
+  assert.match(scrub('SG' + '.' + 'a'.repeat(22) + '.' + 'b'.repeat(43)), /\[REDACTED:sendgrid-key\]/);
+  assert.match(scrub('sq0atp' + '-' + 'a'.repeat(22)), /\[REDACTED:square-token\]/);
+  const azure = 'AccountKey' + '=' + 'b'.repeat(24);
+  assert.match(scrub(azure), /AccountKey=\[REDACTED\]/);
+  assert.ok(!/bbbbbbbb/.test(scrub(azure)), 'azure account key value not leaked');
+  // google-key {35,}: an over-length run is FULLY redacted, no leaked tail (was {35} -> leaked the tail)
+  const over = scrub('AIza' + 'A'.repeat(50));
+  assert.match(over, /\[REDACTED:google-key\]/);
+  assert.ok(!/AAAAA/.test(over), 'over-length google key fully redacted, no tail leak');
+});
+
 test('config-schema — validateValue enforces each type/bound; bad input fails loud', () => {
   const byKey = (k) => CONFIG_SCHEMA.find((s) => s.key === k);
   assert.equal(validateValue(byKey('triggerConfidence'), 90), null);
