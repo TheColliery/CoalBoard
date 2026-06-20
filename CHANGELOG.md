@@ -2,6 +2,17 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.2.1] — 2026-06-21
+
+Wizard token-economy pass (dogfood: a sub RAN the manual `/coalboard` wizard while main watched, then trimmed the waste). **PATCH**: leaner manual-wizard UX, no new capability/config.
+
+### Changed
+- **Manual `/coalboard` wizard restructured to 2 question-box calls** (was up to 4 round-trips across 8 steps): Call 1 = TARGET → a silent enumerate-only scan (1-line summary) → Call 2 = WORK-TYPE + DEPTH + RIGOR + PROCEED (4 questions). 2 calls is the dependency FLOOR (TARGET → SCAN → scan-derived WORK-TYPE forces ≥2 round-trips). The cost-confirm folds into Call 2's PROCEED slot — a cost line precedes the call (informed consent); "change" recomputes the precise per-config estimate on demand.
+- **DISPATCH is no longer a wizard question** — defaults to all-at-once (a speed-only choice, rarely changed; `maxConcurrentSubagents` caps it, ask only if the user raises it), freeing the slot for the confirm.
+- **Terser throughout** — one-line option text, a single scan-summary line, no decorative filler. Every load-bearing ask is KEPT (target-first, ask-work-type, exclude ∪ the dev-contamination floor, `.github`/workflows security, units-from-scan, cost consent, the lens-prompt fill-flow). `references/wizard.md` prose ~−38%.
+
+Gate: build + verify + 28 tests PASS.
+
 ## [1.2.0] — 2026-06-21
 
 Round-3 dogfood (the user ran the board as a customer again + reported each finding) — deterministic rigor-scaled model tiering, a wired scan-exclude config key, `.github`/workflows treated as a security unit, and platform warm-resume. **MINOR**: new config keys (`rigorLensTiers`, a now-functional `excludePaths`) + new deterministic behavior.
