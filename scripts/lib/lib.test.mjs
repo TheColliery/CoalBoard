@@ -231,3 +231,18 @@ test('config-schema — lensTiers + verifyGates validators', () => {
   assert.ok(validateValue(verifyGates, { code: [] }), 'empty gate list fails');
   assert.ok(validateValue(verifyGates, { code: [''] }), 'empty-string gate fails');
 });
+
+test('config-schema — rigorLensTiers validator (deterministic rigor->tier map)', () => {
+  const spec = CONFIG_SCHEMA.find((s) => s.key === 'rigorLensTiers');
+  assert.ok(spec, 'rigorLensTiers key exists in the schema');
+  assert.equal(validateValue(spec, { relaxed: 'haiku', standard: 'haiku', high: 'sonnet', nasa: 'opus' }), null, 'the factory default map is valid');
+  assert.equal(validateValue(spec, { nasa: ['opus', 'sonnet'] }), null, 'a priority chain is valid');
+  assert.ok(validateValue(spec, { bogusRigor: 'opus' }), 'an unknown rigor name fails');
+  assert.ok(validateValue(spec, { nasa: 123 }), 'a non-string/array tier fails');
+  assert.ok(validateValue(spec, { nasa: '' }), 'an empty-string tier fails');
+  assert.ok(validateValue(spec, { high: [''] }), 'an empty-string chain entry fails');
+  // the shipped factory config's rigorLensTiers must itself validate (no drift)
+  const factoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'platform-configs', '.coalboard.json');
+  const factory = JSON.parse(fs.readFileSync(factoryPath, 'utf8').replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : '')));
+  assert.equal(validateValue(spec, factory.rigorLensTiers), null, 'the shipped factory rigorLensTiers validates');
+});

@@ -2,6 +2,26 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.2.0] — 2026-06-21
+
+Round-3 dogfood (the user ran the board as a customer again + reported each finding) — deterministic rigor-scaled model tiering, a wired scan-exclude config key, `.github`/workflows treated as a security unit, and platform warm-resume. **MINOR**: new config keys (`rigorLensTiers`, a now-functional `excludePaths`) + new deterministic behavior.
+
+### Added
+- **`rigorLensTiers` — a deterministic rigor→lens-tier map** (factory `relaxed/standard → haiku · high → sonnet · nasa → opus`). The lens model now SCALES with rigor and the agent READS the table verbatim, so the assignment is identical every run — fixing both the all-haiku-at-nasa under-powering and the run-to-run non-determinism ("deterministic" is now EARNED by the table, not printed over interpreted prose). The judge stays top-tier; the adversary always takes the rigor tier (≥ sonnet), never undetermined.
+- **`excludePaths` is now a FUNCTIONAL scan/audit exclude** (was reserved/inert). The factory default unions the build/vcs dirs with the always-hard dev-contamination floor (`CLAUDE.md`/`MEMORY.md`/`AGENTS.md`/`.claude`/`.agents`); config ADDS to the floor, never weakens it (a lens must never read the dev governance). The scan READS it from config instead of a hardcoded prose list.
+
+### Changed
+- **Adopt CoalTipple's ranking pattern (OPTIONAL, series-interop):** if CT is installed, inherit its `ranking.json` (alias-floor authority + stable tier-structure + `modelTiers` pins + validity-lock + spawn-fail-fall); else the alias floor + `rigorLensTiers` suffice — CB stands alone. CB adds only the rigor→tier map + the adversary bump.
+- **`.github` / workflows = a SECURITY unit, never "just CI"** — the scan classifies `workflows/*.yml` as CI-security; the lens checklist + audit reference now flag action SHA-pins, scanned/action version correctness, `pull_request_target` + untrusted checkout, `${{ github.event.* }}` injection, and over-broad `permissions`. Boarding-scope enumerates UNITS from the scan (`.github` counted as a first-class unit), never re-derives "the tools" (the recurring `.github` skip-bias).
+- **Pre-spawn scan is ENUMERATE-ONLY** — classify by extension/path with NO content read (content-reading is the lens phase); avoids burning 200k+ tokens and bloating main's context before any lens runs.
+- **Warm-resume PREFERS platform resume over re-spawn-fresh** — capture each lens's `agentId` and SendMessage-resume a dead/limit-hit lens (keeps its accumulated work) instead of re-spawning from scratch (which re-does the lost work). Trigger the resume on budget-RETURN (quota reset OR a user refill, whichever first), never a hardcoded clock; any scheduled resume is idempotent.
+- **Judge narration** — the board states "judge running ground-truth to settle the conflict, not acting as a lens" so a watcher is not alarmed when main works post-collapse; after a budget-collapse to an inline judge, the dead lens's domain is flagged NOT-CHECKED, never inline-generated.
+
+### Fixed
+- The CT/CB issue-template version placeholders were stale (`v1.0.0`) and ungated → replaced with a number-free `vX.Y.Z` format hint that cannot rot.
+
+Gate: build + verify + 28 tests PASS.
+
 ## [1.1.0] — 2026-06-21
 
 Round-2 dogfood (the user ran the board as a customer + reported each finding) — the manual `/coalboard` wizard + lens-spawning hardened. **MINOR**: new capability (a canonical lens-prompt template + the wizard's target-first / ask-work-type flow + manual-board memory arming + deterministic model assignment + deadlock handling).

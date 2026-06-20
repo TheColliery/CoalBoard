@@ -23,7 +23,7 @@ body:
     id: version
     attributes:
       label: CoalBoard version + platform
-      placeholder: "v1.0.0 · Claude Code on Windows 11 (or Antigravity / Cursor / …)"
+      placeholder: "vX.Y.Z · Claude Code on Windows 11 (or Antigravity / Cursor / …)"
     validations:
       required: true
   - type: textarea

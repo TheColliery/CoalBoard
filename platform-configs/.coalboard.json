@@ -52,12 +52,13 @@
   // # Default value: 4
   "triggerGradeFloor": 4,
 
-  // ## Dirs the AND-gate SKIPS so it never false-triggers on vendored / generated code you did not write.
-  // ## NOTE: applies ONLY to the OPTIONAL PreToolUse file-write backstop — NOT wired by the default hooks.json
-  // ## (the default board triggers on the PROMPT, not file-writes). RESERVED until you wire that backstop.
+  // ## Dirs/files the board SCAN + audit SKIP (and the optional PreToolUse backstop, if you wire it). On TOP of this,
+  // ## the dev-contamination floor — CLAUDE.md, MEMORY.md, AGENTS.md, .claude, .agents — is ALWAYS excluded: config
+  // ## ADDS to that floor, it never weakens it (a lens must never read your private dev governance — it would inherit
+  // ## your blind spot, the very thing the board exists to break). Tune the build/vendor/vcs entries freely.
   // # Setting type: String[]
-  // # Default value: node_modules, .git, dist, vendor, build
-  "excludePaths": ["node_modules", ".git", "dist", "vendor", "build"],
+  // # Default value: CLAUDE.md, MEMORY.md, AGENTS.md, .claude, .agents, node_modules, .git, dist, vendor, build, .coalboard
+  "excludePaths": ["CLAUDE.md", "MEMORY.md", "AGENTS.md", ".claude", ".agents", "node_modules", ".git", "dist", "vendor", "build", ".coalboard"],
 
   // ─── the board ───
 
@@ -117,6 +118,15 @@
   // # Setting type: Object { data | truth | feeling | observer | judge : "model" | ["priority", "chain"] }
   // # Default value: unset (inherit CoalTipple's alias-floor + pins)
   // "lensTiers": { "data": "haiku", "truth": "sonnet", "feeling": "haiku", "observer": "opus", "judge": "opus" },
+
+  // ## Deterministic rigor->lens-tier map: the LENS model SCALES with rigor (cheap when relaxed, strong when nasa). The
+  // ## agent READS this table verbatim — it does NOT interpret/guess — so the model assignment is IDENTICAL every run
+  // ## (the fix for "deterministic" being an unearned label). The JUDGE is always the top tier (it verifies the cheap
+  // ## lenses on ground truth); the ADVERSARY (high/nasa) takes the rigor tier — always strong, never undetermined.
+  // ## lensTiers (per-role) overrides a specific role; this sets the per-rigor default for all lenses.
+  // # Setting type: Object { relaxed | standard | high | nasa : "haiku" | "sonnet" | "opus" | model | ["priority","chain"] }
+  // # Default value: relaxed/standard -> haiku, high -> sonnet, nasa -> opus
+  "rigorLensTiers": { "relaxed": "haiku", "standard": "haiku", "high": "sonnet", "nasa": "opus" },
 
   // ─── sharpness levers (the rigor preset sets these; set a key here to force it either way) ───
 

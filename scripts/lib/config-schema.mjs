@@ -24,7 +24,7 @@ export const CONFIG_SCHEMA = [
   { key: 'criticalKeywords', type: 'strArr', lower: true, flags: ['--keywords'], help: 'EXTRA Layer-1 keywords ADDED to the built-in seed (additive, never a replacement) — domain terms the seed misses, e.g. "surgical", "trajectory" (default: none added)' },
   { key: 'triggerConfidence', type: 'int', min: 0, max: 100, flags: ['-c'], help: 'AND-gate Layer-2 semantic-classifier threshold 0-100 (default: 90)' },
   { key: 'triggerGradeFloor', type: 'int', min: 1, max: 5, flags: ['-g'], help: 'Board considered at >= this grade, or any sensitive task (reuses the CT grade rubric; default: 4)' },
-  { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'RESERVED — dirs the OPTIONAL PreToolUse file-write backstop (detectFileWrite) would skip; the default hooks.json wires only SessionStart + UserPromptSubmit, so this key is INERT until that backstop is enabled (default: node_modules, .git, dist, vendor, build)' },
+  { key: 'excludePaths', type: 'strArr', lower: true, flags: ['-x', '--exclude'], help: 'Dirs/files the board SCAN + audit SKIP (and the OPTIONAL PreToolUse backstop). The dev-contamination floor (CLAUDE.md, MEMORY.md, AGENTS.md, .claude, .agents) is ALWAYS excluded ON TOP of this — config ADDS to the floor, never weakens it (a lens must never read the dev governance). Default: CLAUDE.md, MEMORY.md, AGENTS.md, .claude, .agents, node_modules, .git, dist, vendor, build, .coalboard' },
   // — the board —
   { key: 'lenses', type: 'strArr', lower: true, values: ['data', 'truth', 'feeling'], flags: ['--lenses'], help: 'Active epistemic lenses — each must be one of: data, truth, feeling (adversary is additive via adversaryLens, NOT selectable here). Default: data, truth, feeling' },
   { key: 'consensusThreshold', type: 'int', min: 0, max: 100, flags: ['-t'], help: 'Below this worker-agreement % = deadlock -> summon the out-of-frame sub4 (default: 80)' },
@@ -33,7 +33,8 @@ export const CONFIG_SCHEMA = [
   { key: 'debateTimeoutSeconds', type: 'int', min: 5, max: 600, flags: ['-d'], help: 'Per-worker/round debate soft cap in seconds (default: 60)' },
   { key: 'subagentTimeoutSeconds', type: 'int', min: 5, max: 3600, flags: ['-s'], help: 'Hard stall-reap: a silent worker past this is treated as failed (default: 150)' },
   { key: 'maxConcurrentSubagents', type: 'int', min: 1, max: 16, flags: ['--concurrency'], help: 'Concurrent worker cap — they share one rate limit (board needs 3-4; default: 4)' },
-  { key: 'lensTiers', type: 'obj', noFlag: true, validate: validateLensTiers, help: 'Optional per-role tier/model pin { data | truth | feeling | observer | judge: "model" | ["priority","chain"] }; overrides the inherit-CT default' },
+  { key: 'lensTiers', type: 'obj', noFlag: true, validate: validateLensTiers, help: 'Optional per-role tier/model pin { data | truth | feeling | observer | judge: "model" | ["priority","chain"] }; overrides BOTH rigorLensTiers and the inherit-CT default' },
+  { key: 'rigorLensTiers', type: 'obj', noFlag: true, validate: validateRigorLensTiers, help: 'Deterministic rigor->lens-tier map { relaxed | standard | high | nasa : "haiku"|"sonnet"|"opus"|model | ["priority","chain"] } — the LENS model scales with rigor; the agent READS this verbatim (never interprets) so the assignment is identical every run. The judge is always the top tier; the adversary always the rigor tier (never undetermined). lensTiers (per-role) overrides this. Default: relaxed/standard->haiku, high->sonnet, nasa->opus' },
   // — sharpness levers (the rigor preset sets these; an explicit key overrides) —
   { key: 'adversaryLens', type: 'bool', flags: ['--adversary'], help: 'Spawn the red-team falsification lens — "find the ONE input that breaks it; could-not-break-it is your only failure" (sharper recall than the show-me skeptic). Adds a worker; rigor sets it (on under high/nasa). Default off' },
   { key: 'contestedRound', type: 'bool', flags: ['--contested'], help: 'On deadlock, run ONE surgical cross-exam on the CONTESTED point only (feed the counter-claim, not full answers) before sub4 — cross-examination without global anchoring. rigor sets it (on under high/nasa). Default off' },
@@ -101,6 +102,19 @@ function validateLensTiers(pins) {
     const okString = typeof val === 'string' && val.trim().length > 0;
     const okChain = Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string' && m.trim().length > 0);
     if (!okString && !okChain) return `lensTiers.${role} must be a non-empty model string or a non-empty array of non-empty strings`;
+  }
+  return null;
+}
+
+// A rigor->tier map: each rigor name -> a model string OR a non-empty priority chain.
+function validateRigorLensTiers(map) {
+  const rigors = ['relaxed', 'standard', 'high', 'nasa'];
+  for (const r of Object.keys(map)) {
+    if (!rigors.includes(r)) return `rigorLensTiers: unknown rigor '${r}' (use ${rigors.join('/')})`;
+    const val = map[r];
+    const okString = typeof val === 'string' && val.trim().length > 0;
+    const okChain = Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string' && m.trim().length > 0);
+    if (!okString && !okChain) return `rigorLensTiers.${r} must be a non-empty model string or a non-empty array of non-empty strings`;
   }
   return null;
 }
