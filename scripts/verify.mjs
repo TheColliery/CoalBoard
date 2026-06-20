@@ -53,9 +53,10 @@ check('CHANGELOG has an entry for the plugin.json version', () => {
 
 const SHIP = [
   'skills/coalboard/SKILL.md',
+  'skills/coalboard/references/wizard.md',
+  'skills/coalboard/references/audit.md',
   'hooks/coalboard-conductor.js',
   'hooks/hooks.json',
-  'commands/coalboard.md',
   'commands/update.md',
   '.claude-plugin/plugin.json',
 ];

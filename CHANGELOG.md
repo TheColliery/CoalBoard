@@ -2,6 +2,27 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.0.13] — 2026-06-20
+
+The load-path **carve** — the series token-economy pilot ([skill-authoring](https://github.com/TheColliery/.github) §4): the SKILL.md body is now the LEAN always-loaded core (auto-trigger AND manual both pay only this); the heavy manual-only / deep detail moved to `references/*.md`, loaded ON-DEMAND. **Core body −40% (19433 ← 32372 chars)** — a board that auto-convenes no longer pays the manual wizard's tokens. Plus the Phase-3 robustness items folded in. (CB is the pilot; the carve rolls to CoalTipple + CoalMine next.)
+
+### Added
+- **`references/wizard.md`** — the manual `/coalboard` 8-step setup wizard (target · scan/classify · work-type · depth · rigor · dispatch · cost-confirm · result + interlinked boarding-scope), loaded only on a manual convene.
+- **`references/audit.md`** — the deep repo/release audit detail (every-file enumeration · `.github` inclusion · scope-containment · interlinked-whole boarding · no-stale-prior-audit · scope-aware report-location), loaded only on an audit run.
+- **Platform/version gate** — CoalBoard is a capability-hack tightly coupled to the exact platform + version (docs ≠ reality); on any platform/version not actually run, it now announces UNVERIFIED, degrades conservatively, and surfaces the risk to the human before spending.
+- **Durable per-agent memory & warm-resume — LONG runs only** — for a deep/L3 or whole-interlinked-repo run that can overflow: per-agent PRIVATE `.coalboard/memory/<agent>.md` (cross-reading forbidden), incremental checkpoint, warm-resume on overflow/compaction/503 (a sub resumes from pending, never restart). A short single board skips it (no-overkill).
+
+### Changed
+- **SKILL.md carved to a lean core** — every behavior preserved; manual/deep detail relocated to `references/` (loaded on demand, not resident every convene).
+- **Lens-failure recovery hardened** — a tripped lens is re-spawned on an available model or resumed from pending; main NEVER does a lens's own work (that collapses the decorrelation that IS the board's value); never restart-from-scratch.
+- **Never assign an unavailable model** — a spawn-failure / 0-token "Completed" (COMPLETED ≠ ANSWERED) is classified + re-routed; an access-gated model (Fable) is dropped from the pool, never re-picked.
+- **Tool-error fail-fast** — a lens hitting an unavailable tool returns immediately (no workaround loops burning tokens); lens contracts are kept tool-agnostic.
+
+### Fixed
+- **`/coalboard` "Unknown command" — the redundant `commands/coalboard.md` removed.** It and the skill both claimed `/coalboard:coalboard` (a command and a same-named skill are merged by the platform); the skill is now the single entry — auto via its description, manual via `/coalboard:coalboard` (which reads the wizard). `/coalboard:update` is unaffected.
+
+Gate: build + verify (9/9, incl. dist-sync of the two new references) + 27 tests PASS.
+
 ## [1.0.12] — 2026-06-20
 
 The session-end rot-canary caught two LOW issues in the v1.0.11 scrubber additions (the scrubber's own rot).

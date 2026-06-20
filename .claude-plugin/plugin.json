@@ -1,6 +1,6 @@
 {
   "name": "coalboard",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "CoalBoard — a diverse-lens consensus & debate board. Its primary auto-trigger is the error-not-allowed slice (security/crypto, migrations, high-precision math); convened manually it generalizes to any hard problem worth several perspectives. On a critical task, with consent, it spawns diverse epistemic lenses in parallel — empirical (live source-grounding), formal (logic), and a show-me skeptic — a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Cross-agent (any subagent platform; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys.",
   "author": { "name": "HetCreep" },
   "homepage": "https://github.com/TheColliery/CoalBoard",
