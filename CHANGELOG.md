@@ -2,6 +2,26 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.3.0] — 2026-06-21
+
+Round-3 deep dogfood (the user ran the real published wizard + board as a customer and surfaced flow / honesty gaps the build gate cannot). **MINOR**: a new layman-default UX path + a holistic wizard/gate flow rework + model-diversity honesty corrections; no new config keys.
+
+### Added
+- **Dual-audience wizard — a LAYMAN-DEFAULT path:** `/coalboard` now defaults to AI-handles-everything — smart safe defaults (cwd · auto-work-type · L2 · standard) + ONE plain-language bill+confirm ("3 reviewers + a judge check X for ~Y tokens — go / cheaper / more thorough / cancel"; no opaque jargon — "cheaper/more thorough" map to depth/rigor, a universally-known word like "nasa" may stay). A programmer opts into the full restaurant wizard ("advanced" / stating prefs). The layman is kept safe by staging + the human-apply gate (no rigor-knowledge needed); the result carries the honest ceiling in plain language and never says "definitely safe".
+
+### Changed
+- **Wizard = the "restaurant" flow order → bill → pay** (programmer path): TARGET → silent scan → the 3 settings (work-type/depth/rigor) → the ACCURATE bill computed FROM the picks → ONE confirm. Fixes the v1.2.1 stale-cost consent (the bill used to precede the picks). DISPATCH defaults all-at-once.
+- **Step 4 exit re-ordered + leaned:** DIGEST → ONE consent question (apply-all / let-me-pick / report-only / stop; "which fixes" only on "let-me-pick") → THEN write, CONDITIONAL on the choice (stop = write NOTHING). The report file is never written before consent. (Was: write-then-"consent gate", two questions.)
+- **Surfaced output = decisions + results only** — internal mechanics (reading the lens-prompt template, arming/cleaning the memory net, the contract steps) run SILENTLY, never narrated.
+- **Model-diversity honesty:** `diversifyModels` is INERT on Claude Code (the spawn tool takes only aliases — it cannot pin a model generation, so "spread across generations" is a no-op; kept degrade-safe for a platform that can). The only actuatable model-decorrelation on CC is a tier-mix (partial, at a lens-strength cost); the real decorrelation is the diverse lens prompts + adversary + sub4, never the model.
+- **NASA honesty (the correlated-blind-spot ceiling):** all-opus at nasa = MAX model-correlation at MAX stakes — the escape is the non-model ground-truth gates (`tier2Verify` — fuzz/property/differential) + the human, NOT model-diversity and NOT sub4 (sub4 is the same model → shares the blind spot; it breaks deadlocks only). The skill no longer implies "nasa is safe because diverse models".
+- **Warm-resume corrected (verified live):** the standard CC session has no callable SendMessage tool, so a stopped/dead lens is recovered by re-spawning a FRESH lens on the un-done REMAINDER tracked in main's journal (re-does only the in-flight partial); SendMessage-resume is a bonus only where the tool exists. `TaskStop` is available (main reaps a runaway / zombie sub).
+
+### Fixed
+- The org `.github` repo had no `dependabot.yml` — its workflows' pinned actions never auto-bumped (the same `.github` skip-bias, one layer down); added it (github-actions, weekly), matching the plugin repos. (R3A-3)
+
+Gate: build + verify + 28 tests PASS.
+
 ## [1.2.1] — 2026-06-21
 
 Wizard token-economy pass (dogfood: a sub RAN the manual `/coalboard` wizard while main watched, then trimmed the waste). **PATCH**: leaner manual-wizard UX, no new capability/config.
