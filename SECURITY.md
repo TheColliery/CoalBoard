@@ -4,7 +4,7 @@ CoalBoard is verified under the same framework as **[CoalMine](https://github.co
 
 ## SkillSpector scan
 
-Last ACTUAL scan: CoalBoard **v1.0.1** dist (skill + hook + command files), on **2026-06-19**, with **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases; the version is the `uvx`-from-git HEAD, pinned by commit). **Re-scan is event-driven on a NEW SkillSpector version (maintainer-commanded), NOT per CoalBoard release** — the static analyzers are stable (unchanged since 2026-05-11), so a CoalBoard content bump does not change what these (non-MCP) rules read. **Honest scope — later CoalBoard versions are NOT re-scanned:** the all-false-positive verdict below was established on **v1.0.1**; it is EXPECTED to hold for later versions (stable rules + the deltas have been SKILL / doc prose, not new attack surface), but read it as "v1.0.1-scanned", not a blanket all-versions guarantee.
+Last scan: CoalBoard **v1.0.12** dist (commit `c67d90b`), on **2026-06-20**, with **NVIDIA SkillSpector v2.2.3** (self-reported — the tool ships no tagged releases; the version is the `uvx`-from-git HEAD). **Re-scan is event-driven on a NEW SkillSpector version (maintainer-commanded), NOT per CoalBoard release** — the static analyzers are stable (unchanged since 2026-05-11), so a CoalBoard content bump does not change what these (non-MCP) rules read. The **2026-06-20 re-scan of the v1.0.12 dist CONFIRMS this**: same SkillSpector v2.2.3, same all-false-positive verdict, the findings unchanged in class from the earlier v1.0.1 scan.
 
 **Read the score in context.** The static stage scored **100/100**; the LLM **semantic** stage was rate-limited (HTTP 429) and fell back to **static-only**, which is pattern-match-based and false-positive-prone (it flags strings without the skill-contract context). **Every finding was verified false-positive** — re-run the semantic stage when the limit clears for a context-aware score. The verifications:
 
@@ -17,7 +17,7 @@ Last ACTUAL scan: CoalBoard **v1.0.1** dist (skill + hook + command files), on *
 | EA3 ×2 — *scope creep* ("not limited to") | The manual `/coalboard` breadth is the **deliberate, consent-gated** two-scope design (auto narrow, manual broad). |
 | SQP-1/2, SDI-2 ×2 | `/coalboard` is a **manual** command (not accidentally triggerable); "no executable code" is wrong (`hooks/coalboard-conductor.js` ships in the dist); the git tag-check is a read-only, by-design lookup. |
 
-(Exact per-category counts shift slightly between static runs — the latest re-scan returned 11 findings; the categories above and the all-false-positive verdict are stable.) This matches the family baseline (CoalMine 58/100, CoalTipple 10/100 — likewise all-false-positive). The report JSON is not shipped.
+(Exact per-category counts shift slightly between static runs — the 2026-06-20 re-scan returned 11 findings: RA1×6 · EA3×2 · EA2 · RA2 · TM1; the categories above and the all-false-positive verdict are stable. The SQP/SDI row was an LLM-semantic-stage finding from an earlier run; the 2026-06-20 static pass — the LLM stage was HTTP-429 rate-limited — did not raise them.) This matches the family baseline: all three skills now score **100/100 static** — CoalMine + CoalTipple rose from 58/100 + 10/100 after they shipped consent-gated **Self-Updating**, which the static **RA1 self-modification** rule flags as the same false positive seen here — **all-false-positive across the family**. The report JSON is not shipped.
 
 ## Reporting a vulnerability
 

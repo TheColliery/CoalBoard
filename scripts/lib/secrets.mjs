@@ -16,8 +16,8 @@ const PATTERNS = [
   [/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}\b/g, '[REDACTED:api-key]'],
   [/\bgh[opsur]_[A-Za-z0-9]{20,}\b/g, '[REDACTED:gh-token]'],
   [/\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g, '[REDACTED:slack-token]'],
-  // AWS access key id
-  [/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED:aws-key]'],
+  // AWS access key id — {16,} so an over-length run (21+ chars) is also fully redacted
+  [/\bAKIA[0-9A-Z]{16,}\b/g, '[REDACTED:aws-key]'],
   // Stripe / underscore-prefixed keys (the `sk-` pattern above only catches the hyphen form)
   [/\b(?:sk|pk|rk)_(?:live|test)_[0-9A-Za-z]{10,}\b/g, '[REDACTED:stripe-key]'],
   // Google API key (open-ended {35,} so an over-length run is fully redacted, never leaving a leaked tail)
@@ -51,7 +51,7 @@ const PATTERNS = [
   // is fully redacted, not leaked after word 1. The {0,8} reps + the [^\n] class stay linear
   // (no catastrophic backtracking). The value branch carries an OPTIONAL auth-scheme prefix
   // (Bearer/Basic/…) so the WHOLE credential is redacted, not just the scheme word.
-  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})(\s*["']?\s*[:=]\s*)(?:(?:bearer|basic|digest|token)\s+)?(?:"[^"]*"|'[^']*'|[^\n"']+)/gi, '$1$2[REDACTED]'],
+  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})([^\S\n]*["']?[^\S\n]*[:=][^\S\n]*)(?:(?:bearer|basic|digest|token)[^\S\n]+)?(?:"[^"]*"|'[^']*'|[^\n"']+)/gi, '$1$2[REDACTED]'],
 ];
 
 // Redact credential-shaped substrings in `text`. Returns a scrubbed copy.

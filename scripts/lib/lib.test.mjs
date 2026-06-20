@@ -162,6 +162,27 @@ test('secrets.scrub — v1.0.11 added formats (npm/gitlab/sendgrid/square/azure)
   assert.ok(!/AAAAA/.test(over), 'over-length google key fully redacted, no tail leak');
 });
 
+test('secrets.scrub — M2: empty-value key does NOT eat the next line (DB_HOST survives)', () => {
+  // "password=\nDB_HOST=localhost" — the separator must not cross the newline; DB_HOST is NOT a secret
+  const result = scrub('password=\nDB_HOST=localhost');
+  assert.ok(result.includes('DB_HOST=localhost'), 'DB_HOST line is preserved unchanged');
+  assert.ok(!result.includes('password=\n[REDACTED]') || result.includes('DB_HOST=localhost'), 'empty-value redaction never consumes the following line');
+  // a non-empty value on the same line is still redacted
+  assert.match(scrub('password=hunter2\nDB_HOST=localhost'), /password=\[REDACTED\]/);
+  assert.ok(scrub('password=hunter2\nDB_HOST=localhost').includes('DB_HOST=localhost'), 'DB_HOST survives when password has a value');
+});
+
+test('secrets.scrub — M3: over-length AWS key (21+ chars) IS redacted; normal 16-char AKIA still redacted', () => {
+  // Normal 20-char AKIA (standard format)
+  assert.match(scrub('AKIA' + 'A'.repeat(16)), /\[REDACTED:aws-key\]/, '16-char AKIA still redacted');
+  // Over-length key (21+ chars) — {16} exact + \b would fail the boundary; {16,} catches it
+  const overLength = 'AKIA' + 'IOSFODNN7EXAMPLEX9A';  // 19 chars -> total 23
+  assert.match(scrub(overLength), /\[REDACTED:aws-key\]/, 'over-length AKIA key is redacted');
+  assert.ok(!/IOSFODNN7EXAMPLEX9A/.test(scrub(overLength)), 'no tail leak from over-length AWS key');
+  // The exact over-length example from the bug report
+  assert.match(scrub('AKIAIOSFODNN7EXAMPLEX9'), /\[REDACTED:aws-key\]/, '21-char AKIA from bug report is redacted');
+});
+
 test('secrets.scrub — v1.0.12: over-length token run fully redacted ({N,}) + AccountKey casing preserved', () => {
   // {N,} not {N}+\b: an over-length token-shaped run is fully redacted, never leaked whole
   const glOver = scrub('glpat' + '-' + 'a'.repeat(40));
