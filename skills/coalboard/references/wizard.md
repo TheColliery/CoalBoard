@@ -1,38 +1,38 @@
 # CoalBoard — the manual `/coalboard` setup wizard
 
-Loaded ON-DEMAND when the user runs `/coalboard` (the auto-trigger path skips this — it convenes directly per SKILL.md Step 0). Walk the 8 steps in order. **Every CHOOSE = the platform's question-box** (CC `AskUserQuestion`; a numbered text menu where none), with the recommended option marked `✓`. Numbers shown are runtime estimates you DERIVE for this target — never hardcoded. Then convene per SKILL.md Steps 0–4.
+Loaded ON-DEMAND when the user runs `/coalboard` (the auto-trigger path skips this — it convenes directly per SKILL.md Step 0). The 8 steps below; each CHOOSE is the platform's question-box (CC `AskUserQuestion`; a numbered menu where none) with the factory default marked `✓`. Steps may be batched into fewer question-box calls (`AskUserQuestion` takes ≤4 questions), but the user picks every value. Numbers are runtime estimates you DERIVE for the chosen target — never hardcoded. After the wizard, convene per SKILL.md Steps 0–4.
 
-## 1 — TARGET
-What is under the board? Default = the cwd repo/path; offer an override (another path, a subproject, a diff, a named file). Read its VERSION from the target's OWN files (its `plugin.json` / manifest), never from your loaded context / MEMORY. Note SOURCE repo vs TRANSIENT install-clone — it decides where the report lands (see `audit.md`).
+## 1 — TARGET (asked FIRST · before any scan / read / spawn)
+**Ask the target before doing ANYTHING else — do NOT scan, read target contents, or "cheap-scan cwd to understand it first".** The user picks; never assume cwd and start scanning. Options: **cwd repo/path (default ✓)** · a **clean export / mirror** (e.g. the offline `Colliery/` shipping view — no dev contamination) · a **subproject** · a **path** · a **diff** · a pre-configured target from config. WAIT for the choice; only THEN does Step 2 scan THAT target. (Why first: cwd is often a contaminated dev workspace, or the user wants the clean mirror / one subproject — assuming cwd wastes tokens on the wrong target.) After the pick, read the chosen target's VERSION from its OWN files (`plugin.json` / manifest), never from your context / MEMORY; note SOURCE vs TRANSIENT install-clone (decides report location — `audit.md`).
 
-## 2 — SCAN + CLASSIFY (cheap, before any spawn)
-- **Git is OPTIONAL** — a non-git target works (enumerate the tree directly); if git is present, `git ls-files` is the ground truth for "what's tracked".
-- **EXCLUDE** = the `excludePaths` config key with a FACTORY DEFAULT: `.git`, the dev-governance files (`MEMORY.md` / `CLAUDE.md` / `AGENTS.md` / `.claude/` / `.agents/`), `.coalboard/`, `node_modules`, `dist`. (These are machine-local / generated — auditing them is noise.)
-- **INCLUDE `.github`** — it is a real top-level area here (landing, benchmarks, docs, `install.mjs`); counter the training-bias to skip it. A repo literally NAMED `.github` legitimately nests `.github/.github/workflows/` — that is NOT a path bug (ground it via `git ls-files` before flagging — an over-eager solo agent false-positived exactly this).
-- **FRESH** — do NOT auto-read a prior `audit-*.md` into context (version-stale hazard; see `audit.md` #no-stale-read).
-- **CLASSIFY = extension-first** (`.js`/`.mjs`/`.ts` → code · `.md` → doc · `SKILL.md` → spec · config → config), + a selective HEAD-read only for the ambiguous; the full read is deferred to the DEPTH you pick next.
+## 2 — SCAN + CLASSIFY the chosen target (cheap · AFTER Step 1 · before any spawn)
+Scans only to INFORM the next questions + the cost estimate — it decides nothing for the user.
+- **Git OPTIONAL** — a non-git target works (enumerate the tree); with git, `git ls-files` = the tracked ground truth.
+- **EXCLUDE from the scan** — the dev-contamination the agent SEES but a GitHub user does NOT (`MEMORY.md`/`CLAUDE.md`/`AGENTS.md`/`.claude/`/`.agents/`) + `.git`/`.coalboard/`/`node_modules`/`dist` — exclude these regardless of config.
+- **INCLUDE `.github`** — a real top-level area (landing/benchmarks/docs/installer); a repo named `.github` legitimately nests `.github/.github/workflows/` (ground via `git ls-files` — not a bug).
+- **FRESH** — never auto-read a prior `audit-*.md` into context (version-stale; `audit.md`).
+- **CLASSIFY = extension-first** (`.mjs`/`.ts`→code · `.md`→doc · `SKILL.md`→spec · config→config) + a head-read for the ambiguous; the full read is deferred to DEPTH.
 
-## 3 — WORK-TYPE
-All `✓` / coding / doc / other (math, research, translation, …). Sets the per-domain known-failure checklist + verify gates the lenses use.
+## 3 — WORK-TYPE (ASK · options derived from the scan · never auto-set)
+`All / mixed ✓` · `coding` · `doc` · `other` (math/research/translation…). **The scan may reveal a mixed repo, but you STILL ASK — never silently auto-pick** (R2-2). Work-type is the ONE scope-narrowing: `doc` → the doc files are in scope, `code` → the code files, `All` → every file. Within the chosen scope the lenses NEVER sub-divide (SKILL.md Step 1) — all lenses examine ALL in-scope files together, never split by file-type / name / category.
 
-## 4 — DEPTH (the READ axis — ⊥ rigor — the PRIMARY cost lever)
-- **L1 surface** — heads + structure + the changed set.
-- **L2 standard `✓`** — read the in-scope files; debate the flagged findings.
-- **L3 deep** — read EVERY line for COVERAGE (tireless, no skim), but the DEBATE still concentrates on the FLAGGED + cross-file candidates, NOT literally per-line (per-line debate = mostly-empty + too expensive).
-
-Depth is the read-effort knob; rigor (next) is the trust knob — they are independent.
+## 4 — DEPTH (the READ axis · ⊥ rigor · the primary cost lever)
+`L1 surface` (heads + structure + changed set) · `L2 standard ✓` (read in-scope files; debate the flagged) · `L3 deep` (read EVERY line for coverage; debate flagged + cross-file, not literally per-line).
 
 ## 5 — RIGOR
-`relaxed` / `standard ✓` / `high` / `nasa` — the preset that bundles adversary lens · sub4-on-consensus · contested round · ground-truth gates · consent strictness (SKILL.md "Always"). A per-run pick here is PER-INSTANCE (never written to config).
+`relaxed` · `standard ✓` · `high` · `nasa` — the preset bundling adversary lens / sub4-on-consensus / contested-round / ground-truth gates / consent strictness (SKILL.md "Always"). A per-run pick is PER-INSTANCE (never written to config).
 
-## 6 — DISPATCH (how many lenses concurrently)
-all `✓` / 1 / 2 / N — a CONCURRENCY choice only (the lenses are always BLIND + examine the SAME target; parallel buys speed, blind buys independence). The agent self-manages the waves under `maxConcurrentSubagents`. This is NOT "split the scope" — the lenses never divide the work.
+## 6 — DISPATCH (how the lenses run)
+`all at once ✓` · `one-at-a-time` · `N` — a SPEED choice only. **BLIND (spec-only · main is never a lens) is the independence requirement; parallel just makes it faster — one-at-a-time is equally independent, only slower.** Run the chosen count under `maxConcurrentSubagents`. This is NOT "split the scope" — the lenses never divide the work.
 
 ## 7 — COST-CONFIRM (the pre-flight checkpoint)
-Summarize ALL choices + the TARGET line (path · version · source-vs-clone · any stale prior audit) + the RECOMPUTED token estimate → CONFIRM / CHANGE / CANCEL. Spawn the FIRST worker ONLY on confirm (SKILL.md Step 0). This is the convene+config+cost+report-location gate — NOT the apply decision (that is Step 4, after findings exist).
+Summarize ALL choices + the TARGET line (path · version · source-vs-clone · any stale prior audit) + the RECOMPUTED token estimate → CONFIRM / CHANGE / CANCEL. Spawn the FIRST worker ONLY on confirm. (Convene + config + cost + report-location gate — NOT the apply decision; that is Step 4, after findings exist.)
 
 ## 8 — RESULT
-After the board runs (Steps 1–4): present the digestible summary → **fix** (stage → verify → apply-consent) or **report-only**.
+After the board runs (SKILL.md Steps 1–4): present the digestible summary → **fix** (stage → apply-consent) or **report-only**.
 
-## Boarding-scope (when the target is interlinked — #15)
-If the target is a set of interlinked subprojects (shared governance, cross-refs, a spanning installer), offer **whole-connected `✓`** (default when interlinked — board it as ONE LONG continuous run so the lenses keep cross-link visibility; a per-folder silo would miss a cross-unit signal like "the installer forgot subproject X") **vs per-unit**. Control the cost of a whole-connected run via DEPTH (step 4) + durable per-agent memory (SKILL.md Memory & resume), NEVER by siloing.
+## Filling the lens prompts (R2-10)
+The wizard's RESOLVED values (factory default OR the user's pick — the template doesn't care which) substitute MECHANICALLY into the canonical lens-prompt template at `references/lens-prompts.md` — NEVER free-write a lens prompt (free-writing is what leaked dev-governance + caused per-lens asymmetry). Prompt-body placeholders: `{target}` · `{version}` · `{scope + excludes}` · `{work-type checklist}` · `{rigor}` · `{depth}`. Orchestration params (NOT prompt-body): the DISPATCH count (Step 6) + the model assignment (SKILL.md Step 1 deterministic rule). Flow: **wizard collects → scan derives → substitute into the template → spawn.**
+
+## Boarding-scope (interlinked target · #15)
+If the chosen target is interlinked subprojects, ASK **whole-connected ✓** (board as ONE continuous run so the lenses keep cross-link visibility; a per-folder silo misses a cross-unit signal) vs **per-unit**. Control whole-run cost via DEPTH (step 4) + durable per-agent memory (SKILL.md), never by siloing.

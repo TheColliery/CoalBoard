@@ -2,6 +2,25 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.1.0] — 2026-06-21
+
+Round-2 dogfood (the user ran the board as a customer + reported each finding) — the manual `/coalboard` wizard + lens-spawning hardened. **MINOR**: new capability (a canonical lens-prompt template + the wizard's target-first / ask-work-type flow + manual-board memory arming + deterministic model assignment + deadlock handling).
+
+### Added
+- **`references/lens-prompts.md` — the canonical lens-prompt TEMPLATE.** main fills `{target}` / `{scope}` / `{work-type-checklist}` / `{version}` placeholders, NEVER free-writes a prompt. Fixed rules: ground every lens in the TARGET's OWN files + FORBID injecting loaded dev-governance (the independence break the board exists to avoid); "seeds, not exhaustive" on EVERY lens (not just show-me/adversary); calibrated + FALSIFIER + NOT-CHECKED honesty; the deterministic model rule.
+
+### Changed
+- **Wizard (`references/wizard.md`) rewritten to the authoritative 8 steps:** Step 1 TARGET is asked FIRST, before any scan (no more "cheap-scan cwd before asking") — offers cwd / the clean mirror / a subproject / path / diff. WORK-TYPE is ASKED (never auto-set) and is the ONLY scope-narrowing. DISPATCH is a speed choice (BLIND = the independence; parallel just faster; one-at-a-time equally independent). The fill-flow (wizard values → template) is explicit.
+- **Lenses NEVER sub-divide the scope** by file-type / name / category / work-kind (SKILL.md Step 1 sharpened) — all lenses examine all in-scope files together.
+- **Model assignment is DETERMINISTIC + identical across every unit** (cost-bonus haiku-lenses + opus judge; `diversifyModels` spreads GENERATIONS not TIERS; Fable excluded) — never an arbitrary per-unit spread.
+- **Memory & resume:** ARM whenever a board is convened (manual = the full per-agent net; auto = CoalHearth-light, degrade-safe) — supersedes the "long-runs-only" gate; per-agent private + cross-read-forbidden; a sub self-resumes (or main re-spawns the remainder on a read-only platform); **EPHEMERAL** — `.coalboard/memory/` is deleted on completion (Phoenix #1 zero-garbage).
+- **Deadlock (sub4):** a sub4-resolved tie is USED directly (no extra blocking gate — a layman can't adjudicate a deep deadlock) but FLAGGED lower-confidence at the apply gate; the full deadlock detail goes in the report; a 3-way split still escalates to the human.
+
+### Fixed
+- README status was stale (`v1.0.12`) vs `plugin.json`.
+
+Gate: build + verify (the new reference is in the SHIP list) + 27 tests PASS.
+
 ## [1.0.13] — 2026-06-20
 
 The load-path **carve** — the series token-economy pilot ([skill-authoring](https://github.com/TheColliery/.github) §4): the SKILL.md body is now the LEAN always-loaded core (auto-trigger AND manual both pay only this); the heavy manual-only / deep detail moved to `references/*.md`, loaded ON-DEMAND. **Core body −40% (19433 ← 32372 chars)** — a board that auto-convenes no longer pays the manual wizard's tokens. Plus the Phase-3 robustness items folded in. (CB is the pilot; the carve rolls to CoalTipple + CoalMine next.)

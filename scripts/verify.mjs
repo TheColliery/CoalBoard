@@ -55,6 +55,7 @@ const SHIP = [
   'skills/coalboard/SKILL.md',
   'skills/coalboard/references/wizard.md',
   'skills/coalboard/references/audit.md',
+  'skills/coalboard/references/lens-prompts.md',
   'hooks/coalboard-conductor.js',
   'hooks/hooks.json',
   'commands/update.md',
