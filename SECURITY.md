@@ -12,7 +12,14 @@ Open an issue at `github.com/TheColliery/CoalBoard`, or request a private channe
 
 ## 🔑 Commit & Tag Signatures
 
-All commits and release tags are SSH-signed (`gpg.format=ssh`); GitHub renders the Verified badge. Verify locally with `git verify-commit HEAD` and `git tag -v "$(git describe --tags --abbrev=0)"`.
+All commits and release tags are SSH-signed (`gpg.format=ssh`); GitHub renders the Verified badge.
+
+Verify locally:
+```bash
+echo "* ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEtqTWGKhX1Dk9nZP8ns13Wl5zsO1Cz3VlTS6m1p2fP9" > coalboard_signers
+git config gpg.ssh.allowedSignersFile ./coalboard_signers
+git verify-commit HEAD && git tag -v "$(git describe --tags --abbrev=0)"
+```
 
 ---
 
