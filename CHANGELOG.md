@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.3.3] — 2026-06-21
+
+**PATCH** — board-audit round-2 fix (sub4-reproduced); bugfix only.
+
+### Fixed
+- **conductor `updateCheckDays` clamped at read (#3).** It was `Number.isInteger(v) ? v : 14` with NO upper/lower clamp — `{updateCheckDays:0}` (or negative) made the throttle window ≤0 → `now-last < 0` never true → the self-update nudge fired EVERY session. Now clamped to `[1,365]` (mirrors CoalTipple); out-of-bound → the 14-day default. + a regression test (two consecutive SessionStart with `{updateCheckDays:0}` → the 2nd is throttled). CoalBoard was the lone unguarded sibling (CT fixed in v1.0.20, CM guards in its conductor).
+
+Gate: build + verify + tests PASS.
+
 ## [1.3.2] — 2026-06-21
 
 **PATCH** — board-audit fix (verify-triaged from the whole-Colliery nasa board); bugfix only.

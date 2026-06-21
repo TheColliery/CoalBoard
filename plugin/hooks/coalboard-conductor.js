@@ -96,7 +96,7 @@ function hasNonLatin(s) {
 function updateDue(cfg) {
   if (lc(cfg.updateMode || 'ask') === 'off') return false;
   try {
-    const days = Number.isInteger(cfg.updateCheckDays) ? cfg.updateCheckDays : 14;
+    const days = (Number.isInteger(cfg.updateCheckDays) && cfg.updateCheckDays >= 1 && cfg.updateCheckDays <= 365) ? cfg.updateCheckDays : 14;
     const stamp = path.join(os.homedir(), '.claude', '.coalboard-update-check');
     let last = 0;
     try { last = Number(String(fs.readFileSync(stamp, 'utf8')).trim()) || 0; } catch {}

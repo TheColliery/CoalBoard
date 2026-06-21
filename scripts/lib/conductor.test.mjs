@@ -140,6 +140,36 @@ test('non-SessionStart non-UPS event -> fully silent (over-fire guard, v1.0.11)'
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('updateCheckDays:0 is CLAMPED -> the 2nd SessionStart is throttled, not re-nagged (#3 regression)', () => {
+  // With an UNCLAMPED read, days=0 makes the window `now-last < 0` never true -> the
+  // self-update nudge would fire on EVERY session. The clamp (out-of-range -> 14) restores
+  // the throttle: run #1 schedules + nudges, run #2 (same sandbox home -> same stamp) is silent.
+  const tmp = mk();
+  try {
+    writeCfg(tmp, { updateMode: 'auto', updateCheckDays: 0 });
+    const r1 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    const r2 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    assert.equal(r1.status, 0); assert.equal(r2.status, 0);
+    assert.match(r1.stdout, /self-update due/, 'run #1 (first ever) is due -> nudges + stamps');
+    assert.doesNotMatch(r2.stdout, /self-update due/, 'run #2 must be throttled: updateCheckDays:0 clamps to 14, the window holds');
+    assert.equal(r2.stderr, '');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('updateCheckDays:14 (in range) stays silent within the window on the 2nd SessionStart (#3 control)', () => {
+  // The in-range control for the clamp test: a valid value behaves identically to the
+  // clamped-0 case -> run #1 nudges, run #2 within the 14-day window is throttled.
+  const tmp = mk();
+  try {
+    writeCfg(tmp, { updateMode: 'auto', updateCheckDays: 14 });
+    const r1 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    const r2 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    assert.equal(r1.status, 0); assert.equal(r2.status, 0);
+    assert.match(r1.stdout, /self-update due/, 'run #1 (first ever) is due -> nudges + stamps');
+    assert.doesNotMatch(r2.stdout, /self-update due/, 'run #2 within the 14-day window must be throttled');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-silent)', () => {
   const tmp = mk();
   try {
