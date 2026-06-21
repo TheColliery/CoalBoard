@@ -36,6 +36,8 @@ node scripts/test.mjs     # runs the zero-dependency test suite (node --test)
 
 CoalBoard is **cross-agent** — it runs on any platform with concurrent subagents (the board spawns parallel-blind lenses; diversity rides the prompts, not a vendor). **Claude Code** additionally lets it run cheap lenses + a premium judge (a cost bonus) and auto-activates via hooks. A platform with no concurrent fan-out degrades to a sequential pass or off — never a broken board. Verify the platform's current subagent support (it churns).
 
+**Two tiers, honestly.** Any subagent platform is **design-supported** — the degrade-safe path runs (conservatively, unverified) with no setup, so you can use the board there today. **Claude Code + Antigravity** are **verified** end-to-end. Verification follows *access*, not a request queue: if you run a platform we haven't, open an issue and we'll walk you through a one-off capability probe **you run** on your side, then we confirm the result and ship a tuned adapter. The probe prompts stay private, and we never mark a platform "verified" until it's actually been run there — the free degrade-safe path is always there; "verified" is earned by whoever has the platform.
+
 ---
 
 ## 🗂️ Project Layout
