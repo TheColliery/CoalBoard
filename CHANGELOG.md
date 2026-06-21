@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.3.1] — 2026-06-21
+
+**PATCH**: report-context sharpen + doc sibling-consistency; no change to the board flow or config.
+
+### Changed
+- **R3B-8 — the report carries the FULL sub4 picture in BOTH cases.** On a sub4-broken deadlock (resolved OR escalated), the report always carries the contested claim · each camp's position · sub4's verdict (which camp it matched + why) OR its inability (the 3-way split that escalated) — so at the apply gate the human can RECONSTRUCT sub4's judgment, never rubber-stamp it. The consent digest surfaces enough of it to BE the out-of-frame check (full detail in the report).
+- **Docs sibling-consistency (#20):** README leads with the badge + links rows (the series pattern); SECURITY.md reordered to the family section order (Reporting → Signatures → Dist integrity → SkillSpector → Structural safety → board-specific) + a `version-transition` marker on the scan section; workflow action-version comments normalized to the major-only style (`# v7`, SHAs untouched). The shared public-doc pattern is now documented at `TheColliery/.github/DOC-PATTERN.md`.
+
+Gate: build + verify + 28 tests PASS.
+
 ## [1.3.0] — 2026-06-21
 
 Round-3 deep dogfood (the user ran the real published wizard + board as a customer and surfaced flow / honesty gaps the build gate cannot). **MINOR**: a new layman-default UX path + a holistic wizard/gate flow rework + model-diversity honesty corrections; no new config keys.

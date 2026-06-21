@@ -2,6 +2,12 @@
 
 > A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
 
+![version](https://img.shields.io/github/v/tag/TheColliery/CoalBoard?label=version&color=blue)
+![license](https://img.shields.io/badge/license-MIT-blue)
+![status](https://img.shields.io/badge/status-stable-brightgreen)
+
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
+
 **Status: stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)); the live version is in [CHANGELOG.md](CHANGELOG.md) and the GitHub releases.
 
 ## What it is
@@ -56,5 +62,3 @@ Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by proj
 CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
 
 Zero-dependency, offline, no API keys.
-
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Changelog](CHANGELOG.md)
