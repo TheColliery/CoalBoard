@@ -44,7 +44,7 @@ It **improves** correctness; it does **not** claim a defect rate or a reliabilit
 
 ## 📊 Benchmark
 
-**Headline:** with the board **10/10 (100% consistent)** vs an un-primed strong solo **~13/20 (~65%)** on 5 error-not-allowed tasks (Claude Code, Opus-class; 2026-06-19).
+**Headline:** with the board **10/10 (100% consistent)** vs an un-primed strong solo **~13/20 (~65%)** on 5 error-not-allowed tasks (Claude Code, Opus-class; 2026-06-19 — predates the current release; the board's debate/judge/verify logic is unchanged since).
 
 With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19. The board makes the rigor automatic where a casual pass is inconsistent — forced precision, live grounding, completeness — and the lift is larger on a weaker model. Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
 
