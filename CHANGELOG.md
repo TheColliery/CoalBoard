@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.4.2] — 2026-06-21
+
+**PATCH** — wizard / Step-0 consent CHANGE-path correctness. A user found that picking **change** at the cost checkpoint did not specify the recompute-and-re-consent loop — an implementer could spawn on a stale bill (a change to nasa multiplies cost, un-reconsented).
+
+### Fixed
+- **CHANGE recomputes the bill + re-consents (`bill → change → bill → pay`).** `references/wizard.md` (programmer Call 3 + the layman bill) and `SKILL.md` Step 0 now spell out: on `change`, loop back to re-pick → RECOMPUTE the bill → re-present the confirm as a FRESH box; never spawn on a stale bill, never fold the recompute into the change step. Spawn only on a confirm of the CURRENT bill.
+
+Gate: build + 36 node tests + verify PASS.
+
 ## [1.4.1] — 2026-06-21
 
 **PATCH** — lens decontamination hardened (W1/W2/W3). A dogfood audit run from inside the dev tree caught two "blind" lenses citing the umbrella `MEMORY.md` (outside the target): on Claude Code a spawned lens auto-loads the project `CLAUDE.md → MEMORY.md/AGENTS.md` (the up-tree walk) + SessionStart hooks, defeating the R2-6 "no dev-governance" rule. No new capability — a correctness fix to existing decontamination.
