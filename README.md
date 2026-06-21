@@ -1,16 +1,24 @@
-# CoalBoard
+<div align="center">
 
-> A *coal board* governs operations and resolves disputes for the mines. This one is the **consensus & debate board** of [TheColliery](https://github.com/TheColliery) — for the work where a single mistake is catastrophic.
+# ⚖️ CoalBoard
+
+> *A coal board governs operations and resolves disputes for the mines — this one is the board for the work where a single mistake is catastrophic.*
+
+**A diverse-lens consensus & debate board for error-not-allowed work** — on a critical task, with your consent, blind epistemic lenses debate in parallel, a judge synthesizes on verified inputs, and you sign off before anything touches your files.
 
 ![version](https://img.shields.io/github/v/tag/TheColliery/CoalBoard?label=version&color=blue)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
-**Status: stable.** Functional, tested, and benchmarked (see [Benchmark](#benchmark)); the live version is in [CHANGELOG.md](CHANGELOG.md) and the GitHub releases.
+**Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/HetCreep/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing).
 
-## What it is
+</div>
+
+---
+
+## ⚖️ What it is
 
 On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board:
 
@@ -21,7 +29,7 @@ On an **error-not-allowed** task — security/crypto, a DB/financial migration, 
 
 Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or run the `/coalboard:coalboard` plugin command) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
 
-## What it guarantees (and what it doesn't)
+## 🛡️ What it guarantees (and what it doesn't)
 
 CoalBoard is **NASA-inspired in structure** (redundancy + design-diversity + human-in-the-loop + trigger-only-on-critical) — **not in numbers.** It honestly guarantees two things:
 
@@ -32,17 +40,15 @@ Both guarantees are **contract-enforced** — the board's staging discipline + y
 
 It **improves** correctness; it does **not** claim a defect rate or a reliability figure (an LLM ensemble is probabilistic, not formally proven — and `10⁻⁹` is unverifiable by any system). It gets *more accurate as the underlying models improve*, for free — the structure is model-agnostic.
 
-## Benchmark
+## 📊 Benchmark
 
-With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19 — full method + per-task scoring in the series records, [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard):
+**Headline:** with the board **10/10 (100% consistent)** vs an un-primed strong solo **~13/20 (~65%)** on 5 error-not-allowed tasks (Claude Code, Opus-class; 2026-06-19).
 
-- **Reliability (Claude Code, Opus-class), repeated runs:** board **10/10** consistent vs an un-primed solo **~13/20 (~65%)**. A strong solo knows the textbook traps but is inconsistent where rigor must be forced — it shipped a wrong-cent figure, hedged a fetched date, missed a duplicate heading. The board makes the rigor automatic.
-- **Cross-vendor (Antigravity, Gemini 3.1 Pro Low):** solo **1/5 → board 4/5** — the board fixed the three *dangerous* errors a casual pass shipped (a timing side-channel, a stale version, a race condition). The lift is **larger on a weaker model**, and the discipline is **not Claude-specific**.
-- **The honest ceiling, shown:** the all-Gemini board still missed one defect — its lenses share a model, so they share the blind spot (Knight–Leveson); a different-model board (Claude) caught it. The board *improves* correctness; it does not escape a blind spot every copy shares. Hence the honest sell — **bounded cost + zero-breakage**, not a reliability number.
+With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19. The board makes the rigor automatic where a casual pass is inconsistent — forced precision, live grounding, completeness — and the lift is larger on a weaker model. Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
 
-> Honest scope: small, dated samples; a board improves correctness, it does not prove a defect rate.
+> Honest scope: small, dated samples; the board **improves** correctness, it does not prove a defect rate. A board whose lenses share one model still shares that model's blind spot (the honest ceiling). The honest sell is **bounded cost + zero-breakage**, not a reliability number.
 
-## Install
+## 🚀 Install
 
 **Claude Code** — one command (also enables hook auto-activation + the cheap-lenses / premium-judge cost discount, both CC-only):
 
@@ -53,12 +59,18 @@ claude plugin install coalboard@coalboard
 
 **Other platforms** (Cursor, Codex, Copilot, Amp, Goose, …) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **Cross-agent operation is by design but VERIFIED on Claude Code only** — treat other platforms as supported-not-yet-proven, and re-verify subagent support on yours.
 
-## Configure
+## ⚙️ Configure
 
 Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by project `.claude/`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) Key groups: activation (`coalboardMode`, `criticalPaths`, `triggerConfidence`), the board (`lenses`, `consensusThreshold`, `maxRounds`), verify (`qaStrictness`, `sastCommand`, `applyConsent`), and self-update. See the skill contract for the full set. A fully-commented template ships at [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json) — copy it to `~/.claude/.coalboard.json` (or your project's `.claude/.coalboard.json`) and edit.
 
-## Part of TheColliery
+## 🧭 Part of TheColliery
 
-CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
+CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries) and [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing). Install one and it stands alone; install all and they compose without conflict. Shared doctrine: Phoenix-13 hooks (zero-dependency, no network, fail-silent, no child processes, deterministic), single-source-of-truth config schemas, and a strict no-overkill discipline. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
 
 Zero-dependency, offline, no API keys.
+
+---
+
+## 📄 License
+
+MIT License. See [LICENSE](LICENSE).
