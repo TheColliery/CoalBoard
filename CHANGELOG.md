@@ -2,6 +2,18 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.0] — 2026-06-22
+
+**MINOR** — Antigravity is now a VERIFIED supported platform for the board (the capability-hack gate flips AG from UNVERIFIED to VERIFIED — new cross-agent support). The board was validated end-to-end on AG (Claude Opus 4.6): 3 read-only-leaf lenses via `define_subagent` → `invoke_subagent` parallel, the decontamination clause clean on all lenses, reaped via `manage_subagents`.
+
+### Added
+- **`references/platform-antigravity.md`** — the Claude-Code→Antigravity tool-mapping + verified caveats: read-only is TOOL-level (the write/spawn tools are absent from the sub — stronger than CC's by-instruction); AG auto-injects `AGENTS.md` → the decontam clause is required + was confirmed clean; subs are zombies → `manage_subagents kill_all` mandatory; no model-pick → lenses inherit the parent model (cross-vendor = human-manual); ~16 concurrent, depth-10 nesting; no hooks → manual-invoke.
+
+### Changed
+- **SKILL.md capability-hack** now lists "Verified live: Claude Code + Antigravity" (with a pointer to the new reference). Every other platform stays designed-for / unverified.
+
+Gate: build + 36 node tests + verify PASS.
+
 ## [1.4.2] — 2026-06-21
 
 **PATCH** — wizard / Step-0 consent CHANGE-path correctness. A user found that picking **change** at the cost checkpoint did not specify the recompute-and-re-consent loop — an implementer could spawn on a stale bill (a change to nasa multiplies cost, un-reconsented).
