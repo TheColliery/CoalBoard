@@ -37,3 +37,6 @@ body:
     id: expected
     attributes:
       label: Expected behavior
+      description: "What you expected to happen instead."
+    validations:
+      required: false
