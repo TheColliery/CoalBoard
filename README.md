@@ -9,6 +9,8 @@
 ![version](https://img.shields.io/github/v/tag/TheColliery/CoalBoard?label=version&color=blue)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![Claude Code](https://img.shields.io/badge/Claude_Code-validated-success)
+![Antigravity](https://img.shields.io/badge/Antigravity-validated-success)
 
 [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
@@ -57,7 +59,19 @@ claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-**Other concurrent-subagent platforms** (Cursor, Codex, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design, but it is VERIFIED on Claude Code only** — every actuatable artifact here (installer, hook, cost-tiering) is CC-specific, so treat the named platforms as supported-not-yet-proven and re-verify subagent support on yours.
+**Antigravity** — *validated end-to-end (2026-06-22)*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
+
+```powershell
+git clone https://github.com/TheColliery/CoalBoard.git --depth 1
+# global (all workspaces):
+Copy-Item -Recurse CoalBoard/skills/coalboard "$env:USERPROFILE\.gemini\config\skills\coalboard"
+# — or per-project: copy into <your-repo>\.agents\skills\coalboard instead
+Remove-Item -Recurse -Force CoalBoard   # optional cleanup
+```
+
+Start a new Antigravity session; `coalboard` appears in the skills list. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (Antigravity has no hooks and no per-worker model-pick — the lenses run the parent model).
+
+**Other concurrent-subagent platforms** (Cursor, Codex, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VERIFIED on Claude Code and Antigravity** — every other named platform is supported-not-yet-proven, so re-verify subagent support on yours.
 
 ## ⚙️ Configure
 
