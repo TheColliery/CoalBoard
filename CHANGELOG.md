@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.4.1] — 2026-06-21
+
+**PATCH** — lens decontamination hardened (W1/W2/W3). A dogfood audit run from inside the dev tree caught two "blind" lenses citing the umbrella `MEMORY.md` (outside the target): on Claude Code a spawned lens auto-loads the project `CLAUDE.md → MEMORY.md/AGENTS.md` (the up-tree walk) + SessionStart hooks, defeating the R2-6 "no dev-governance" rule. No new capability — a correctness fix to existing decontamination.
+
+### Fixed
+- **Lens decontamination defeated on Claude Code (W1).** `references/lens-prompts.md` now carries an explicit "IGNORE auto-loaded governance" FIXED rule — a lens must never cite or be primed by an ancestor `CLAUDE.md`/`MEMORY.md`/`AGENTS.md` the platform injects, and re-grounds in the target's own files if it catches itself. `excludePaths` only kept governance out of the *scan*, never the platform-loaded *context*; this closes the lens side. Proven live: an out-of-frame solver spawned WITH the clause did not leak.
+- **Neutral-cwd guidance + honest independence flag (W2/W3).** `SKILL.md` Step 1 + `references/audit.md` now direct main to spawn lenses from a NEUTRAL cwd when the target sits inside a governed tree, and to flag any inside-the-tree pass NOT independence-clean — main + the judge auto-load the governance too, so their dismissals are dev-informed, not out-of-frame.
+
+Gate: build + 36 node tests + verify PASS.
+
 ## [1.4.0] — 2026-06-21
 
 **MINOR** — the manual `/coalboard` wizard brought to CM-parity (flow-correctness + max token-min), a non-Latin critical-prompt trigger, and a gateless-auto-apply guard. Wizard built via the same two-stage loop CM's gold-standard wizard got (correctness loop → token-min loop), each adversarially re-verified at the commit-gate.
