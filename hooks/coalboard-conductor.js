@@ -70,6 +70,14 @@ function boardOff(cfg) {
   return !!(cfg && typeof cfg.coalboardMode === 'string' && cfg.coalboardMode.toLowerCase() === 'off');
 }
 
+// Non-Latin script present? TRUE iff a non-Latin LETTER appears. Strip Latin-script chars + every
+// NON-letter (digits, punctuation, symbols, EMOJI, C0 controls, whitespace) -> what remains is a
+// non-Latin letter (Thai/Arabic/CJK/Cyrillic/etc.). Unicode property escapes (u flag); no typed
+// control char (AGENTS.md NUL-byte hazard). Mirrors trigger.mjs hasNonLatin (the SOT).
+function hasNonLatin(s) {
+  return String(s == null ? '' : s).replace(/[\p{Script=Latin}\P{L}]/gu, '').length > 0;
+}
+
 function detect(prompt, cfg) {
   const paths = cfgList(cfg.criticalPaths, D_PATHS);
   const imports = cfgList(cfg.criticalImports, D_IMPORTS);
@@ -80,15 +88,12 @@ function detect(prompt, cfg) {
   if (p.length) reasons.push('path:' + p.join('/'));
   if (i.length) reasons.push('import:' + i.join('/'));
   if (k.length) reasons.push('keyword:' + Array.from(new Set(k)).slice(0, 6).join('/'));
+  // CB-7: a non-Latin (Thai/CJK/etc.) prompt matches NO English seed -> zero reasons -> the hook
+  // would emit nothing for a non-English critical task. Its SCRIPT presence is itself a Layer-1
+  // signal: emit so the model grades by MEANING (Layer 2). Mirrors trigger.mjs detectStatic
+  // opts.scriptSignal (PROMPTS only — file scans never run this path).
+  if (hasNonLatin(prompt)) reasons.push('script:non-Latin');
   return reasons;
-}
-
-// Non-Latin script present? TRUE iff a non-Latin LETTER appears. Strip Latin-script chars + every
-// NON-letter (digits, punctuation, symbols, EMOJI, C0 controls, whitespace) -> what remains is a
-// non-Latin letter (Thai/Arabic/CJK/Cyrillic/etc.). Unicode property escapes (u flag); no typed
-// control char (AGENTS.md NUL-byte hazard). Supersedes the old negated-range + emoji/C0 false-fires.
-function hasNonLatin(s) {
-  return String(s == null ? '' : s).replace(/[\p{Script=Latin}\P{L}]/gu, '').length > 0;
 }
 
 // Self-update is kind-1 (plugin version): the HOOK only SCHEDULES (a throttled stamp);

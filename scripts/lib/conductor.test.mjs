@@ -68,6 +68,20 @@ test('non-English critical prompt -> the grade-by-meaning nudge fires', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('PURE-Thai critical prompt (NO Latin keyword) -> still fires via the non-Latin script signal (CB-7)', () => {
+  const tmp = mk();
+  try {
+    // The exact CB-7 case: a critical prompt entirely in Thai matches ZERO English seed.
+    // Before the fix this returned no reasons -> the conductor emitted nothing for a
+    // Thai-speaking user's critical prompt. The script-presence signal must now fire it.
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'แก้บั๊กการเข้ารหัสในระบบยืนยันตัวตน' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /CRITICAL signal/, 'a pure-Thai critical prompt must not be silent');
+    assert.match(r.stdout, /non-English/, 'and it carries the grade-by-meaning nudge');
+    assert.equal(r.stderr, '');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('multi-line ENGLISH critical prompt -> CRITICAL signal but NO non-English nudge (C0 control-char guard, audit A)', () => {
   const tmp = mk();
   try {

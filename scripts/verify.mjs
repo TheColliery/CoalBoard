@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
+import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -141,6 +141,9 @@ check('factory config valid against schema', () => {
     const err = validateValue(spec, v);
     if (err) return `.coalboard.json '${k}' ${err}`;
   }
+  // cross-key: individually-valid keys can form a JOINTLY-dangerous combo (gateless auto-apply)
+  const cross = validateConfig(cfg);
+  if (cross) return `.coalboard.json ${cross}`;
   return null;
 });
 

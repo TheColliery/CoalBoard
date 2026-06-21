@@ -3,10 +3,10 @@
 // Run: node --test lib.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectStatic, detectFileWrite, isExcluded } from './trigger.mjs';
+import { detectStatic, detectFileWrite, isExcluded, hasNonLatin } from './trigger.mjs';
 import { rigorPreset, applyRigor } from './rigor.mjs';
 import { scrub, hasSecret } from './secrets.mjs';
-import { CONFIG_SCHEMA, validateValue } from './config-schema.mjs';
+import { CONFIG_SCHEMA, validateValue, validateConfig } from './config-schema.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +45,31 @@ test('trigger — config-robustness: additive keywords, empty-array guards, timi
   assert.equal(detectStatic('prevent a timing attack on the login').hit, true, 'space form of timing attack');
 });
 
+test('trigger.hasNonLatin — non-Latin LETTERS only (CB-7)', () => {
+  assert.equal(hasNonLatin('แก้บั๊กการเข้ารหัส'), true, 'Thai letters');
+  assert.equal(hasNonLatin('修复加密漏洞'), true, 'CJK letters');
+  assert.equal(hasNonLatin('исправить ошибку'), true, 'Cyrillic letters');
+  assert.equal(hasNonLatin('fix the auth crypto bug'), false, 'plain Latin prose');
+  assert.equal(hasNonLatin('fix the bug\nin login flow'), false, 'a newline (C0 control) is NOT a letter');
+  assert.equal(hasNonLatin('fix the bug ' + String.fromCodePoint(0x1F600)), false, 'an emoji is a SYMBOL, not a letter');
+  assert.equal(hasNonLatin('cost is 100% done!'), false, 'digits + punctuation are not letters');
+  assert.equal(hasNonLatin(''), false, 'empty string');
+  assert.equal(hasNonLatin(null), false, 'null is safe');
+});
+
+test('trigger.detectStatic — scriptSignal (opt-in) catches a pure-non-Latin critical prompt (CB-7)', () => {
+  // The CB-7 gap: a pure-Thai critical prompt matches NO English seed -> zero reasons.
+  assert.equal(detectStatic('แก้บั๊กการเข้ารหัสในระบบยืนยันตัวตน').hit, false, 'without the signal: a pure-Thai prompt produces zero reasons');
+  // opts.scriptSignal (the PROMPT path) makes the script presence itself a Layer-1 reason
+  const r = detectStatic('แก้บั๊กการเข้ารหัสในระบบยืนยันตัวตน', {}, { scriptSignal: true });
+  assert.equal(r.hit, true, 'with the signal: a non-Latin prompt fires');
+  assert.ok(r.reasons.some((x) => /non-Latin/.test(x)), 'and names the non-Latin signal');
+  // off by default for file scans -> non-Latin file content does NOT false-fire
+  assert.equal(detectStatic('// 注释\nconst x = 1', {}, {}).hit, false, 'file content with non-Latin comments does not fire (signal off by default)');
+  // plain English never gets a script reason even with the signal on (no over-fire)
+  assert.equal(detectStatic('list the readme files', {}, { scriptSignal: true }).hit, false, 'plain English benign stays benign with the signal on');
+});
+
 test('rigor — presets + explicit override + unknown falls to standard', () => {
   assert.equal(rigorPreset('nasa').observerOnMaxStakes, true);
   assert.equal(rigorPreset('relaxed').active, false);
@@ -52,6 +77,33 @@ test('rigor — presets + explicit override + unknown falls to standard', () => 
   // an explicit key overrides the preset
   assert.equal(applyRigor({ rigor: 'nasa', applyConsent: false }).applyConsent, false);
   assert.equal(applyRigor({ rigor: 'nasa' }).applyConsent, true);
+});
+
+test('config — validateConfig REJECTS gateless auto-apply, allows each key alone + safe combos (CB-4)', () => {
+  // the dangerous PAIR: auto-convene AND no apply-gate = both human gates removed
+  assert.ok(validateConfig({ coalboardMode: 'auto', applyConsent: false }), 'auto + applyConsent:false is rejected');
+  assert.match(validateConfig({ coalboardMode: 'auto', applyConsent: false }), /gateless auto-apply/);
+  assert.ok(validateConfig({ coalboardMode: 'AUTO', applyConsent: false }), 'enum is case-insensitive (AUTO)');
+  // each key ALONE is fine (validateValue passes them individually; only the PAIR is dangerous)
+  assert.equal(validateConfig({ coalboardMode: 'auto' }), null, 'auto alone (applyConsent defaults true) is fine');
+  assert.equal(validateConfig({ applyConsent: false }), null, 'applyConsent:false alone (mode defaults ask) is fine');
+  // safe combos
+  assert.equal(validateConfig({ coalboardMode: 'auto', applyConsent: true }), null, 'auto + apply-gate ON is fine');
+  assert.equal(validateConfig({ coalboardMode: 'ask', applyConsent: false }), null, 'ask + applyConsent:false (still one gate) is fine');
+  assert.equal(validateConfig({ coalboardMode: 'off', applyConsent: false }), null, 'off never convenes, so no gateless apply');
+  assert.equal(validateConfig({}), null, 'empty config is fine');
+  assert.equal(validateConfig(null), null, 'null is safe');
+});
+
+test('rigor — applyRigor FAIL-SAFE: auto + inherited/explicit applyConsent:false is forced back ON (CB-4)', () => {
+  // rigor:relaxed inherits applyConsent:false — under coalboardMode:auto that would be gateless; force ON
+  assert.equal(applyRigor({ coalboardMode: 'auto', rigor: 'relaxed' }).applyConsent, true, 'relaxed-inherited applyConsent:false is forced ON under auto');
+  // explicit applyConsent:false under auto -> forced ON
+  assert.equal(applyRigor({ coalboardMode: 'auto', applyConsent: false }).applyConsent, true, 'explicit false is forced ON under auto');
+  assert.equal(applyRigor({ coalboardMode: 'AUTO', applyConsent: false }).applyConsent, true, 'case-insensitive');
+  // NOT auto -> the value is left as configured (relaxed under ask keeps its single gate semantics)
+  assert.equal(applyRigor({ coalboardMode: 'ask', applyConsent: false }).applyConsent, false, 'under ask, applyConsent:false is honored (one gate remains)');
+  assert.equal(applyRigor({ rigor: 'relaxed' }).applyConsent, false, 'no mode (defaults ask) -> relaxed keeps applyConsent:false');
 });
 
 test('rigor — sharpness levers are tiered by preset, explicit key overrides', () => {

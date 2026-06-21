@@ -57,7 +57,7 @@ claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-**Other platforms** (Cursor, Codex, Copilot, Amp, Goose, …) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **Cross-agent operation is by design but VERIFIED on Claude Code only** — treat other platforms as supported-not-yet-proven, and re-verify subagent support on yours.
+**Other concurrent-subagent platforms** (Cursor, Codex, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design, but it is VERIFIED on Claude Code only** — every actuatable artifact here (installer, hook, cost-tiering) is CC-specific, so treat the named platforms as supported-not-yet-proven and re-verify subagent support on yours.
 
 ## ⚙️ Configure
 

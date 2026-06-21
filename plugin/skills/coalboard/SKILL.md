@@ -15,7 +15,7 @@ description: >-
 You are **main** (depth-0): you decide whether to convene, orchestrate, judge, and (with the human) own the apply. Lens-workers are **leaves** — bounded by a task-contract, they RETURN, never spawn.
 
 ## Entry — manual vs auto
-- **Manual `/coalboard`** = an interactive setup: **read `references/wizard.md` and run the 2-call wizard** (Call 1 = target → scan → Call 2 = work-type · depth · rigor · confirm; dispatch defaults to all-at-once), then convene per the Steps below.
+- **Manual `/coalboard`** = an interactive setup: **read `references/wizard.md` and run it** — dual-audience: LAYMAN-default = derive safe defaults + ONE plain bill (≤2 boxes); ADVANCED = order→bill→pay (target → scan → the 3 settings → the bill computed AFTER the picks, then confirm — 3 boxes). dispatch defaults all-at-once. The wizard owns the step detail; convene per the Steps below.
 - **Auto** (a conductor CRITICAL signal · a CoalTipple hand-off · your own error-not-allowed read) SKIPS the wizard → go straight to Step 0.
 - **A deep AUDIT of a repo/release** (prior-audit handling · `.github` inclusion · scope-containment · the every-file pass · interlinked-whole boarding) → **read `references/audit.md`.** (References load on-demand — the cheap auto path never pays for them.)
 

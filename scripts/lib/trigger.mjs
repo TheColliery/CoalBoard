@@ -27,6 +27,15 @@ function matched(text, list) {
   return list.filter((f) => f && t.includes(String(f).toLowerCase()));
 }
 
+// Non-Latin script present? TRUE iff a non-Latin LETTER appears. Strip Latin-script chars +
+// every NON-letter (digits, punctuation, symbols, EMOJI, C0 controls, whitespace) — what
+// remains is a non-Latin letter (Thai/Arabic/CJK/Cyrillic/…). Unicode property escapes (u flag).
+// The English keyword/path/import seed under-fires on a non-Latin prompt, so its mere PRESENCE
+// is a signal to grade by intent (the model does Layer-2). Mirrored verbatim in the conductor hook.
+export function hasNonLatin(s) {
+  return String(s == null ? '' : s).replace(/[\p{Script=Latin}\P{L}]/gu, '').length > 0;
+}
+
 // Resolve a config list: use it ONLY if it has >=1 non-empty entry, else the default.
 // An empty array or an all-'' array means "fall back to defaults", never "match nothing" —
 // so `excludePaths: []` cannot silently disable exclusions and `criticalPaths: ['']`
@@ -53,8 +62,13 @@ export function isExcluded(filePath, excludePaths = DEFAULT_EXCLUDE) {
 
 // Detect the Layer-1 static signal in a piece of text (a prompt, or a file's content).
 // `cfg` may carry criticalPaths / criticalImports / criticalKeywords / excludePaths / language overrides.
+// `opts.scriptSignal` (PROMPTS only) adds a non-Latin-script presence signal: a pure-Thai/CJK
+// critical prompt matches NO English seed, so without this it would produce zero reasons and the
+// conductor would emit nothing — a Thai-speaking user's critical prompt would slip the gate.
+// Off by default so a file-content scan (which may legitimately hold non-Latin comments) never
+// false-fires; the prompt path opts in. (CB-7)
 // Returns { hit: boolean, reasons: string[] } — reasons are short, human-readable.
-export function detectStatic(text, cfg = {}) {
+export function detectStatic(text, cfg = {}, opts = {}) {
   const paths = cfgList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
   const imports = cfgList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
   const keywords = keywordList(cfg.criticalKeywords);
@@ -65,6 +79,7 @@ export function detectStatic(text, cfg = {}) {
   if (pHit.length) reasons.push(`critical path: ${pHit.join(', ')}`);
   if (iHit.length) reasons.push(`critical import: ${iHit.join(', ')}`);
   if (kHit.length) reasons.push(`critical keyword: ${[...new Set(kHit)].slice(0, 6).join(', ')}`);
+  if (opts.scriptSignal && hasNonLatin(text)) reasons.push('non-Latin script: grade by intent');
   return { hit: reasons.length > 0, reasons };
 }
 

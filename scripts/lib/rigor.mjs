@@ -35,5 +35,11 @@ export function applyRigor(cfg = {}) {
   for (const k of RIGOR_CONTROLLED) {
     if (cfg[k] !== undefined) eff[k] = cfg[k]; // explicit key overrides the preset
   }
+  // FAIL-SAFE: gateless auto-apply (coalboardMode:auto + applyConsent:false — explicit OR
+  // inherited from rigor:relaxed) removes BOTH human gates. verify.mjs REJECTS it loudly; at
+  // runtime we never silently honor it — force the apply-gate back ON. The human gate is the
+  // load-bearing safety node (DESIGN); it is never config-able to off under auto. (CB-4)
+  const mode = typeof cfg.coalboardMode === 'string' ? cfg.coalboardMode.toLowerCase() : 'ask';
+  if (mode === 'auto' && eff.applyConsent === false) eff.applyConsent = true;
   return eff;
 }

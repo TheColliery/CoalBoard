@@ -93,6 +93,24 @@ export function validateValue(spec, v) {
   }
 }
 
+// Cross-key validation — a combination that is individually-valid but JOINTLY dangerous.
+// validateValue checks one key in isolation; this catches the unsafe PAIR. Returns an
+// error fragment or null. (SKILL.md "No gateless auto-apply" is the prose form of this —
+// here it is mechanically guarded so the safety does not rest on the model recalling a line.)
+//   coalboardMode:auto + applyConsent:false = gateless auto-apply: the board convenes
+//   WITHOUT asking AND writes to live files WITHOUT the staged-diff sign-off = BOTH human
+//   gates removed. The human gate is the load-bearing safety node (DESIGN) — never gateless.
+// `applyConsent` may arrive explicitly OR inherited from a preset (rigor:relaxed sets it
+// false) — so the check is on the EFFECTIVE value the caller passes, not just an explicit key.
+export function validateConfig(cfg = {}) {
+  if (!cfg || typeof cfg !== 'object') return null;
+  const mode = typeof cfg.coalboardMode === 'string' ? cfg.coalboardMode.toLowerCase() : 'ask';
+  if (mode === 'auto' && cfg.applyConsent === false) {
+    return 'coalboardMode:auto with applyConsent:false = gateless auto-apply (both human gates removed) — set applyConsent:true, or use coalboardMode:ask';
+  }
+  return null;
+}
+
 // A per-role pin is a model string OR a non-empty priority chain of model strings.
 function validateLensTiers(pins) {
   const roles = ['data', 'truth', 'feeling', 'observer', 'judge'];

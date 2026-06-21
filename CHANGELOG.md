@@ -2,6 +2,23 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.4.0] — 2026-06-21
+
+**MINOR** — the manual `/coalboard` wizard brought to CM-parity (flow-correctness + max token-min), a non-Latin critical-prompt trigger, and a gateless-auto-apply guard. Wizard built via the same two-stage loop CM's gold-standard wizard got (correctness loop → token-min loop), each adversarially re-verified at the commit-gate.
+
+### Added
+- **Non-Latin critical-prompt trigger (CB-7).** The per-prompt conductor was English-keyword-only — a pure-Thai/CJK critical prompt (e.g. `แก้บั๊กการเข้ารหัส…`) produced zero reasons and the board stayed silent. `trigger.mjs` now emits a `script:non-Latin` reason (the grade-by-intent nudge) when a prompt carries a meaningful non-Latin run, so a non-English critical prompt still routes to the board's judge-by-intent. Off for file scans (non-Latin code comments don't false-fire). Phoenix-pure (zero-dep, fail-silent, deterministic).
+
+### Fixed
+- **Gateless auto-apply now mechanically guarded (CB-4).** `{coalboardMode:"auto", applyConsent:false}` (explicit, or inherited from `rigor:relaxed`) removed both human gates with only a prose rule stopping it. `verify.mjs` now rejects the combo loudly, and `applyRigor()` forces the apply-gate back on at runtime (on the *effective* value, covering the relaxed-inheritance path). The human gate is never config-able off under `auto`.
+- **Manual-wizard flow-correctness (CB-W1).** The resident `SKILL.md` described the superseded pre-v1.3.0 "2-call, stale-cost" flow, contradicting the on-demand wizard's corrected 3-call order→bill→pay (bill computed AFTER the picks). Resident contract + wizard now agree; `SKILL.md` delegates the step detail to the wizard (lean resident body).
+- **Cross-platform README claim scoped (CB-14).** The named-platform list (Cursor/Codex/Copilot/Amp/Goose) is now explicitly *design-supported, unverified* — every actuatable artifact (installer, hook, cost-tiering) is Claude-Code-specific; the debate structure is cross-agent by design but verified on Claude Code only.
+
+### Changed
+- **Wizard token-minimized ~33%** — the on-demand wizard squeezed to the leanest text passing all bars; every cut re-verified against the flow / no-double-ask / honesty / no-dup bars, and the box-counts, the bill-after-picks anti-drift rule, the layman honesty triad, and the dev-contamination exclude-floor were all rejected-from-cutting (= load-bearing, the maximality proof).
+
+Gate: build + 36 node tests + verify PASS.
+
 ## [1.3.3] — 2026-06-21
 
 **PATCH** — board-audit round-2 fix (sub4-reproduced); bugfix only.
