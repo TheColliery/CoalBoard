@@ -90,13 +90,28 @@ test('emoji in an English prompt -> CRITICAL signal but NO non-English nudge (em
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('coalboardMode:off -> fully silent on every event', () => {
+test('coalboardMode:off -> board contract + AND-gate silent, but self-update is orthogonal', () => {
   const tmp = mk();
   try {
     writeCfg(tmp, { coalboardMode: 'off' });
+    // SessionStart: the board contract is suppressed, but the self-update is due (fresh sandbox,
+    // updateMode defaults to ask) -> only the self-update directive fires, NOT the board contract.
     const r1 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
     const r2 = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, tmp, tmp);
-    assert.equal(r1.status, 0); assert.equal(r1.stdout, '');
+    assert.equal(r1.status, 0);
+    assert.match(r1.stdout, /self-update due/, 'self-update is orthogonal to the board and still fires when off');
+    assert.doesNotMatch(r1.stdout, /Consensus board available/, 'the board contract is suppressed when coalboardMode:off');
+    assert.equal(r2.status, 0); assert.equal(r2.stdout, '', 'the UserPromptSubmit AND-gate stays silent when the board is off');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('coalboardMode:off + updateMode:off -> fully silent on every event', () => {
+  const tmp = mk();
+  try {
+    writeCfg(tmp, { coalboardMode: 'off', updateMode: 'off' });
+    const r1 = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    const r2 = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, tmp, tmp);
+    assert.equal(r1.status, 0); assert.equal(r1.stdout, '', 'board off + update off -> SessionStart fully silent');
     assert.equal(r2.status, 0); assert.equal(r2.stdout, '');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

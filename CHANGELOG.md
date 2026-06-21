@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.3.2] — 2026-06-21
+
+**PATCH** — board-audit fix (verify-triaged from the whole-Colliery nasa board); bugfix only.
+
+### Fixed
+- **`coalboardMode:off` no longer silences self-update.** The conductor returned early on `boardOff`, which also suppressed the SessionStart self-update check — but the board AND-gate (`coalboardMode`) and self-update (`updateMode`) are ORTHOGONAL (independent off-switches). Now the board's UserPromptSubmit path is skipped when off while the SessionStart self-update still fires per its own `updateMode`. (+ the companion test, which had encoded the bug.)
+
+Gate: build + verify + 28 tests PASS.
+
 ## [1.3.1] — 2026-06-21
 
 **PATCH**: report-context sharpen + doc sibling-consistency; no change to the board flow or config.

@@ -109,12 +109,13 @@ function updateDue(cfg) {
 
 function main() {
   const cfg = readCfg();
-  if (boardOff(cfg)) return;
+  const off = boardOff(cfg);
   let input = {};
   try { const p = JSON.parse(readStdin() || '{}'); if (p && typeof p === 'object' && !Array.isArray(p)) input = p; } catch {}
   const event = input.hook_event_name || input.hookEventName || '';
 
   if (event === 'UserPromptSubmit') {
+    if (off) return; // the board AND-gate is gated by coalboardMode; self-update is orthogonal (SessionStart only).
     const reasons = detect(input.prompt || input.user_prompt || '', cfg);
     if (!reasons.length) return;
     const nonLatin = hasNonLatin(input.prompt || input.user_prompt || '')
@@ -127,11 +128,13 @@ function main() {
   // stays silent (Phoenix #13 zero-noise — the hook is wired to SessionStart + UserPromptSubmit;
   // never emit on an unexpected/unknown event).
   if (event !== 'SessionStart') return;
-  let msg = "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
+  // The board contract is gated by coalboardMode; self-update is ORTHOGONAL (its own off-switch
+  // is updateMode), so it still fires when the board is off — the two keys are independent.
+  let msg = off ? '' : "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
-    msg += ' [self-update due] Offer the /coalboard:update check (compare the latest git tag to the installed version, then offer `claude plugin update`). Consent-gated; the hook only scheduled it.';
+    msg += (msg ? ' ' : '[CoalBoard] ') + '[self-update due] Offer the /coalboard:update check (compare the latest git tag to the installed version, then offer `claude plugin update`). Consent-gated; the hook only scheduled it.';
   }
-  process.stdout.write(msg);
+  if (msg) process.stdout.write(msg);
 }
 
 try { main(); } catch { /* Phoenix #4: fail-silent, never crash the host */ }
