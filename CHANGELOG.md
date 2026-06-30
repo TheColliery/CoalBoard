@@ -2,6 +2,17 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.1] — 2026-07-01
+
+**PATCH** — structural LEAF enforcement (issue #2). On Claude Code at rigor `nasa`, a show-me lens **spawned its own background subagent**; the orphan grandchild was **unreapable by `main`** once the lens returned (~27 min / ~213k tokens / 80 Bash uses, manual stop). The LEAF rule was prompt-only — nothing structurally stopped a spawn-capable lens. A second fix, surfaced while gating this release, hardens config resolution (the conductor no longer walks above the home dir) and closes a hermetic-test leak it caused.
+
+### Fixed
+- **LEAF is now STRUCTURAL, not prose (issue #2).** `SKILL.md` Step 1 + the depth-0 intro + `references/lens-prompts.md` mandate spawning every lens with an agent type that LACKS the spawn tool — Claude Code: the `Explore` agent type (no Agent/Task tool; keeps Read/Grep/Bash/web for show-me + adversary); Antigravity: `define_subagent(enable_subagent_tools=false)`. A grandchild a lens spawns is UNREAPABLE by `main` on CC once the lens returns (main holds no handle; `TaskStop`/`TaskList` find nothing) — so the fix PREVENTS the grandchild rather than relying on reaping it.
+- **Backstop:** if a lens's returned text reports it spawned a subagent, `main` must surface + stop it immediately, before the judge step (a slipped grandchild is the one escape from the no-zombie guarantee).
+- **Config resolution no longer escapes above the home dir (latent fix + test hermeticity).** `findProjectCfg` walked UP from cwd to the filesystem ROOT (skipping home but continuing ABOVE it) → it could read a `.coalboard.json` above the home dir, which is not "this project"; it now STOPS at home (Phoenix #10). This also closed a hermetic-test leak: the test sandbox sits under the real home (`os.tmpdir()`), so the walk-up was reading the real `~/.claude/.coalboard.json` (`{updateMode:off}`) and suppressing the self-update directive the 3 self-update tests assert — a real-machine-state leak that surfaced only once the real config gained `updateMode:off` (the tests passed at v1.5.0, before it existed). A new hermetic test asserts a config above the sandboxed home is ignored.
+
+Gate: build + 37 node tests + verify PASS.
+
 ## [1.5.0] — 2026-06-22
 
 **MINOR** — Antigravity is now a VERIFIED supported platform for the board (the capability-hack gate flips AG from UNVERIFIED to VERIFIED — new cross-agent support). The board was validated end-to-end on AG (Claude Opus 4.6): 3 read-only-leaf lenses via `define_subagent` → `invoke_subagent` parallel, the decontamination clause clean on all lenses, reaped via `manage_subagents`.

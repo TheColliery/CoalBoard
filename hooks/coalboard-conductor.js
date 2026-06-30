@@ -36,16 +36,17 @@ function parseJsonc(text) {
 
 // Find the nearest project .coalboard.json by walking UP from cwd (a CC hook cwd may be a
 // SUBDIR, not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
-// Skip the home dir (it is the GLOBAL config, already read) so it is not double-counted as project.
+// STOP at the home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing
+// above your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
+// another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
 function findProjectCfg() {
   try {
     const home = os.homedir();
     let dir = process.cwd();
     for (let i = 0; i < 40; i++) {
-      if (dir !== home) {
-        const f = path.join(dir, '.claude', '.coalboard.json');
-        if (fs.existsSync(f)) return f;
-      }
+      if (dir === home) break; // reached home: its config is the GLOBAL (already read), and nothing above home is "this project"
+      const f = path.join(dir, '.claude', '.coalboard.json');
+      if (fs.existsSync(f)) return f;
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;

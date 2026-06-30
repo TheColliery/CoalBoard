@@ -143,6 +143,20 @@ test('project config read from a PARENT when cwd is a subdir (cwd walk-up, round
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+test('findProjectCfg STOPS at home -- a .coalboard.json ABOVE the sandboxed home is IGNORED (no walk-above-home escape; hermetic isolation, issue #2 follow-up)', () => {
+  const base = mk();
+  try {
+    writeCfg(base, { updateMode: 'off' });                       // a config ABOVE home: must be IGNORED (it would suppress self-update if the walk escaped up to it)
+    const home = path.join(base, 'h');
+    writeCfg(home, { updateMode: 'auto', updateCheckDays: 14 });  // the GLOBAL: self-update IS due (first ever)
+    const proj = path.join(home, 'proj');
+    fs.mkdirSync(proj, { recursive: true });                     // cwd = a subdir of home -> the walk-up must STOP at home, never reach base
+    const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /self-update due/, 'the global updateMode:auto fires; the {updateMode:off} ABOVE home must NOT be picked up by walking above home');
+  } finally { fs.rmSync(base, { recursive: true, force: true }); }
+});
+
 test('non-SessionStart non-UPS event -> fully silent (over-fire guard, v1.0.11)', () => {
   const tmp = mk();
   try {
