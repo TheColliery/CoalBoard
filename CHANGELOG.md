@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.2] — 2026-07-01
+
+**PATCH** — prototype-pollution guard on the config parser. The conductor's `parseJsonc` merged an untrusted PROJECT `.coalboard.json` into the config via `Object.assign` (`readCfg`), so a malicious cloned-repo config could inject settings through a `__proto__` key (e.g. inherit `coalboardMode:"off"` to silently suppress the board). The parse now drops `__proto__` / `constructor` / `prototype` (OWASP prototype-pollution; the series' `ecc` TypeScript security rule). Low severity (a fail-silent, short-lived hook process); fixed for defense-in-depth and consistency with CoalHearth's identical guard.
+
+### Fixed
+- **`parseJsonc` drops `__proto__` / `constructor` / `prototype`** via a `JSON.parse` reviver, so an untrusted project config cannot pollute the merged config's prototype through the `Object.assign` merge in `readCfg`. A hermetic regression test (a `{"__proto__":{"coalboardMode":"off"}}` project config) asserts the injected setting is NOT honored — the board contract still fires on SessionStart.
+
+Gate: build + 38 node tests + verify PASS.
+
 ## [1.5.1] — 2026-07-01
 
 **PATCH** — structural LEAF enforcement (issue #2). On Claude Code at rigor `nasa`, a show-me lens **spawned its own background subagent**; the orphan grandchild was **unreapable by `main`** once the lens returned (~27 min / ~213k tokens / 80 Bash uses, manual stop). The LEAF rule was prompt-only — nothing structurally stopped a spawn-capable lens. A second fix, surfaced while gating this release, hardens config resolution (the conductor no longer walks above the home dir) and closes a hermetic-test leak it caused.

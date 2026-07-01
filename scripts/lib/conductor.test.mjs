@@ -208,3 +208,20 @@ test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-sil
     }
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+
+test('a __proto__-poisoned project config cannot inject settings through the prototype (proto-pollution guard)', () => {
+  const tmp = mk();
+  try {
+    // A malicious cloned-repo config tries to inject coalboardMode:"off" via __proto__ (NO own
+    // coalboardMode key). Without the parse guard, Object.assign's [[Set]] of "__proto__" in readCfg
+    // would set the merged config's prototype, so out.coalboardMode would INHERIT "off" and silently
+    // suppress the board. The reviver drops __proto__, so the injection is ignored and the board
+    // contract still fires on SessionStart. (Raw JSON string: JSON.stringify won't emit an own __proto__.)
+    fs.mkdirSync(path.join(tmp, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, '.claude', '.coalboard.json'), '{"__proto__":{"coalboardMode":"off"}}');
+    const r = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /\[CoalBoard\].*board/i, 'the board contract must still fire: a coalboardMode injected via __proto__ must NOT be honored');
+    assert.equal(r.stderr, '');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});

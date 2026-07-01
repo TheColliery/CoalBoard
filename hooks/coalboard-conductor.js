@@ -29,7 +29,9 @@ function kwList(v) { const e = Array.isArray(v) ? v.filter(Boolean) : []; return
 function parseJsonc(text) {
   try {
     const clean = String(text).replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : ''));
-    const p = JSON.parse(clean);
+    // Drop __proto__/constructor/prototype so an untrusted PROJECT config can't pollute the merged
+    // config's prototype via the Object.assign in readCfg (OWASP prototype-pollution; ecc ts/security).
+    const p = JSON.parse(clean, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
     return p && typeof p === 'object' && !Array.isArray(p) ? p : {};
   } catch { return {}; }
 }
