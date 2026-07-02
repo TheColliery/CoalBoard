@@ -1,6 +1,9 @@
 # Internal governance + design notes — machine-local, never shipped to the public repo
 CLAUDE.md
-MEMORY.md
+MEMORY*.md
+AGENTS.md
+.claude/
+.agents/
 COALBOARD_DESIGN.md
 COALBOARD_BLUEPRINT.md
 
@@ -10,10 +13,11 @@ node_modules/
 # Runtime staging (created inside a target project at run-time, never committed)
 .coalboard/
 
-# SkillSpector scan reports (provenance recorded in SECURITY.md; the raw JSON is not shipped)
-skillspector-*.json
+# Generated SkillSpector scan reports (provenance recorded in SECURITY.md; the raw report is not shipped)
+skillspector-*
 
 # OS / editor cruft
 .DS_Store
 Thumbs.db
 *.log
+*.swp
