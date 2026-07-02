@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.5] — 2026-07-02
+
+**PATCH** — symlink-correct stop-at-home config walk (the series one-flock sweep; same class as CoalFace v0.1.0-beta.2, whose macOS CI proved the bug live).
+
+### Fixed
+- **`findProjectCfg`'s stop-at-home compare is now SYMLINK-CORRECT — realpath BOTH sides (`hooks/coalboard-conductor.js`).** On macOS `process.cwd()` returns the physical `/private/var/...` path while `os.homedir()` returns the raw `/var/...` symlink, so the lexical `dir === home` NEVER matched — the walk escaped above home and a `.claude/.coalboard.json` above home was read as PROJECT config, defeating the v1.5.1 stop-at-home guard on macOS (any symlinked HOME hits the same class). Both sides now resolve through `physical()` (`fs.realpathSync`, falling back to `path.resolve` when realpath throws — an absent dir has no realpath) before the compare; the walk stays lexical after that. Phoenix-13 unchanged: `physical()` is read-only and fail-open, inside the existing fail-silent try/catch.
+
+Gate: build + 38 node tests + verify PASS.
+
 ## [1.5.4] — 2026-07-02
 
 **MINOR** — four fixes surfaced by a fable-nasa dogfood board auditing the Colliery mirror (its findings + its own process telemetry): a run-confirmed secret-scrub leak, two wizard-UX corrections, and an honesty fix to the no-zombie claim.

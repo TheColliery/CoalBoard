@@ -36,6 +36,17 @@ function parseJsonc(text) {
   } catch { return {}; }
 }
 
+// realpath a dir to its PHYSICAL path, falling back to a lexical resolve if realpath
+// throws (an absent dir has no realpath) — so the stop-at-home compare is like-for-like.
+// macOS's os.tmpdir() (and any symlinked HOME) is a symlink: process.cwd() returns the
+// realpath (/private/var/...) while os.homedir() returns the raw HOME env (/var/...), so
+// a lexical `dir === home` NEVER matches and the walk escapes above home (CoalHearth
+// beta.3 realpath-both-sides lesson; same class as CoalFace v0.1.0-beta.2). Resolve BOTH
+// sides before comparing.
+function physical(p) {
+  try { return fs.realpathSync(p); } catch { return path.resolve(p); }
+}
+
 // Find the nearest project .coalboard.json by walking UP from cwd (a CC hook cwd may be a
 // SUBDIR, not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
 // STOP at the home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing
@@ -43,8 +54,8 @@ function parseJsonc(text) {
 // another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
 function findProjectCfg() {
   try {
-    const home = os.homedir();
-    let dir = process.cwd();
+    const home = physical(os.homedir());
+    let dir = physical(process.cwd());
     for (let i = 0; i < 40; i++) {
       if (dir === home) break; // reached home: its config is the GLOBAL (already read), and nothing above home is "this project"
       const f = path.join(dir, '.claude', '.coalboard.json');
