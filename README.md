@@ -44,7 +44,7 @@ It **improves** correctness; it does **not** claim a defect rate or a reliabilit
 
 ## 📊 Benchmark
 
-**Headline:** with the board **10/10 (100% consistent)** vs an un-primed strong solo **~13/20 (~65%)** on 5 error-not-allowed tasks (Claude Code, Opus-class; 2026-06-19 — predates the current release; the board's debate/judge/verify logic is unchanged since).
+**Headline (2026-07-03 redo, Opus 4.8):** solo **4/5** vs board **5/5** on 5 error-not-allowed tasks. On a STRONG solo model the reasoning traps (crypto timing-leak, compounding basis, async race, heading defects) are already caught unaided — the board's irreducible edge is the version-sensitive FACT (T3), where only RUN-the-check (a live fetch) beats training-stale memory (board committed the current LTS; solo hedged-then-shipped a stale one). The board = solo **+ ground-truth execution**; its margin narrows as the base model strengthens but never closes on facts that live outside the model. (The older ~13/20 solo run was a weaker solo model.)
 
 With the board vs without, on a fixed set of **error-not-allowed** tasks (each a known gold + a subtle trap a single pass ships), measured 2026-06-19. The board makes the rigor automatic where a casual pass is inconsistent — forced precision, live grounding, completeness — and the lift is larger on a weaker model. Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
 
