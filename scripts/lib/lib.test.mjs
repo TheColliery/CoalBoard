@@ -165,6 +165,16 @@ test('secrets.scrub — board-audit gaps closed (compound env-var, quoted, token
   // HIGH: URL userinfo password containing a literal '@' (no partial leak)
   assert.match(scrub('postgres://u:pass@word@host/db'), /u:\[REDACTED\]@host/);
   assert.ok(!/pass@word/.test(scrub('postgres://u:pass@word@host/db')), 'no partial password leak');
+  // HIGH (fable-nasa board): URL userinfo password containing a literal '/' — the earlier
+  // `[^\s/]+` class stopped at the first '/' and leaked the '/'-containing password verbatim.
+  assert.match(scrub('postgres://u:pa/ss@host/db'), /u:\[REDACTED\]@host/);
+  assert.ok(!/pa\/ss/.test(scrub('postgres://u:pa/ss@host/db')), "no '/'-containing password leak");
+  assert.ok(!/aB3\/xYz9Qw==/.test(scrub('postgresql://svc:aB3/xYz9Qw==@db.internal:5432/app')), 'base64/path-shaped DB password fully redacted');
+  // control: a password with NO '/' still redacts (guards against an over-narrow fix)
+  assert.match(scrub('postgres://u:passWORDnoSLASH@host/db'), /u:\[REDACTED\]@host/);
+  // edge: userinfo '@' at end-of-string (degenerate, no host after) still redacts (the
+  // host-char lookahead accepts end-of-string, so this isn't lost vs the earlier pattern)
+  assert.match(scrub('postgres://u:pw@'), /u:\[REDACTED\]@/);
   // MED: JWT with base64 '=' padding
   assert.match(scrub('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0=.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV'), /\[REDACTED:jwt\]/);
   // MED: missing provider prefixes

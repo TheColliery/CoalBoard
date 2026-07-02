@@ -37,10 +37,14 @@ const PATTERNS = [
   [/\bSG\.[A-Za-z0-9_-]{22,}\.[A-Za-z0-9_-]{43,}\b/g, '[REDACTED:sendgrid-key]'],
   [/\bsq0atp-[A-Za-z0-9_-]{22,}\b/g, '[REDACTED:square-token]'],
   [/\b(AccountKey=)[^;\s]+/gi, '$1[REDACTED]'],
-  // A credential in a URL userinfo — redact the password. `[^\s/]+` (greedy, allows '@')
-  // backtracks to the LAST '@' before the path, so a password containing a literal '@'
-  // (e.g. pass@word) is fully redacted, not partially.
-  [/(:\/\/[^\s:/@]+:)[^\s/]+(@)/g, '$1[REDACTED]$2'],
+  // A credential in a URL userinfo — redact the password. The password runs greedily
+  // over any non-whitespace up to the LAST '@' that ends the userinfo — the '@' followed by
+  // a host char OR end-of-string (`(@)(?=[^\s@]|$)`). So a password containing '/' (a
+  // path-shaped DB password, postgres://u:pa/ss@host) OR '@' (pass@word) is fully redacted,
+  // not truncated at the first '/' (the earlier `[^\s/]+` leaked a '/'-containing password
+  // verbatim). The single greedy run + a lookahead stay linear (no nested quantifier → no
+  // catastrophic backtracking).
+  [/(:\/\/[^\s:/@]+:)[^\s]+(@)(?=[^\s@]|$)/g, '$1[REDACTED]$2'],
   // key=value / key: value for a sensitive name — keep the name, drop the value. Fixes
   // over a naive \bsecret\b: (1) a lookbehind + an underscore/hyphen-delimited prefix/suffix
   // so a keyword EMBEDDED in a compound name matches (AWS_SECRET_ACCESS_KEY=, DB_PASSWORD=);

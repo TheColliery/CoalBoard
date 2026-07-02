@@ -2,6 +2,20 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.4] — 2026-07-02
+
+**MINOR** — four fixes surfaced by a fable-nasa dogfood board auditing the Colliery mirror (its findings + its own process telemetry): a run-confirmed secret-scrub leak, two wizard-UX corrections, and an honesty fix to the no-zombie claim.
+
+### Fixed
+- **Secret-scrub URL-userinfo password leak (`scripts/lib/secrets.mjs`).** The URL-userinfo password class `[^\s/]+` stopped at the first `/`, so a path-shaped / base64 DB password in a connection URL (`postgres://u:pa/ss@host`) leaked **verbatim** into anything scrubbed before a log/consent display — the exact class the scrubber's own comment claims to catch. The password now runs greedily up to the LAST `@` that is followed by a host char or end-of-string (`[^\s]+(@)(?=[^\s@]|$)`), so a password containing `/` OR `@` is fully redacted (incl. the degenerate trailing-`@` `postgres://u:pw@`); a no-`/` password still redacts (control test). Single greedy run + a lookahead = linear (no catastrophic backtracking; the ReDoS guard test still passes). Regression test added (`lib.test.mjs`): the `/`-in-password + base64-DB-URL cases leak without the fix, redact with it. The scrubber's BEST-EFFORT-not-a-guarantee frame is unchanged — no new speculative patterns.
+
+### Changed
+- **Manual `/coalboard` routes by SIGNAL, not a fixed layman default (`references/wizard.md` + SKILL.md Entry).** A `/coalboard` with a TECHNICAL target (a repo/subproject/path, a rigor/depth/lens word, stated prefs) is a PROGRAMMER signal → OFFER the picks (order→bill→pay), never silently auto-pick-then-bill. The layman path keeps auto-picks but now MARKS every auto-picked knob as CHANGEABLE in the bill (the `cheaper`/`more thorough` levers map to depth/rigor), so the user knows the config was chosen for them and is theirs to change.
+- **The bill's detail renders as chat text BEFORE the question box; the box carries only a 1-2 line decision summary (`~cost + headline config`) + options (`references/wizard.md` both paths + SKILL.md Step 0 checkpoint).** Applies the board's own anti-rubber-stamp rule to its own bill — cramming the full config/per-lens/cost breakdown INTO the question defeats the read.
+- **Honest no-zombie framing on Claude Code (SKILL.md Step 1 + Step 4).** A depth-≥2 lens FLATTENS into an independent top-level session main holds no handle to → main can neither see nor `TaskStop` a flattened lens; the "confirm all terminated" barrier is best-effort agentId-reconciliation, NOT an enforced reap, and only the human's top-level UI (Clear) reaps it. The claim no longer over-promises a reap the board cannot perform; the end-of-run report now tells the user to Clear any lingering lens sessions (listing the launched lens agentIds).
+
+Gate: build + 38 node tests + verify PASS. Resident SKILL.md +1350 ch (three behavior additions; say-it-once preserved).
+
 ## [1.5.3] — 2026-07-02
 
 **PATCH** — de-rot: the shipped text asserted a model's CURRENT availability as a standing fact ("Fable is access-gated → drop it", "Never assign an access-gated model (Fable)"), which rots as access shifts (Fable 5 unlocked 2026-07-02; its access model may shift again). The skill now never asserts any model's availability either way — availability is DISCOVERED at spawn time.
