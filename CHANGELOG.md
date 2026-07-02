@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.5.3] — 2026-07-02
+
+**PATCH** — de-rot: the shipped text asserted a model's CURRENT availability as a standing fact ("Fable is access-gated → drop it", "Never assign an access-gated model (Fable)"), which rots as access shifts (Fable 5 unlocked 2026-07-02; its access model may shift again). The skill now never asserts any model's availability either way — availability is DISCOVERED at spawn time.
+
+### Changed
+- **Runtime-discovery wording (SKILL.md Step 1 · `references/lens-prompts.md` model-assignment · the `diversifyModels` config help):** `fable` joins the spawnable-alias enumeration (`haiku/sonnet/opus/fable`) with the honest note that alias availability itself SHIFTS (fable's access is episodic) and is discovered at SPAWN, never assumed from the shipped text — a spawn-fail on ANY alias falls down the tier list. The standing Fable ban is dropped; the GONE-classification rule is unchanged (spawn-fail → re-route immediately; never re-pick a model known-unavailable this run), with Fable kept only as a historical example ("Fable 5's 2026-06 access-gating"). No behavior change; the correlated-blind-spot / Knight-Leveson frame untouched.
+
+Gate: build + 38 node tests + verify PASS.
+
 ## [1.5.2] — 2026-07-01
 
 **PATCH** — prototype-pollution guard on the config parser. The conductor's `parseJsonc` merged an untrusted PROJECT `.coalboard.json` into the config via `Object.assign` (`readCfg`), so a malicious cloned-repo config could inject settings through a `__proto__` key (e.g. inherit `coalboardMode:"off"` to silently suppress the board). The parse now drops `__proto__` / `constructor` / `prototype` (OWASP prototype-pollution; the series' `ecc` TypeScript security rule). Low severity (a fail-silent, short-lived hook process); fixed for defense-in-depth and consistency with CoalHearth's identical guard.
