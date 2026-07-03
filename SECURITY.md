@@ -32,14 +32,15 @@ The clean `plugin/` distribution is generated from source by `node scripts/build
 
 Last scan: CoalBoard **v1.5.5** dist (commit `96c49af`), on **2026-07-02**, with **NVIDIA SkillSpector v2.3.9** (self-reported — the tool ships no tagged releases; the version is the `uvx`-from-git HEAD, `326a2b4`). **Re-scan is event-driven on a NEW SkillSpector version (maintainer-commanded), NOT per CoalBoard release.** A new SkillSpector version is exactly when the rules, codes, and score can move — v2.3.9 (vs the 2026-06-24 v2.3.5 pass) added new analyzers (`AR1` anti-refusal · SSRF · rug-pull `RP1-3` · `PE4`/`PE5` · `E5` · `TM4`) and reworked per-file score weighting; the **2026-07-02 re-scan returned the same all-false-positive verdict** (identical finding classes and count: RA1 ×8 · EA2 · RA2 · TM1; the score eased 89 → 71 from the scoring rework, not from a CoalBoard change).
 
-**Read the score in context.** The static stage scored **71/100** (trend: v2.2.3 100 → v2.3.1 96 → v2.3.5 89 → v2.3.9 71); the **semantic** LLM stage was not run this pass (`--no-llm` — static-only is the documented FP-prone baseline, pattern-match-based, flagging strings without the skill-contract context). **Every finding was verified false-positive.** The verifications:
+**Read the score in context.** The static stage scored **71/100** (trend: v2.2.3 100 → v2.3.1 96 → v2.3.5 89 → v2.3.9 71); the **semantic** LLM stage was not run this pass (`--no-llm` — static-only is the documented FP-prone baseline, pattern-match-based, flagging strings without the skill-contract context). **Every finding was verified false-positive.**
 
-| finding(s) | why it is a false positive |
-|---|---|
-| RA1 ×8 — *self-modification* (self-update) | The series self-update is consent-gated: the **hook only schedules** (never networks), the **agent** offers the platform's own `claude plugin update`. The skill never rewrites its own files. |
-| TM1 — *tool-parameter abuse* (`rm -rf`) | The matched text is the verify step's **pre-run lint that BANS** `rm -rf` in reviewed code (skip-and-flag) — a defensive rule, the opposite of using it. |
-| RA2 — *session persistence* (lens-prompt template) | The matched text instructs lenses to be instantiated **from the canonical template** and forbids injecting dev-governance — prompt-hygiene instruction; none of the OS/session-persistence mechanisms RA2 keys on. |
-| EA2 — *autonomous decision* ("without asking") | The matched clause is "`auto` → convene without asking" — the documented, user-CONFIGURED standing-consent mode inside the consent-gate paragraph (default `ask`); the hard rules directly below force report-only with no human present and REFUSE gateless auto-apply. |
+* **Static Scan (71/100 · all false-positive):**
+  * `RA1 Self-Modification` ×8 (self-update) — the series self-update is consent-gated: the hook only SCHEDULES (never networks), the agent offers the platform's own `claude plugin update`; the skill never rewrites its own files.
+  * `TM1 Tool-Parameter Abuse` (`rm -rf`) — the matched text is the verify step's pre-run lint that BANS `rm -rf` in reviewed code (skip-and-flag) — a defensive rule, the opposite of using it.
+  * `RA2 Session Persistence` (lens-prompt template) — instructs lenses to be instantiated from the canonical template and forbids injecting dev-governance — prompt-hygiene, not any OS/session-persistence mechanism RA2 keys on.
+  * `EA2 Autonomous Decision` ("without asking") — the matched clause is "`auto` → convene without asking", the documented user-CONFIGURED standing-consent mode (default `ask`); the hard rules below force report-only with no human present and REFUSE gateless auto-apply.
+* **Method:** `uvx --from git+https://github.com/NVIDIA/skillspector.git skillspector scan` against the `plugin/` dist — no install required (uvx fetches its own ephemeral Python).
+* **LLM Semantic Scan:** not run this pass (`--no-llm` — static-only is the documented, FP-prone baseline: pattern-match without the skill-contract context).
 
 (Exact per-category counts and locations shift between SkillSpector versions — e.g. the RA2 match moved from the `.coalboard/proposed/` staging text to the lens-template text; the categories and the all-false-positive verdict are stable.) This matches the family baseline: CoalMine and CoalTipple carry the same **RA1 self-modification** false positive (from consent-gated **Self-Updating**) — **all-false-positive across the family**; each repo's SECURITY.md pins its own last-scan score. The report JSON is not shipped.
 
