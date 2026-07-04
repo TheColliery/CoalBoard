@@ -2,6 +2,11 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Changed
+- Relicensed from MIT to Apache-2.0. `LICENSE` is now the Apache License 2.0 (verbatim); a new `NOTICE` carries the attribution; the `plugin.json` `license` field is `Apache-2.0`. No code or behavior change.
+
 ## [1.5.5] — 2026-07-02
 
 **PATCH** — symlink-correct stop-at-home config walk (the series one-flock sweep; same class as CoalFace v0.1.0-beta.2, whose macOS CI proved the bug live).
