@@ -5,6 +5,6 @@
   "author": { "name": "HetCreep" },
   "homepage": "https://github.com/TheColliery/CoalBoard",
   "repository": "https://github.com/TheColliery/CoalBoard",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["consensus", "debate", "multi-agent", "code-review", "audit", "verification", "subagents", "source-grounding", "high-integrity", "skills", "hooks"]
 }
