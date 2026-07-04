@@ -7,7 +7,7 @@
 **A diverse-lens consensus & debate board for error-not-allowed work** — on a critical task, with your consent, blind epistemic lenses debate in parallel, a judge synthesizes on verified inputs, and you sign off before anything touches your files.
 
 ![version](https://img.shields.io/github/v/tag/TheColliery/CoalBoard?label=version&color=blue)
-![license](https://img.shields.io/badge/license-MIT-blue)
+![license](https://img.shields.io/badge/license-Apache_2.0-blue)
 ![status](https://img.shields.io/badge/status-stable-brightgreen)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-validated-success)
 ![Antigravity](https://img.shields.io/badge/Antigravity-validated-success)
@@ -87,4 +87,4 @@ Zero-dependency, offline, no API keys.
 
 ## 📄 License
 
-MIT License. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
