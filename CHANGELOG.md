@@ -2,9 +2,17 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [1.6.0] - 2026-07-08
+
+**MINOR** — a new user-facing capability (factory-off) + two flock-conform doc fixes. Board behavior is unchanged until the user opts in.
+
+### Added
+- **`callFable` config key (factory `false`)** — a hard feature-gate for seating Fable on the board, independent of `rigor`. Fable is leaving the subscription plan: every call now bills real usage credits outside the plan's quota, so the gate defaults off and the user alone opts in. Off: Fable is never seated on any lens, and a `lensTiers`/`rigorLensTiers` entry naming it is inert (the gate overrides pins). On: Fable may be seated only on the highest-value seats — the sub4 observer (episodic; deadlock/max-stakes only) and optionally the truth/formal lens at `rigor:nasa` — never the security-focused lens (the platform safeguard reroutes Fable off security content) and never the judge, which always runs on main.
 
 ### Changed
+- **README Configure section** converted from a prose paragraph to the flock table shape (the shape CoalMine/CoalTipple/CoalHearth/CoalFace already use) — a `| Key | Default | What it does |` table of the high-impact keys, including the new `callFable`.
+- **Self-update nudge wording (`hooks/coalboard-conductor.js`)** aligned to the CoalMine/CoalTipple gold phrasing: web-check the latest tag vs the installed `plugin.json` version; offer `claude plugin update coalboard@coalboard` if newer; say "up to date" if current; say so and suggest updating manually later if git/network is unavailable (never assume).
+- **Judge-model text reconciled (3 files).** The pre-existing "the JUDGE is ALWAYS the top tier (opus)" claim contradicted the design truth the new `callFable` text states: the judge runs on MAIN — the user's own model, never switched by the skill (convened as CoalTipple's top escalation rung it typically IS the strongest tier). SKILL.md, the `rigorLensTiers` schema help, and the factory-config comments now all say the latter.
 - Relicensed from MIT to Apache-2.0. `LICENSE` is now the Apache License 2.0 (verbatim); a new `NOTICE` carries the attribution; the `plugin.json` `license` field is `Apache-2.0`. No code or behavior change.
 
 ## [1.5.5] — 2026-07-02

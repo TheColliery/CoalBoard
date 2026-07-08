@@ -121,12 +121,24 @@
 
   // ## Deterministic rigor->lens-tier map: the LENS model SCALES with rigor (cheap when relaxed, strong when nasa). The
   // ## agent READS this table verbatim — it does NOT interpret/guess — so the model assignment is IDENTICAL every run
-  // ## (the fix for "deterministic" being an unearned label). The JUDGE is always the top tier (it verifies the cheap
-  // ## lenses on ground truth); the ADVERSARY (high/nasa) takes the rigor tier — always strong, never undetermined.
+  // ## (the fix for "deterministic" being an unearned label). The JUDGE runs on main — typically the strongest tier
+  // ## via CT's ladder (it verifies the cheap lenses on ground truth); the ADVERSARY (high/nasa) takes the rigor
+  // ## tier — always strong, never undetermined.
   // ## lensTiers (per-role) overrides a specific role; this sets the per-rigor default for all lenses.
   // # Setting type: Object { relaxed | standard | high | nasa : "haiku" | "sonnet" | "opus" | model | ["priority","chain"] }
   // # Default value: relaxed/standard -> haiku, high -> sonnet, nasa -> opus
   "rigorLensTiers": { "relaxed": "haiku", "standard": "haiku", "high": "sonnet", "nasa": "opus" },
+
+  // ## Feature-gate for Fable on the board. Fable bills real usage credits outside plan limits —
+  // ## keep off unless you mean to spend. false = Fable is NEVER seated on any lens, and any lensTiers/
+  // ## rigorLensTiers entry naming it is inert (this gate overrides pins — it guards real money). true =
+  // ## Fable MAY be seated on the highest-value seats only: the sub4 observer (episodic, deadlock/max-
+  // ## stakes only) and optionally the truth lens at rigor:nasa — never the security-focused lens (the
+  // ## platform safeguard reroutes Fable off security content) and never the judge, which always runs
+  // ## on main (whatever model the user is already running).
+  // # Setting type: Boolean
+  // # Default value: false
+  "callFable": false,
 
   // ─── sharpness levers (the rigor preset sets these; set a key here to force it either way) ───
 

@@ -151,7 +151,7 @@ function main() {
   // is updateMode), so it still fires when the board is off — the two keys are independent.
   let msg = off ? '' : "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
-    msg += (msg ? ' ' : '[CoalBoard] ') + '[self-update due] Offer the /coalboard:update check (compare the latest git tag to the installed version, then offer `claude plugin update`). Consent-gated; the hook only scheduled it.';
+    msg += (msg ? ' ' : '[CoalBoard] ') + '[self-update due] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER `claude plugin update coalboard@coalboard`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.';
   }
   if (msg) process.stdout.write(msg);
 }

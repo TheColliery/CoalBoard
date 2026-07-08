@@ -75,7 +75,19 @@ Start a new Antigravity session; `coalboard` appears in the skills list. The boa
 
 ## ⚙️ Configure
 
-Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by project `.claude/`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) Key groups: activation (`coalboardMode`, `criticalPaths`, `triggerConfidence`), the board (`lenses`, `consensusThreshold`, `maxRounds`), verify (`qaStrictness`, `sastCommand`, `applyConsent`), and self-update. See [the skill contract](skills/coalboard/SKILL.md) for the full set. A fully-commented template ships at [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json) — copy it to `~/.claude/.coalboard.json` (or your project's `.claude/.coalboard.json`) and edit.
+Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by project `.claude/`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) The high-impact keys:
+
+| Key | Default | What it does |
+|---|---|---|
+| `rigor` | `standard` | Strictness preset (`relaxed` \| `standard` \| `high` \| `nasa`) — sets defaults for the knobs below; any explicit key overrides it |
+| `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene — the board's master switch) |
+| `triggerConfidence` | `90` | Semantic-classifier confidence (0-100) a task must clear to count as critical — higher = fewer false triggers, more false-negatives (the manual `/coalboard` is the safety valve) |
+| `lenses` | `data, truth, feeling` | The active epistemic lenses (each `data` \| `truth` \| `feeling`) — the decorrelation mechanism; all three are the floor for error-not-allowed work |
+| `consensusThreshold` | `80` | Worker-agreement % below which the board is deadlocked and summons the out-of-frame sub4 observer to break the tie |
+| `maxRounds` | `1` | Debate rounds — `1` = single-turn (max independence); `>1` = multi-round cross-examination (reintroduces anchoring) |
+| `callFable` | `false` | Feature-gate for Fable on the board — bills real usage credits outside plan limits. `false` = Fable is never seated on any lens (a `lensTiers`/`rigorLensTiers` pin naming it is inert). `true` = Fable may be seated on the sub4 observer (and optionally the truth lens at `nasa`) — never the judge or a security-focused lens |
+
+Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs`](scripts/lib/config-schema.mjs) and the commented template [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json).
 
 ## 🧭 Part of TheColliery
 
