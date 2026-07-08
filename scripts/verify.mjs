@@ -59,6 +59,7 @@ const SHIP = [
   'hooks/coalboard-conductor.js',
   'hooks/hooks.json',
   'commands/update.md',
+  'commands/stats.md',
   '.claude-plugin/plugin.json',
 ];
 check('plugin/ dist in sync with source', () => {

@@ -44,6 +44,7 @@ test('UserPromptSubmit with a critical signal -> HALT/CONSENT directive', () => 
     assert.equal(r.status, 0);
     assert.match(r.stdout, /CRITICAL signal/);
     assert.match(r.stdout, /HALT/);
+    assert.match(r.stdout, /ARBITRATE/, 'the double-hook arbitration cue must be appended');
     assert.equal(r.stderr, '');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

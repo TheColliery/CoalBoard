@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.0] - 2026-07-09
+
+**MINOR** — measurement + cache-shaping + the double-hook arbitration (the CB side of `DOUBLE-HOOK-FIX.md`).
+
+### Added
+- **`/coalboard:stats`** (`commands/stats.md`) — the measurement standard-system command (series system #5): boards convened (auto vs manual), lenses + tiers, verdicts, staged-vs-applied, approximate spend; honest empty state; read-only.
+- **Double-hook CB-bias (SKILL.md Step 0 hard rule):** a Layer-1 stakes signal fired → lean CB; the agent may downgrade only a CLEAR false-positive (a comment merely mentioning "crypto"), never silently skip a real one — a false convene wastes recoverable tokens, a missed board is unrecoverable. + the arbitration cue on the conductor's CRITICAL-signal message (same decision table as CoalTipple's — one flock). **3-tier regression PASS** (the stakes-borderline rate-limiter = CB on every tier).
+- **Cache-shaping (SKILL.md Step 1):** the judge reads the target ONCE and EMBEDS the content into each lens contract (lenses stay blind to EACH OTHER — decorrelation intact; grounded 2026-07-08: cache is per-prefix, N blind lenses re-reading the same target pay full input N×); lens contracts say "emit ALL findings in ONE generation" (limit-robust); show-me/adversary keep their tool rounds; very large targets fall back to scoped lens-reads.
+- **Theatrical-consensus guard (SKILL.md Step 2):** before counting votes the judge compares the lenses' REASONING FOOTPRINTS (evidence cited, checks run, argument path); substantially-overlapping lenses count as ONE voice, and the collapse is NAMED in the report — no invented numeric threshold (judgment-guided, honestly).
+
 ## [1.6.1] - 2026-07-08
 
 Same-day withdrawal of the v1.6.0 key + a text trim. Board behavior is identical to v1.5.5.
