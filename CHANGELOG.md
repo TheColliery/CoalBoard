@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.6.1] - 2026-07-08
+
+Same-day withdrawal of the v1.6.0 key + a text trim. Board behavior is identical to v1.5.5.
+
+### Removed
+- **`callFable` — withdrawn (shipped prematurely).** A SKILL.md feature flag cannot hard-block a lens seat the way commented-out code blocks execution — the owner's requirement is a gate that stays dead no matter what the config says. Tombstoned in the schema; returns as the redesigned real-money gate WHEN Fable billing actually leaves the subscription plan (it has not yet). With it go two texts that overstepped: the "never the security-focused lens" clause (a temporary platform state hardcoded as a standing rule — availability is DISCOVERED at spawn, the v1.5.3 lesson) and the repeated "never the judge / main never switched" declarations (an agent cannot switch the main model on any platform; stating the impossible is noise). A leftover `callFable` in a user's `.coalboard.json` is harmless (unknown keys are ignored).
+
+### Changed
+- The judge-model line keeps the v1.6.0 reconcile, trimmed: "the JUDGE runs on MAIN" (the old "always the top tier (opus)" stays gone).
+
 ## [1.6.0] - 2026-07-08
 
 **MINOR** — a new user-facing capability (factory-off) + two flock-conform doc fixes. Board behavior is unchanged until the user opts in.

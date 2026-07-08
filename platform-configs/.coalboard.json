@@ -129,16 +129,6 @@
   // # Default value: relaxed/standard -> haiku, high -> sonnet, nasa -> opus
   "rigorLensTiers": { "relaxed": "haiku", "standard": "haiku", "high": "sonnet", "nasa": "opus" },
 
-  // ## Feature-gate for Fable on the board. Fable bills real usage credits outside plan limits —
-  // ## keep off unless you mean to spend. false = Fable is NEVER seated on any lens, and any lensTiers/
-  // ## rigorLensTiers entry naming it is inert (this gate overrides pins — it guards real money). true =
-  // ## Fable MAY be seated on the highest-value seats only: the sub4 observer (episodic, deadlock/max-
-  // ## stakes only) and optionally the truth lens at rigor:nasa — never the security-focused lens (the
-  // ## platform safeguard reroutes Fable off security content) and never the judge, which always runs
-  // ## on main (whatever model the user is already running).
-  // # Setting type: Boolean
-  // # Default value: false
-  "callFable": false,
 
   // ─── sharpness levers (the rigor preset sets these; set a key here to force it either way) ───
 

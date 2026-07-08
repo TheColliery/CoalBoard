@@ -309,10 +309,6 @@ test('config-schema — rigorLensTiers validator (deterministic rigor->tier map)
   assert.equal(validateValue(spec, factory.rigorLensTiers), null, 'the shipped factory rigorLensTiers validates');
 });
 
-test('config-schema — callFable gates Fable on the board (bool, factory default false — a real-money feature flag)', () => {
-  const spec = CONFIG_SCHEMA.find((s) => s.key === 'callFable');
-  assert.ok(spec, 'callFable spec exists');
-  assert.equal(validateValue(spec, false), null, 'factory default: Fable is never seated on any lens');
-  assert.equal(validateValue(spec, true), null, 'opt-in: Fable may be seated on the highest-value seats only');
-  assert.ok(validateValue(spec, 'true'), 'a string is not a boolean, whatever it says');
+test('config-schema — callFable stays tombstoned (withdrawn 1.6.1 — returns only as the redesigned real-money gate)', () => {
+  assert.equal(CONFIG_SCHEMA.find((s) => s.key === 'callFable'), undefined, 'callFable must not be in the schema');
 });

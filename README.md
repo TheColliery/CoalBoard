@@ -85,7 +85,6 @@ Everything is tunable in `.coalboard.json` (global `~/.claude/` overlaid by proj
 | `lenses` | `data, truth, feeling` | The active epistemic lenses (each `data` \| `truth` \| `feeling`) — the decorrelation mechanism; all three are the floor for error-not-allowed work |
 | `consensusThreshold` | `80` | Worker-agreement % below which the board is deadlocked and summons the out-of-frame sub4 observer to break the tie |
 | `maxRounds` | `1` | Debate rounds — `1` = single-turn (max independence); `>1` = multi-round cross-examination (reintroduces anchoring) |
-| `callFable` | `false` | Feature-gate for Fable on the board — bills real usage credits outside plan limits. `false` = Fable is never seated on any lens (a `lensTiers`/`rigorLensTiers` pin naming it is inert). `true` = Fable may be seated on the sub4 observer (and optionally the truth lens at `nasa`) — never the judge or a security-focused lens |
 
 Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs`](scripts/lib/config-schema.mjs) and the commented template [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json).
 
