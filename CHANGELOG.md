@@ -2,6 +2,10 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.1] - 2026-07-09
+
+### Changed
+- SKILL.md frontmatter description trimmed 1123 -> under 1024 chars (the cross-platform-safe cap; always-loaded per session on every platform, so shorter = a per-session token saving). No behavior change.
 ## [1.7.0] - 2026-07-09
 
 **MINOR** — measurement + cache-shaping + the double-hook arbitration (the CB side of `DOUBLE-HOOK-FIX.md`).
