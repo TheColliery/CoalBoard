@@ -37,6 +37,12 @@ test('trigger — config-robustness: additive keywords, empty-array guards, timi
   assert.equal(detectStatic('process the surgical approval', { criticalKeywords: ['surgical'] }).hit, true, 'custom keyword fires');
   assert.equal(detectStatic('fix the auth bug', { criticalKeywords: ['surgical'] }).hit, true, 'default seed still fires alongside a custom list');
   assert.equal(detectStatic('list the readme files', { criticalKeywords: ['surgical'] }).hit, false, 'benign stays benign');
+  // criticalPaths/criticalImports are ADDITIVE too (Board-2 fix — was REPLACE, so a
+  // custom list silently DROPPED the built-in auth/payment/crypto seed): a custom entry
+  // fires AND the built-in seed still fires.
+  assert.equal(detectStatic('edit the billing module', { criticalPaths: ['billing'] }).hit, true, 'custom criticalPath fires');
+  assert.equal(detectStatic('touch the auth handler', { criticalPaths: ['billing'] }).hit, true, 'built-in path seed still fires alongside a custom list (union, not replace)');
+  assert.equal(detectFileWrite('src/auth/jwt.ts', 'import jsonwebtoken from "x"', { criticalImports: ['stripe'] }).hit, true, 'built-in import seed still fires alongside a custom criticalImports (union, not replace)');
   // excludePaths: [] must NOT disable exclusions (empty -> fall back to defaults)
   assert.equal(detectFileWrite('node_modules/auth/x.js', 'import crypto', { excludePaths: [] }).hit, false, 'empty excludePaths -> defaults, node_modules still excluded');
   // criticalPaths: [''] must NOT disable the gate (empty -> fall back to defaults)

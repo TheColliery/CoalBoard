@@ -19,8 +19,8 @@
 export const CONFIG_SCHEMA = [
   // — activation / trigger —
   { key: 'coalboardMode', type: 'enum', values: ['ask', 'auto', 'off'], flags: ['-m'], help: 'On a critical task: ask (default — per-instance consent) | auto (activate without asking) | off (never)' },
-  { key: 'criticalPaths', type: 'strArr', lower: true, flags: ['--paths'], help: 'AND-gate Layer-1 path fragments (default: auth, payment, migration, security, crypto)' },
-  { key: 'criticalImports', type: 'strArr', lower: true, flags: ['--imports'], help: 'AND-gate Layer-1 import names (default: crypto, bcrypt, jsonwebtoken, child_process)' },
+  { key: 'criticalPaths', type: 'strArr', lower: true, flags: ['--paths'], help: 'EXTRA AND-gate Layer-1 path fragments ADDED to the built-in seed (additive, never a replacement — a config cannot DROP a default). Built-in: auth, payment, migration, security, crypto. A non-critical dir that happens to share a name → excludePaths, not seed removal' },
+  { key: 'criticalImports', type: 'strArr', lower: true, flags: ['--imports'], help: 'EXTRA AND-gate Layer-1 import names ADDED to the built-in seed (additive, never a replacement). Built-in: crypto, bcrypt, jsonwebtoken, child_process' },
   { key: 'criticalKeywords', type: 'strArr', lower: true, flags: ['--keywords'], help: 'EXTRA Layer-1 keywords ADDED to the built-in seed (additive, never a replacement) — domain terms the seed misses, e.g. "surgical", "trajectory" (default: none added)' },
   { key: 'triggerConfidence', type: 'int', min: 0, max: 100, flags: ['-c'], help: 'AND-gate Layer-2 semantic-classifier threshold 0-100 (default: 90)' },
   { key: 'triggerGradeFloor', type: 'int', min: 1, max: 5, flags: ['-g'], help: 'Board considered at >= this grade, or any sensitive task (reuses the CT grade rubric; default: 4)' },

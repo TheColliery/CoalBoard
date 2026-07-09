@@ -22,7 +22,11 @@ function lc(s) { return String(s == null ? '' : s).toLowerCase(); }
 function matched(text, list) { const t = lc(text); return list.filter((f) => f && t.includes(lc(f))); }
 // Empty/all-'' config list -> fall back to the default (never "match nothing"); keywords are ADDITIVE.
 function cfgList(v, d) { if (!Array.isArray(v)) return d; const c = v.filter(Boolean); return c.length ? c : d; }
-function kwList(v) { const e = Array.isArray(v) ? v.filter(Boolean) : []; return e.length ? D_KEYWORDS.concat(e) : D_KEYWORDS; }
+// seed lists (paths/imports/keywords) are ADDITIVE — a user's list EXTENDS the built-in
+// security seed, never DROPS it (CT v1.0.18 REPLACE->UNION; mirrors trigger.mjs seedList).
+// cfgList stays replace-or-default for excludePaths (its dev-contamination floor is applied separately).
+function seedList(v, d) { const e = Array.isArray(v) ? v.filter(Boolean) : []; return e.length ? d.concat(e) : d; }
+function kwList(v) { return seedList(v, D_KEYWORDS); }
 
 // String-aware JSONC strip (the CoalMine #12 fix: a value ending in a backslash before a
 // later // must not desync the comment stripper). Guards the result to a plain object.
@@ -93,8 +97,8 @@ function hasNonLatin(s) {
 }
 
 function detect(prompt, cfg) {
-  const paths = cfgList(cfg.criticalPaths, D_PATHS);
-  const imports = cfgList(cfg.criticalImports, D_IMPORTS);
+  const paths = seedList(cfg.criticalPaths, D_PATHS);
+  const imports = seedList(cfg.criticalImports, D_IMPORTS);
   const reasons = [];
   const p = matched(prompt, paths);
   const i = matched(prompt, imports);

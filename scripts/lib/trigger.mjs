@@ -46,12 +46,18 @@ function cfgList(v, dflt) {
   return clean.length ? clean : dflt;
 }
 
-// Critical keywords are ADDITIVE: a user's `criticalKeywords` EXTEND the built-in seed
-// (a config cannot silently DROP a default keyword by overriding the list).
-function keywordList(v) {
+// Critical SEEDS (paths / imports / keywords) are ADDITIVE: a user's list EXTENDS the
+// built-in security seed — a config cannot silently DROP a default critical
+// path/import/keyword by overriding the list (the CoalTipple v1.0.18 REPLACE→UNION
+// security lesson: a user customizing the seed must not weaken the Layer-1 gate). A
+// legitimately-named-but-non-critical dir is handled by excludePaths (which skips it),
+// NOT by removing the seed. (cfgList above stays REPLACE-or-default for excludePaths,
+// whose security floor — the dev-contamination set — is applied separately, always.)
+function seedList(v, dflt) {
   const extra = Array.isArray(v) ? v.filter(Boolean) : [];
-  return extra.length ? [...DEFAULT_CRITICAL_KEYWORDS, ...extra] : DEFAULT_CRITICAL_KEYWORDS;
+  return extra.length ? [...dflt, ...extra] : dflt;
 }
+const keywordList = (v) => seedList(v, DEFAULT_CRITICAL_KEYWORDS);
 
 // Is this file path inside an excluded dir? (so the gate never fires on vendored code)
 export function isExcluded(filePath, excludePaths = DEFAULT_EXCLUDE) {
@@ -69,8 +75,8 @@ export function isExcluded(filePath, excludePaths = DEFAULT_EXCLUDE) {
 // false-fires; the prompt path opts in. (CB-7)
 // Returns { hit: boolean, reasons: string[] } — reasons are short, human-readable.
 export function detectStatic(text, cfg = {}, opts = {}) {
-  const paths = cfgList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
-  const imports = cfgList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
+  const paths = seedList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
+  const imports = seedList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
   const keywords = keywordList(cfg.criticalKeywords);
   const reasons = [];
   const pHit = matched(text, paths);
@@ -90,8 +96,8 @@ export function detectFileWrite(filePath, content, cfg = {}) {
   if (isExcluded(filePath, cfg.excludePaths)) {
     return { hit: false, reasons: [] };
   }
-  const paths = cfgList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
-  const imports = cfgList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
+  const paths = seedList(cfg.criticalPaths, DEFAULT_CRITICAL_PATHS);
+  const imports = seedList(cfg.criticalImports, DEFAULT_CRITICAL_IMPORTS);
   const pHit = matched(filePath, paths);
   const iHit = matched(content, imports);
   if (pHit.length && iHit.length) {

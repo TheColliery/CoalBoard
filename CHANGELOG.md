@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.2] - 2026-07-09
+
+### Security
+- **`criticalPaths` + `criticalImports` are now ADDITIVE (union), not REPLACE — customizing the Layer-1 seed can no longer silently DROP the built-in security detection.** A project `.coalboard.json` setting `criticalPaths` (or `criticalImports`) REPLACED the built-in seed (auth/payment/migration/security/crypto · crypto/bcrypt/jsonwebtoken/child_process), so a user adding one domain path silently disabled the board's AND-gate on the built-in security paths/imports. Now additive like `criticalKeywords` (a config EXTENDS the seed, never drops a default); a legitimately-named-but-non-critical dir is handled by `excludePaths`, not seed removal. Fixed in both `trigger.mjs` and the conductor's inlined copy; schema help updated. Same class as CoalTipple's v1.0.18 REPLACE→UNION `sensitivePaths` fix. +3 assertions. (Board-2 dogfood finding.)
+
+### Notes
+- Board-2 also flagged the cross-platform scope WORDING; on review it is already adequate — the README + SKILL body carry the honest "verified on Claude Code + Antigravity; every other named platform is design-supported, unverified" split (product of the v1.4.0 CB-14 + v1.6.1 cleanups). No change.
+
 ## [1.7.1] - 2026-07-09
 
 ### Changed
