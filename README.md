@@ -36,7 +36,7 @@ Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) �
 CoalBoard is **NASA-inspired in structure** (redundancy + design-diversity + human-in-the-loop + trigger-only-on-critical) — **not in numbers.** It honestly guarantees two things:
 
 1. **Bounded cost** — a solo agent thrashing on a hard bug is an unbounded token-bleed; the board converges (single-turn, judge-final, human-escape), so its cost is high but **predictable and capped**. Pay a known premium to cap the tail.
-2. **Zero-breakage** — staging + propose-not-execute means the live workspace is never touched until verified *and* approved (a side-effect — a run migration, an API call — is gated behind your approval, never executed during the debate).
+2. **Zero-breakage** — staging + propose-not-execute means the live workspace is never touched until verified *and* approved (a side-effect — a run migration, an API call — is gated behind your approval, never executed during the debate). This is a **files** guarantee: the verify step itself runs checks, so an executed side-effect can only be *prevented* (pre-run lint + propose-not-execute), never undone.
 
 Both guarantees are **contract-enforced** — the board's staging discipline + your sign-off — **not** an OS sandbox; a skill cannot OS-enforce. The human gate is the load-bearing node.
 
@@ -59,7 +59,7 @@ claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-**Antigravity** — *validated end-to-end (2026-06-22)*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
+**Antigravity** — *validated end-to-end (2026-06-22), self-run — not third-party-audited*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
 
 ```powershell
 git clone https://github.com/TheColliery/CoalBoard.git --depth 1

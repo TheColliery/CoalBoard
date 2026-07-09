@@ -1,6 +1,6 @@
 # CoalBoard on Antigravity (verified 2026-06-22)
 
-> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. Validated end-to-end on AG (Claude Opus 4.6): 3 read-only-leaf lenses → invoke parallel → judge → reap; decontamination clean.
+> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. Validated end-to-end on AG (Claude Opus 4.6) — a self-run validation, not third-party-audited: 3 read-only-leaf lenses → invoke parallel → judge → reap; decontamination clean.
 
 ## Tool mapping (Claude Code → Antigravity)
 | step | Claude Code | Antigravity |

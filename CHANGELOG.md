@@ -2,6 +2,19 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.4] - 2026-07-09
+
+**PATCH** — docs-only conform, from the user's CoalBoard nasa audit (findings **M9 + L4**) plus a report-location hardening from a live incident.
+
+### Changed
+- **The ALWAYS-LOADED description surfaces now carry the same verified-hedge the resident body already did.** `SKILL.md`'s frontmatter `description`, `.claude-plugin/plugin.json`'s `description`, and `marketplace.json`'s plugin `description` each flatly asserted "Cross-agent (any platform...)" while the resident SKILL.md body (line 11) correctly hedged "Verified: Claude Code + Antigravity; every other platform designed-for, unverified" — a reader who only sees the always-loaded description (never opens the body) got the overclaim. All three now read "Cross-agent (verified: Claude Code + Antigravity; others designed-for, unverified; Claude Code adds cost-optimized tiering)." The SKILL.md frontmatter description stays inside the 1024-char cross-platform cap (1016 chars).
+- **The 2026-06-22 Antigravity validation now names its own nature.** "Validated end-to-end" (SKILL.md body, `references/platform-antigravity.md`, README Install section) reads as an unverifiable self-claim on its own — an artifact (the reference doc) exists, but the process behind it is unaudited by anyone but the model that ran it. Each of the 3 spots gained one clause: a self-run validation, not third-party-audited. No rewrite, no change to the underlying record.
+- **The top-line "zero-breakage" claim is now files-scoped (L4).** The Step-4 verify-run EXECUTES staged code before the human approves (no OS sandbox — a pre-run lint plus judgment), so a staged side-effect the lint misses fires pre-consent; the SIDE-EFFECTS ≠ FILES ceiling was disclosed deep in the docs while the headline guarantee stayed unqualified. The SKILL.md body top-line and the README guarantees section now carry the one-clause qualifier: zero-breakage is a FILES guarantee (staging rollback) — an executed verify-run side-effect is *prevented* (pre-run lint + propose-not-execute), never undone. The frontmatter description is unchanged (8 chars of headroom under the 1024 cap — the clause cannot fit; its "(staging)" parenthetical already names the mechanism).
+- **`references/audit.md` TRANSIENT-clone bullet can no longer be stretched into silently picking the report location.** "Write the report to a PERMANENT path the user picks" was stretched live (2026-07-09) by an operator into silently choosing the umbrella PARENT for the user — the exact location the bullet above it forbids. The bullet now binds: ASK the user to pick the permanent path explicitly (never choose silently); a parent / umbrella / catch-all root is never a legal pick even if offered; user absent or no answer → the factory location inside the scanned part, telling the user to copy the report out before the next update wipes it.
+
+### Notes
+- M9's own meta-point: a board auditing itself shares the very platform blind spot it exists to catch — this repo IS the board's own home platform (Claude Code), so a self-audit cannot see a Claude-Code-only framing bias. The human (or an agent) on another platform is the check the board cannot perform on itself.
+
 ## [1.7.3] - 2026-07-09
 
 ### Fixed

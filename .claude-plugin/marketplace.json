@@ -6,7 +6,7 @@
     {
       "name": "coalboard",
       "source": "./plugin",
-      "description": "Diverse-lens consensus & debate board. Its primary auto-trigger is error-not-allowed work (security/crypto, migrations, high-precision math); convened manually it generalizes to any hard problem worth several perspectives. With consent it convenes diverse epistemic lenses in parallel (empirical/source-grounded, formal, a show-me skeptic), a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Off ~90% of the time. Cross-agent (any subagent platform; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys."
+      "description": "Diverse-lens consensus & debate board. Its primary auto-trigger is error-not-allowed work (security/crypto, migrations, high-precision math); convened manually it generalizes to any hard problem worth several perspectives. With consent it convenes diverse epistemic lenses in parallel (empirical/source-grounded, formal, a show-me skeptic), a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Off ~90% of the time. Cross-agent (verified: Claude Code + Antigravity; others designed-for, unverified; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys."
     }
   ]
 }
