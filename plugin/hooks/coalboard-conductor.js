@@ -20,11 +20,11 @@ const D_KEYWORDS = ['auth', 'authentication', 'authorization', 'crypto', 'encryp
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
 function lc(s) { return String(s == null ? '' : s).toLowerCase(); }
 function matched(text, list) { const t = lc(text); return list.filter((f) => f && t.includes(lc(f))); }
-// Empty/all-'' config list -> fall back to the default (never "match nothing"); keywords are ADDITIVE.
-function cfgList(v, d) { if (!Array.isArray(v)) return d; const c = v.filter(Boolean); return c.length ? c : d; }
 // seed lists (paths/imports/keywords) are ADDITIVE — a user's list EXTENDS the built-in
 // security seed, never DROPS it (CT v1.0.18 REPLACE->UNION; mirrors trigger.mjs seedList).
-// cfgList stays replace-or-default for excludePaths (its dev-contamination floor is applied separately).
+// Empty/all-'' -> fall back to the default (never "match nothing"). The conductor detects on
+// PROMPTS only, so there is no excludePaths path here (that file-scan + its own cfgList live in
+// trigger.mjs) — every seed the conductor reads is additive.
 function seedList(v, d) { const e = Array.isArray(v) ? v.filter(Boolean) : []; return e.length ? d.concat(e) : d; }
 function kwList(v) { return seedList(v, D_KEYWORDS); }
 

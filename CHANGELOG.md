@@ -2,6 +2,11 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.3] - 2026-07-09
+
+### Fixed
+- Removed the now-dead `cfgList` function from the conductor hook. The v1.7.2 seed-union refactor moved `criticalPaths`/`criticalImports` to `seedList`, leaving `cfgList` unreferenced in `coalboard-conductor.js` (the conductor detects on prompts only — it has no `excludePaths` file-scan path; `trigger.mjs` keeps its own `cfgList` for the exclude default). Closes a CodeQL `js/unused-local-variable` note surfaced by the post-push code-scanning check. No behavior change.
+
 ## [1.7.2] - 2026-07-09
 
 ### Security
