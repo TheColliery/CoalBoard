@@ -37,14 +37,14 @@ test('SessionStart -> board contract, exit 0, no stderr', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('UserPromptSubmit with a critical signal -> HALT/CONSENT directive', () => {
+test('UserPromptSubmit with a critical signal -> HALT/CONSENT directive + the arbitration cue', () => {
   const tmp = mk();
   try {
     const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto timing bug' }, tmp, tmp);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /CRITICAL signal/);
     assert.match(r.stdout, /HALT/);
-    assert.match(r.stdout, /ARBITRATE/, 'the double-hook arbitration cue must be appended');
+    assert.match(r.stdout, /ARBITRATE/, 'CB carries its own arbitration cue on every HARD-reason hit -- CT\'s conditional per-turn cue is not congruent with CB\'s substring seed set');
     assert.equal(r.stderr, '');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
@@ -69,16 +69,19 @@ test('non-English critical prompt -> the grade-by-meaning nudge fires', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('PURE-Thai critical prompt (NO Latin keyword) -> still fires via the non-Latin script signal (CB-7)', () => {
+test('PURE-Thai critical prompt (NO Latin keyword) -> the lean one-liner, not the full CRITICAL block (CB-7 + HOOK-LEAN downgrade)', () => {
   const tmp = mk();
   try {
-    // The exact CB-7 case: a critical prompt entirely in Thai matches ZERO English seed.
-    // Before the fix this returned no reasons -> the conductor emitted nothing for a
-    // Thai-speaking user's critical prompt. The script-presence signal must now fire it.
+    // The exact CB-7 case: a critical prompt entirely in Thai matches ZERO English seed -> zero
+    // HARD reasons, script-only. Before CB-7 this returned no reasons -> silent; CB-7 then fired
+    // the FULL CRITICAL block on every non-Latin turn; HOOK-LEAN (2026-07-15) downgrades a
+    // script-only signal to a one-line reminder -- the "judge by MEANING" rail already lives in
+    // the resident SessionStart contract, this just re-surfaces it.
     const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'แก้บั๊กการเข้ารหัสในระบบยืนยันตัวตน' }, tmp, tmp);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /CRITICAL signal/, 'a pure-Thai critical prompt must not be silent');
-    assert.match(r.stdout, /non-English/, 'and it carries the grade-by-meaning nudge');
+    assert.doesNotMatch(r.stdout, /CRITICAL signal/, 'a script-only signal must NOT pay the full CRITICAL block');
+    assert.match(r.stdout, /Non-English prompt/, 'the lean one-liner still fires -- a pure-Thai critical prompt is never silent');
+    assert.match(r.stdout, /MEANING/);
     assert.equal(r.stderr, '');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

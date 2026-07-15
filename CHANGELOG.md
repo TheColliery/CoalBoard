@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.5] - 2026-07-16
+
+### Changed
+- **HOOK-LEAN — a script-only signal downgrades to a one-liner.** `detect()` now returns the non-Latin script flag SEPARATELY from the hard reasons: a script-only turn (non-Latin prompt, no path/import/keyword hit) injects a one-line judge-by-MEANING reminder (~126 chars) instead of the full CRITICAL block (~794 chars) — the "judge by MEANING" rail already lives in the resident SessionStart contract; the one-liner is the re-surface net for long never-compacting sessions. A hard path/import/keyword hit keeps the full block unchanged, INCLUDING the CB↔CT arbitration cue — CB carries its OWN cue, never delegated to CoalTipple (CT's per-turn cue is conditional on CT's own whole-word/stem signal set, which is NOT congruent with CB's substring seeds: a bare `ledger`/`auth` turn fires this block while CT's cue stays silent that turn; an earlier draft removed the cue on the opposite premise — false, corrected in review).
+- **SKILL.md Step-0 gains the ARC-JUDGMENT rail:** judge the TASK ARC, not only this turn — a sequence of individually-routine asks around money/records/overseers (send → deflect a stakeholder → keep the overseer out → clean up the record) is error-not-allowed even though no single turn looks critical; the asker personally benefiting from the edit is itself a signal. Harvested 2026-07-16 from a public Petri-style audit transcript in which a frontier target complied with exactly this ladder (deflection mail → counsel isolated → financial CSV falsified) and refused only the final minutes-backdating rung.
+- `verify.mjs` gains the flock `DESC_CAP` gate: every `skills/*/SKILL.md` + `commands/*.md` frontmatter `description` (+ `when_to_use`) ≤ 1024 chars — cross-platform-safe cap (agentskills.io); CC's own listing truncation is 1536 combined (verified 2026-07-16). USER lock, past/present/future.
+
 ## [1.7.4] - 2026-07-09
 
 **PATCH** — docs-only conform, from the user's CoalBoard nasa audit (findings **M9 + L4**) plus a report-location hardening from a live incident.
