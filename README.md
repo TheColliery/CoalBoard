@@ -12,11 +12,11 @@
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-validated-brightgreen)
 ![Antigravity](https://img.shields.io/badge/Antigravity-validated-brightgreen)
-![Cursor](https://img.shields.io/badge/Cursor-works_with-blue)
-![Codex](https://img.shields.io/badge/Codex-works_with-blue)
-![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-works_with-blue)
-![Cline](https://img.shields.io/badge/Cline-works_with-blue)
-![Copilot](https://img.shields.io/badge/Copilot-works_with-blue)
+![Cursor](https://img.shields.io/badge/Cursor-design--supported-blue)
+![Codex](https://img.shields.io/badge/Codex-design--supported-blue)
+![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-design--supported-blue)
+![Cline](https://img.shields.io/badge/Cline-design--supported-blue)
+![Copilot](https://img.shields.io/badge/Copilot-design--supported-blue)
 
 [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
@@ -75,9 +75,9 @@ Copy-Item -Recurse CoalBoard/skills/coalboard "$env:USERPROFILE\.gemini\config\s
 Remove-Item -Recurse -Force CoalBoard   # optional cleanup
 ```
 
-Start a new Antigravity session; `coalboard` appears in the skills list. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (Antigravity has no hooks and no per-worker model-pick — the lenses run the parent model).
+Start a new Antigravity session; `coalboard` appears in the skills list. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (CoalBoard ships no Antigravity hook wire, and Antigravity has no per-worker model-pick — the lenses run the parent model).
 
-**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VERIFIED on Claude Code and Antigravity** — every other named platform is supported-not-yet-proven, so re-verify subagent support on yours.
+**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VALIDATED on Claude Code and Antigravity** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours.
 
 ## ⚙️ Configure
 
