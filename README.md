@@ -81,7 +81,7 @@ Start a new Antigravity session; `coalboard` appears in the skills list. The boa
 
 ## ⚙️ Configure
 
-Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.json` overlaid per key by the nearest project `.claude/.coalboard.json` (project wins), so you can **tune or shut off a globally-installed skill per project** (off-switch: `coalboardMode: off`). The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) The high-impact keys:
+Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.json` overlaid per key by the nearest project `.claude/.coalboard.json` (project wins), so you can **tune or shut off a globally-installed skill per project** (off-switch: `coalboardMode: off`) — a skill you don't need in a given project stops loading (and burning tokens) there. The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) The high-impact keys:
 
 | Key | Default | What it does |
 |---|---|---|
