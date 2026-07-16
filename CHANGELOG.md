@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.7.6] - 2026-07-16
+
+**PATCH** — SKILL.md body re-carve (the regrowth-ratchet, skill-authoring.md §5). No behavior change: every RAIL stays in the body verbatim/intact; only EXPLANATION prose (war-stories · rationale · a duplicated lens prompt) moves to references.
+
+### Changed
+- **SKILL.md body carved 33,831 → 31,510 ch (−2,321).** The v1.0.13 carve (32,372→19,433, −40%) had re-grown to 33,831 (+74%, past pre-carve) as dogfood added WHY/war-story prose INLINE around real rails, release-over-release. Four explanation blocks moved out, rails kept: (1) the Step-1 Bounds grandchild-runaway war-story (~213k-token runaway) + the flatten-limit mechanics → new `references/failure-modes.md`; (2) the Step-1 Tiers decorrelation essay (`diversifyModels`-INERT · nasa=all-opus MAX-correlation · sub4-shares-the-blind-spot) → `references/lens-prompts.md` §Model assignment (most was already there — dedup; the nasa/sub4 nuances appended); (3) the Memory & resume SendMessage-absent mechanics + build-verify note → `references/failure-modes.md`; (4) the duplicated ~600-ch show-me prompt in the sub3 lens-table cell shrunk to one line (the full prompt already instantiates from `lens-prompts.md`; the sub3 design-feeling ROUTE branch preserved in the Step-2 judge route line). Plus a Step-0 anti-rubber-stamp rationale trim (the phrasing already lives in `wizard.md`).
+- **Rails verified INTACT via the §5 rail-checklist (the lab-gate PROOF, not eyeballing):** every rail enumerated from the pre-carve body — the spawn-no-spawn-leaf structural enforcement, the Backstop, the agentId reconciliation, the HONEST-CC-LIMIT best-effort/Clear/don't-attest set, the tier-resolution order + deterministic-by-table, the journal/remainder-re-spawn/idempotent resume set, the memory-delete + cross-read-forbidden set, and every consent gate — confirmed PRESENT + INTACT in the carved body (moved facts land verbatim in a reference; nothing dropped, nothing duplicated). New carve baseline for the regrowth-ratchet = **31,510 ch** (the number future releases diff against).
+
 ## [1.7.5] - 2026-07-16
 
 ### Changed
