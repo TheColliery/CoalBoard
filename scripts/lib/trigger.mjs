@@ -21,7 +21,11 @@ export const DEFAULT_CRITICAL_KEYWORDS = [
 ];
 const DEFAULT_EXCLUDE = ['node_modules', '.git', 'dist', 'vendor', 'build'];
 
-// Lowercase contains-match for any fragment in `list`. Returns the matched fragments.
+// Lowercase CONTAINS-match (substring). DELIBERATELY over-inclusive (WAI, not a bug): 'auth' also
+// hits 'author', 'session' hits 'this session', 'token' hits an LLM 'token'. Layer 1 maximizes RECALL
+// as a cheap static pre-filter; Layer 2 (the model, per the header) discards the false hits by intent.
+// The asymmetry is the whole point: an over-fire is a recoverable one-line re-check, an UNDER-fire is
+// an unrecoverable missed error-not-allowed task. Do NOT tighten to word-boundaries. Returns the matches.
 function matched(text, list) {
   const t = String(text || '').toLowerCase();
   return list.filter((f) => f && t.includes(String(f).toLowerCase()));
