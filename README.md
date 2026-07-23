@@ -89,6 +89,7 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 | `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene — the board's master switch) |
 | `triggerConfidence` | `90` | Semantic-classifier confidence (0-100) a task must clear to count as critical — higher = fewer false triggers, more false-negatives (the manual `/coalboard` is the safety valve) |
 | `lenses` | `data, truth, feeling` | The active epistemic lenses (each `data` \| `truth` \| `feeling`) — the decorrelation mechanism; all three are the floor for error-not-allowed work |
+| `fableConsent` | `ask` | Consent to seat **Fable 5** (the top lens rung — within the weekly Fable cap on Max/Team-Premium, real metered credit on lower plans) at `high`/`nasa`: `ask` (a consent box before the fable seats, showing the exact count + a ~est cost) \| `always` (seat without asking) \| `never` (always fall to the highest non-fable tier). `relaxed`/`standard` never seat fable |
 | `consensusThreshold` | `80` | Worker-agreement % below which the board is deadlocked and summons the out-of-frame sub4 observer to break the tie |
 | `maxRounds` | `1` | Debate rounds — `1` = single-turn (max independence); `>1` = multi-round cross-examination (reintroduces anchoring) |
 

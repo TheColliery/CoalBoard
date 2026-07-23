@@ -1,0 +1,21 @@
+# CoalBoard — Claude Code adapter facts (fable seating · safe-or-block · the consent-box cost note)
+
+> Loaded ON-DEMAND when the ladder seats **fable** (high/nasa) — the cheap auto path never pays for it. This is read by MAIN (the orchestrator), never sent to a lens. CB core stays PLATFORM-GENERIC (any platform with concurrent subagents); everything here is a Claude-Code ADAPTER fact, never core logic.
+
+## Fable is exposed as SAFE-OR-BLOCK (a pre-generation gate, 0 tokens)
+Claude Code exposes Fable 5 (`claude-fable-5`) with a safeguard that decides BEFORE generation: the seat either runs normally (safe) or the request is BLOCKED pre-generation on a LEXICAL AUP trigger ("attack" / "exploit" / "break the source" / "compromise" / … ) — a block spends **0 tokens** (nothing was generated). A block is NOT unavailability (the model exists + is reachable); it is a content refusal. Two consequences the board is built around:
+- **The lens / launch / judge templates are AUP-SAFE** — defensive-QA-neutral vocabulary (verify the invariant holds · find a counterexample · probe for a failure · stress-test the claim) with the adversarial INTENT fully intact. The safeguard keys on trigger WORDS; the epistemic pressure is what gives the board its decorrelation value → keep the teeth, drop the trigger words.
+- **fable is NEVER seated on the sub4/observer tiebreaker seat** (SKILL.md Step 1 · lens-prompts.md §Model assignment) — final-arbiter robustness: the resolver forces it to the highest non-fable tier (opus) even if a config tries to pin fable onto it. The **ADVERSARY seat, by contrast, IS fable-eligible** (a domain-general falsification lens — "find where the work fails its own contract", not an exploit hunt — seated fable at nasa): on a security-CODE target its output can be exploit-shaped and the safeguard may BLOCK that spawn, which is exactly the empty-return re-route below (→ opus), uniform with any fable lens on security content; on general boards (docs/math/research/translation/legal) it runs fable normally.
+
+## A fable block needs NO new CB recovery code — it rides the existing re-route
+A blocked fable seat returns EMPTY (0 tokens, "Completed" in ~0s). CB already treats an empty / missing lens return as a DEAD lens (SKILL.md Step 1 "Spawn-failure / dead-lens" — COMPLETED ≠ ANSWERED): the parent detects it by RETURN-COUNTING (every launched lens reconciled by agentId before the judge proceeds) and re-spawns that seat. For a fable block the re-route target is the **highest non-fable tier (opus)** — never re-pick fable for the SAME content (it would block again). So the AUP-safe templates make a block UNLIKELY, and the existing subagent-safety re-route makes a block HARMLESS. CB core adds nothing for it.
+
+## The consent-box cost note (what the fable ask SHOWS)
+The board cannot know the user's plan, so the ask shows BOTH branches. Render, terse:
+- **Count (EXACT):** `fable ×N` — N = **1 at high**, **2 at nasa** (the ladder seats fable on the reasoning lenses — truth at high; truth + adversary at nasa).
+- **Token estimate (~est):** a spawned worker costs ~35–58k tokens (CoalTipple's empirical spawn-overhead lock) → `~N × ~50k tokens` as a rough magnitude, labeled **~est**.
+- **Rate note (BOTH plan branches):** "**Max / Team-Premium** = within the weekly Fable cap (no extra money) · **lower plans** = real metered credit ~$X at **$10 / $50 per Mtok** (input / output) — a labeled **~est** hint, never precise." Compute $X only as a rough magnitude from the token ~est. The COUNT is exact; the dollars are a hint.
+
+The box carries the decision line (count + ~est + the one-line rate note) + `once · always this project · no`; the fuller breakdown renders as chat text BEFORE the box (anti-rubber-stamp, same as every CB consent gate). `no` → fall every fable seat to opus; `always this project` → persist `fableConsent:"always"` to the project `.coalboard.json`.
+
+⚠️ **Version-sensitive (source-grounding — re-verify before trusting):** the Fable metered rate `$10 / $50 per Mtok`, the "off-plan since 2026-07-12" framing, "within the weekly Fable cap on Max / Team-Premium", and the model id `claude-fable-5` are all pricing / availability facts that ROT. Keep the number in THIS one spot so a pricing change is a one-line edit, and re-verify against current Anthropic pricing on any Fable billing change.

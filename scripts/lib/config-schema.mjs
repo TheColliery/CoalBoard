@@ -34,13 +34,14 @@ export const CONFIG_SCHEMA = [
   { key: 'subagentTimeoutSeconds', type: 'int', min: 5, max: 3600, flags: ['-s'], help: 'Hard stall-reap: a silent worker past this is treated as failed (default: 150)' },
   { key: 'maxConcurrentSubagents', type: 'int', min: 1, max: 16, flags: ['--concurrency'], help: 'Concurrent worker cap — they share one rate limit (board needs 3-4; default: 4)' },
   { key: 'lensTiers', type: 'obj', noFlag: true, validate: validateLensTiers, help: 'Optional per-role tier/model pin { data | truth | feeling | observer | judge: "model" | ["priority","chain"] }; overrides BOTH rigorLensTiers and the inherit-CT default' },
-  { key: 'rigorLensTiers', type: 'obj', noFlag: true, validate: validateRigorLensTiers, help: 'Deterministic rigor->lens-tier map { relaxed | standard | high | nasa : "haiku"|"sonnet"|"opus"|model | ["priority","chain"] } — the LENS model scales with rigor; the agent READS this verbatim (never interprets) so the assignment is identical every run. The judge runs on main (typically the strongest tier via CT\'s ladder); the adversary always the rigor tier (never undetermined). lensTiers (per-role) overrides this. Default: relaxed/standard->haiku, high->sonnet, nasa->opus' },
+  { key: 'rigorLensTiers', type: 'obj', noFlag: true, validate: validateRigorLensTiers, help: 'Deterministic rigor->lens-tier ladder. Each rigor maps to EITHER a per-seat object { data | truth | feeling | adversary : "haiku"|"sonnet"|"opus"|"fable"|model | ["priority","chain"] } (the mixed ladder — a tier-MIX is the only actuatable model-decorrelation on CC) OR a single string/chain (the pre-fable form: every seat that tier). The LENS model scales with rigor; the agent READS this verbatim (never interprets). The judge runs on main; the sub4/observer tiebreaker is ALWAYS a non-fable tier (final-arbiter robustness); the adversary seat is fable-ELIGIBLE (a domain-general falsification lens, seated fable at nasa); data is never fable. lensTiers (per-role) overrides this. Default: relaxed haiku/sonnet/haiku/sonnet · standard sonnet/opus/sonnet/opus · high opus/fable/opus/opus · nasa opus/fable/opus/fable' },
+  { key: 'fableConsent', type: 'enum', values: ['ask', 'always', 'never'], flags: ['--fable'], help: 'Consent to seat Fable 5 (the top lens rung — within the weekly Fable cap on Max/Team-Premium, metered real credit on lower plans): ask (default — a consent box fires BEFORE the fable seats at high/nasa, showing the exact fable count + a ~est cost) | always (seat fable without asking; what "always this project" writes) | never (always fall to the highest non-fable tier). relaxed/standard never seat fable, so the ask only fires at high/nasa' },
   // Tombstoned keys — do NOT resurrect without their trigger:
   //   'callFable' (shipped 1.6.0, withdrawn 1.6.1 — premature: a SKILL.md flag cannot hard-block a
   //   lens seat the way commented-out code blocks execution; returns as the real-money Fable gate,
   //   redesigned, WHEN Fable billing actually leaves the plan).
   // — sharpness levers (the rigor preset sets these; an explicit key overrides) —
-  { key: 'adversaryLens', type: 'bool', flags: ['--adversary'], help: 'Spawn the red-team falsification lens — "find the ONE input that breaks it; could-not-break-it is your only failure" (sharper recall than the show-me skeptic). Adds a worker; rigor sets it (on under high/nasa). Default off' },
+  { key: 'adversaryLens', type: 'bool', flags: ['--adversary'], help: 'Spawn the falsification lens — "find the ONE input where the work fails its own spec; could-not-find-a-counterexample is your only failure" (sharper recall than the show-me skeptic). Adds a worker; rigor sets it (on under high/nasa). Default off' },
   { key: 'contestedRound', type: 'bool', flags: ['--contested'], help: 'On deadlock, run ONE surgical cross-exam on the CONTESTED point only (feed the counter-claim, not full answers) before sub4 — cross-examination without global anchoring. rigor sets it (on under high/nasa). Default off' },
   { key: 'diversifyModels', type: 'bool', flags: ['--diversify'], help: 'INERT on alias-only platforms (Claude Code): the spawn tool takes only aliases (haiku/sonnet/opus/fable; availability shifts — discovered at spawn) — it CANNOT pin a model GENERATION, so "spread across generations" is a no-op here (kept degrade-safe for a platform that can pin generations). On CC the only actuatable model-decorrelation is a tier-MIX (different models, partial, at a lens-strength cost); the REAL decorrelation is the diverse lens prompts + adversary + sub4, never the model. rigor sets it (nasa). Default off' },
   // — verify / apply —
@@ -128,15 +129,27 @@ function validateLensTiers(pins) {
   return null;
 }
 
-// A rigor->tier map: each rigor name -> a model string OR a non-empty priority chain.
+// A rigor->tier map. Each rigor name maps to EITHER:
+//   - a model string OR a non-empty priority chain (the pre-fable form: every seat that tier), OR
+//   - a per-seat OBJECT { data | truth | feeling | adversary : string | chain } (the mixed ladder).
+// A tier value (string or chain) must be a non-empty model string or a non-empty array of them.
 function validateRigorLensTiers(map) {
   const rigors = ['relaxed', 'standard', 'high', 'nasa'];
+  const seats = ['data', 'truth', 'feeling', 'adversary'];
+  const okTier = (val) =>
+    (typeof val === 'string' && val.trim().length > 0) ||
+    (Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string' && m.trim().length > 0));
   for (const r of Object.keys(map)) {
     if (!rigors.includes(r)) return `rigorLensTiers: unknown rigor '${r}' (use ${rigors.join('/')})`;
     const val = map[r];
-    const okString = typeof val === 'string' && val.trim().length > 0;
-    const okChain = Array.isArray(val) && val.length > 0 && val.every((m) => typeof m === 'string' && m.trim().length > 0);
-    if (!okString && !okChain) return `rigorLensTiers.${r} must be a non-empty model string or a non-empty array of non-empty strings`;
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      for (const seat of Object.keys(val)) {
+        if (!seats.includes(seat)) return `rigorLensTiers.${r}: unknown seat '${seat}' (use ${seats.join('/')})`;
+        if (!okTier(val[seat])) return `rigorLensTiers.${r}.${seat} must be a non-empty model string or a non-empty array of non-empty strings`;
+      }
+      continue;
+    }
+    if (!okTier(val)) return `rigorLensTiers.${r} must be a non-empty model string, a non-empty array of non-empty strings, or a per-seat object { data|truth|feeling|adversary : tier }`;
   }
   return null;
 }

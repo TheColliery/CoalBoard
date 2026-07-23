@@ -7,7 +7,7 @@ export const RIGOR_PRESETS = {
   // active: does the board engage on a critical task at all
   // observerOnMaxStakes: summon the out-of-frame sub4 even on CONSENSUS (not just on deadlock)
   // allDomainGates: run every domain verify gate (vs the default subset)
-  // adversaryLens: spawn the red-team falsification lens (find-the-breaking-input)
+  // adversaryLens: spawn the falsification lens (find-the-counterexample)
   // tier2Verify: property/fuzz/differential/metamorphic/mutation ground-truth gates
   // contestedRound: one surgical contested-point cross-exam on deadlock before sub4
   // diversifyModels: spread lenses across model generations when lensTiers unset

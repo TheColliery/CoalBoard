@@ -119,22 +119,45 @@
   // # Default value: unset (inherit CoalTipple's alias-floor + pins)
   // "lensTiers": { "data": "haiku", "truth": "sonnet", "feeling": "haiku", "observer": "opus", "judge": "opus" },
 
-  // ## Deterministic rigor->lens-tier map: the LENS model SCALES with rigor (cheap when relaxed, strong when nasa). The
-  // ## agent READS this table verbatim — it does NOT interpret/guess — so the model assignment is IDENTICAL every run
-  // ## (the fix for "deterministic" being an unearned label). The JUDGE runs on main — typically the strongest tier
-  // ## via CT's ladder (it verifies the cheap lenses on ground truth); the ADVERSARY (high/nasa) takes the rigor
-  // ## tier — always strong, never undetermined.
-  // ## lensTiers (per-role) overrides a specific role; this sets the per-rigor default for all lenses.
-  // # Setting type: Object { relaxed | standard | high | nasa : "haiku" | "sonnet" | "opus" | model | ["priority","chain"] }
-  // # Default value: relaxed/standard -> haiku, high -> sonnet, nasa -> opus
-  "rigorLensTiers": { "relaxed": "haiku", "standard": "haiku", "high": "sonnet", "nasa": "opus" },
+  // ## Deterministic rigor->lens-tier LADDER: the LENS model SCALES with rigor, as a MIXED per-seat assignment
+  // ## across the 4 lens seats (data, truth, feeling, adversary). Each rigor uses 2 tiers (a lighter + a stronger model)
+  // ## plus fable at the TOP rung on high/nasa — a modest model-decorrelation gain over the old one-tier-per-rigor
+  // ## default (4 IDENTICAL models per rigor). A tier-MIX is the only actuatable model-decorrelation on Claude Code
+  // ## (different models share fewer blind spots); a LIGHT secondary layer, not a full spread (high/nasa opus-heavy by design).
+  // ## The agent READS this table verbatim (never interprets) so the assignment is IDENTICAL every run. Support seats
+  // ## (data, feeling) take the range FLOOR; reasoning seats (truth, then adversary) take the ceil, fable-first. The
+  // ## JUDGE runs on main; the sub4/observer tiebreaker is ALWAYS a non-fable tier (final-arbiter robustness). "fable"
+  // ## is the TOP rung — seated on the REASONING lenses (truth at high; truth + adversary at nasa), and consent-gated
+  // ## (see fableConsent below). data is empirical/fetch-bound and NEVER fable. The adversary lens is fable-ELIGIBLE (a
+  // ## domain-general falsification lens); on security-CODE content a fable adversary may trip Fable's safeguard, which
+  // ## the existing empty-return re-route falls to opus — uniform with any fable lens on security content.
+  // ## Each rigor may be a per-seat object { data | truth | feeling | adversary : tier } OR a single string/chain
+  // ## (the pre-fable form: every seat that tier). lensTiers (per-role) still overrides a specific role.
+  // # Setting type: Object { relaxed|standard|high|nasa : { data|truth|feeling|adversary : "haiku"|"sonnet"|"opus"|"fable"|["chain"] } | "tier" }
+  // # Default value: relaxed haiku/sonnet/haiku/sonnet · standard sonnet/opus/sonnet/opus · high opus/fable/opus/opus · nasa opus/fable/opus/fable (data/truth/feeling/adversary)
+  "rigorLensTiers": {
+    "relaxed":  { "data": "haiku",  "truth": "sonnet", "feeling": "haiku",  "adversary": "sonnet" },
+    "standard": { "data": "sonnet", "truth": "opus",   "feeling": "sonnet", "adversary": "opus" },
+    "high":     { "data": "opus",   "truth": "fable",  "feeling": "opus",   "adversary": "opus" },
+    "nasa":     { "data": "opus",   "truth": "fable",  "feeling": "opus",   "adversary": "fable" }
+  },
+
+  // ## Consent to seat Fable 5, the TOP lens rung. Fable is real-money on lower plans (metered credit) but within the
+  // ## weekly Fable cap on Max / Team-Premium (no extra money). Because the skill cannot know your plan, at high/nasa
+  // ## (the only rigors that seat fable) a consent box fires BEFORE the fable seats spawn, showing the exact fable
+  // ## count (1 at high, 2 at nasa) + a rough ~est token/credit cost. Options: once (this run) · always (this project —
+  // ## writes "always" here) · no (fall to the highest non-fable tier, opus). Set it directly to skip the box:
+  // ## ask = the box each high/nasa run · always = seat fable silently · never = always fall to opus, never ask.
+  // # Setting type: String (ask, always, never)
+  // # Default value: ask
+  "fableConsent": "ask",
 
 
   // ─── sharpness levers (the rigor preset sets these; set a key here to force it either way) ───
 
-  // ## Spawn the red-team FALSIFICATION lens alongside the epistemic lenses. Its mandate: find the ONE input/case/
-  // ## sequence where the work FAILS — "could not break it" is its only failure mode. Sharper recall than the show-me
-  // ## skeptic (it HUNTS the breaking case, not just demands evidence). Adds a worker. The rigor preset sets it on
+  // ## Spawn the FALSIFICATION lens alongside the epistemic lenses. Its mandate: find the ONE input/case/
+  // ## sequence where the work FAILS its own spec — "could not find a counterexample" is its only failure mode. Sharper
+  // ## recall than the show-me skeptic (it SEARCHES for the falsifying case, not just demands evidence). Adds a worker. The rigor preset sets it on
   // ## under high/nasa; setting it here forces it either way.
   // # Setting type: Boolean
   // # Default value: false (rigor:standard); high/nasa turn it on via the preset
