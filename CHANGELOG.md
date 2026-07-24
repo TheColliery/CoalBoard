@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [1.8.1] - 2026-07-24
+
+**PATCH** — doc-truth fix in the shipped skill body; no behavior change.
+
+### Fixed
+- **The Memory & resume auto-trigger line still called CoalHearth "design-only."** CoalHearth graduated to a LIVE sibling; the auto-trigger note in SKILL.md (source + `plugin/` dist) hadn't caught up. Reworded: "CoalHearth is LIVE — lean on it when installed; absent → CB's light net / best-effort." The auto-trigger's actual degrade-safe behavior (light net when CoalHearth is absent) is unchanged — only the resident rail's own description of it was stale.
+
 ## [1.8.0] - 2026-07-23
 
 **MINOR** — Fable 5 gains a first-class identity as CoalBoard's top lens tier: a mixed per-seat rigor ladder, a consent-gate before any fable seat, and AUP-safe prompt templates.
