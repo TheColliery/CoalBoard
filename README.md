@@ -18,7 +18,7 @@
 ![Cline](https://img.shields.io/badge/Cline-design--supported-blue)
 ![Copilot](https://img.shields.io/badge/Copilot-design--supported-blue)
 
-[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
+[Benchmark](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
 **Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/HetCreep/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing) · **[CoalHearth](https://github.com/TheColliery/CoalHearth)** (session warm-resume) · **[CoalFace](https://github.com/TheColliery/CoalFace)** (fan-out discipline) · **[CoalWash](https://github.com/TheColliery/CoalWash)** (memory defrag) · **[CoalLedger](https://github.com/TheColliery/CoalLedger)** (docs health).
 
@@ -28,14 +28,22 @@
 
 ## ⚖️ What it is
 
-On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board:
+On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board of diverse epistemic lenses to debate the task, a judge to synthesize on verified inputs, and you to sign off before anything touches your files.
 
-- three **epistemic lenses** debate the task **in parallel, blind to each other** (so they don't anchor): an **empirical** lens that grounds claims in live, cross-referenced sources; a **formal** lens that reasons from logic and proof; and a **"show-me" skeptic** that turns every doubt into a concrete evidence-demand (*"show the date", "show it actually runs"*);
-- a **judge** synthesizes — on **verified** inputs, never on which answer sounds best;
-- on a deadlock, an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement;
-- every proposed change is staged to `.coalboard/proposed/` (reports land in `.coalboard/reports/`) and **you sign off** before a single live file changes.
+Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or invoke the `/coalboard` skill — plugin-qualified as `coalboard:coalboard`) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
 
-Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or run the `/coalboard:coalboard` plugin command) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
+## 🔍 How it works
+
+| Lens | Grounds in |
+|---|---|
+| **Empirical** | Live, cross-referenced sources — never training memory |
+| **Formal** | Logic and proof — internal consistency |
+| **Show-me** | Turns every doubt into a concrete evidence-demand (*"show the date", "show it actually runs"*) |
+
+1. **Convene** — the active lenses debate the same target **in parallel, blind to each other** (so they don't anchor on one another's answer).
+2. **Judge** — synthesizes on **verified** inputs, never on which answer sounds best.
+3. **Tiebreak** (on deadlock) — an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement.
+4. **Stage → consent → apply** — every proposed change is staged to `.coalboard/proposed/` (reports land in `.coalboard/reports/`) and **you sign off** before a single live file changes.
 
 ## 🛡️ What it guarantees (and what it doesn't)
 
@@ -48,13 +56,11 @@ Both guarantees are **contract-enforced** — the board's staging discipline + y
 
 It **improves** correctness; it does **not** claim a defect rate or a reliability figure (an LLM ensemble is probabilistic, not formally proven — and `10⁻⁹` is unverifiable by any system). It gets *more accurate as the underlying models improve*, for free — the structure is model-agnostic.
 
-## 📊 Benchmark
+## 🤖 Compatibility
 
-**Headline (2026-07-03 redo, Opus 4.8):** solo **4/5** vs board **5/5** on 5 error-not-allowed tasks. On a STRONG solo model the reasoning traps (crypto timing-leak, compounding basis, async race, heading defects) are already caught unaided — the board's irreducible edge is the version-sensitive FACT (T3), where only RUN-the-check (a live fetch) beats training-stale memory (board committed the current LTS; solo hedged-then-shipped a stale one). The board = solo **+ ground-truth execution**; its margin narrows as the base model strengthens but never closes on facts that live outside the model. (The older ~13/20 solo run was a weaker solo model.)
+**Validated end-to-end: Claude Code + Antigravity** (Antigravity: 2026-06-22, a self-run validation — not third-party-audited). Claude Code additionally auto-activates via hooks and gets the cheap-lenses / premium-judge cost discount — both Claude-Code-only bonuses.
 
-Cross-vendor, the lift is larger on a weaker solo model (the older 2026-06-19 run). Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
-
-> Honest scope: small, dated samples; the board **improves** correctness, it does not prove a defect rate. A board whose lenses share one model still shares that model's blind spot (the honest ceiling). The honest sell is **bounded cost + zero-breakage**, not a reliability number.
+Every other concurrent-subagent platform (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, …) is **design-supported, unverified** — the board is a plain, platform-neutral skill ([`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md)) that convenes via your platform's own native subagent tool, so it should run there, but re-verify subagent support before trusting it. See Install below for the exact steps per platform.
 
 ## 🚀 Install
 
@@ -94,6 +100,14 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 | `maxRounds` | `1` | Debate rounds — `1` = single-turn (max independence); `>1` = multi-round cross-examination (reintroduces anchoring) |
 
 Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs`](scripts/lib/config-schema.mjs) and the commented template [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json).
+
+## 📊 Benchmark
+
+**Headline (2026-07-03 redo, Opus 4.8):** solo **4/5** vs board **5/5** on 5 error-not-allowed tasks. On a STRONG solo model the reasoning traps (crypto timing-leak, compounding basis, async race, heading defects) are already caught unaided — the board's irreducible edge is the version-sensitive FACT (T3), where only RUN-the-check (a live fetch) beats training-stale memory (board committed the current LTS; solo hedged-then-shipped a stale one). The board = solo **+ ground-truth execution**; its margin narrows as the base model strengthens but never closes on facts that live outside the model. (The older ~13/20 solo run was a weaker solo model.)
+
+**Cross-vendor (same 2026-07-03 redo, Antigravity / Gemini 3.5 Flash):** solo **~4/15 (27%)** vs board **5/5** — a weak solo model misses reasoning traps too, so the board recovers all of them; the weaker the solo model, the larger the board's lift. (Supersedes the older 2026-06-19 AG run's smaller solo 1/5 → board 4/5 gap.) Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
+
+> Honest scope: small, dated samples; the board **improves** correctness, it does not prove a defect rate. A board whose lenses share one model still shares that model's blind spot (the honest ceiling). The honest sell is **bounded cost + zero-breakage**, not a reliability number.
 
 ## 🧭 Part of TheColliery
 

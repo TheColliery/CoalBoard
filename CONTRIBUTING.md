@@ -14,7 +14,7 @@ CoalBoard is the consensus & debate board of the [TheColliery](https://github.co
 
 ## 💻 Developing & Testing
 
-CoalBoard is **zero-dependency** (Node.js built-ins only, Node 18+). No `npm install` is required.
+CoalBoard is **zero-dependency** (Node.js built-ins only, Node 22+). No `npm install` is required.
 
 Keep the gates green before and after editing:
 
