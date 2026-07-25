@@ -101,6 +101,12 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 
 Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs`](scripts/lib/config-schema.mjs) and the commented template [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json).
 
+## 🔐 Permissions
+
+CoalBoard reads the target and writes only to its own scratch — staged fixes in `.coalboard/proposed/`, a worker's private resume checkpoint in `.coalboard/memory/` — nothing touches a live file until you approve it. Two lens seats carry a capability spike beyond read: **show-me**, and (when active) **adversary**, may run commands to prove a claim; **empirical** alone reaches the network, and no other seat gets either. Workers never spawn and never ask; only main picks each seat's model (including any Fable seat, gated by `fableConsent`), verifies ground-truth, and applies to live — on your consent.
+
+Full series matrix + the must-fail set: [Permission Matrix](https://github.com/TheColliery/.github/blob/main/PERMISSION-MATRIX.md)
+
 ## 📊 Benchmark
 
 **Headline (2026-07-03 redo, Opus 4.8):** solo **4/5** vs board **5/5** on 5 error-not-allowed tasks. On a STRONG solo model the reasoning traps (crypto timing-leak, compounding basis, async race, heading defects) are already caught unaided — the board's irreducible edge is the version-sensitive FACT (T3), where only RUN-the-check (a live fetch) beats training-stale memory (board committed the current LTS; solo hedged-then-shipped a stale one). The board = solo **+ ground-truth execution**; its margin narrows as the base model strengthens but never closes on facts that live outside the model. (The older ~13/20 solo run was a weaker solo model.)
