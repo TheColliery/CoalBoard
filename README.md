@@ -30,7 +30,11 @@
 
 On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board of diverse epistemic lenses to debate the task, a judge to synthesize on verified inputs, and you to sign off before anything touches your files.
 
-Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) — but you can **manually convene it** (say *"convene the board"* in chat, or invoke the `/coalboard` skill — plugin-qualified as `coalboard:coalboard`) on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal — not just code. Always behind a consent gate.
+Three doors in — every one behind your consent:
+
+- **Auto** — the error-not-allowed slice above. Cost-disciplined: asleep ~90% of the time.
+- **Manual** — say *"convene the board"* in chat, or invoke the `/coalboard` skill (plugin-qualified as `coalboard:coalboard`), on any hard problem worth several diverse perspectives, in **any domain** — code, docs, math, research, translation, legal. Two modes: **generate** new work, or **audit / review** existing work.
+- **Opinion ("ask CB")** — when your agent is about to ask you to settle a decision it can't settle itself, that same question gains a third option, *ask CB*, its cost on the label (~4 lenses + a judge). **Your pick is the consent** — per-instance, never auto-convened, nothing persisted. The board returns an **opinion** re-asked into your original question: you still decide, and no file changes.
 
 ## 🔍 How it works
 
@@ -45,7 +49,7 @@ Its **auto-trigger** stays on the critical slice (off ~90%, cost-disciplined) �
 3. **Tiebreak** (on deadlock) — an **independent out-of-frame solver** re-derives the answer blind and breaks the tie by agreement.
 4. **Stage → consent → apply** — every proposed change is staged to `.coalboard/proposed/` (reports land in `.coalboard/reports/`) and **you sign off** before a single live file changes.
 
-## 🛡️ What it guarantees (and what it doesn't)
+**The opinion lane seats a different board.** Four equal-knowledge seats — one equal tier, never Fable — differ only in a locked perspective: **realtime** (trusts only what it can measure, run, or fetch this session; anything out of reach is declared *ran blind*, never filled from memory), **reality** (show-me — undemonstrated = not yet real; builds breaking cases both ways), **feeling** (walks the human experience under each option; never runs anything), **outdim** (receives the bare problem only — no options, no proposal, no house context — and designs its own answer from scratch). If you brought a leaning, every seat that sees it tries to **refute** it — never grade it (a refutation that fails is the strongest support a proposal can earn); outdim never sees it at all. The judge synthesizes — never counts votes — and **re-asks your original question** with the board's view attached: you decide, and nothing is staged or applied.
 
 CoalBoard is **NASA-inspired in structure** (redundancy + design-diversity + human-in-the-loop + trigger-only-on-critical) — **not in numbers.** It honestly guarantees two things:
 
@@ -92,7 +96,7 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 | Key | Default | What it does |
 |---|---|---|
 | `rigor` | `standard` | Strictness preset (`relaxed` \| `standard` \| `high` \| `nasa`) — sets defaults for the knobs below; any explicit key overrides it |
-| `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene — the board's master switch) |
+| `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene, never offer "ask CB" — the board's master switch) |
 | `triggerConfidence` | `90` | Semantic-classifier confidence (0-100) a task must clear to count as critical — higher = fewer false triggers, more false-negatives (the manual `/coalboard` is the safety valve) |
 | `lenses` | `data, truth, feeling` | The active epistemic lenses (each `data` \| `truth` \| `feeling`) — the decorrelation mechanism; all three are the floor for error-not-allowed work |
 | `fableConsent` | `ask` | Consent to seat **Fable 5** (the top lens rung — within the weekly Fable cap on Max/Team-Premium, real metered credit on lower plans) at `high`/`nasa`: `ask` (a consent box before the fable seats, showing the exact count + a ~est cost) \| `always` (seat without asking) \| `never` (always fall to the highest non-fable tier). `relaxed`/`standard` never seat fable |
@@ -103,7 +107,7 @@ Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs
 
 ## 🔐 Permissions
 
-CoalBoard reads the target and writes only to its own scratch — staged fixes in `.coalboard/proposed/`, a worker's private resume checkpoint in `.coalboard/memory/` — nothing touches a live file until you approve it. Two lens seats carry a capability spike beyond read: **show-me**, and (when active) **adversary**, may run commands to prove a claim; **empirical** alone reaches the network, and no other seat gets either. Workers never spawn and never ask; only main picks each seat's model (including any Fable seat, gated by `fableConsent`), verifies ground-truth, and applies to live — on your consent.
+CoalBoard reads the target and writes only to its own scratch — staged fixes in `.coalboard/proposed/`, a worker's private resume checkpoint in `.coalboard/memory/` — nothing touches a live file until you approve it. On the main board two lens seats carry a capability spike beyond read: **show-me**, and (when active) **adversary**, may run commands to prove a claim; **empirical** alone reaches the network, and no other seat gets either. In the opinion lane the run/fetch spike sits on the **realtime** seat alone (measuring, running, and fetching this session is its whole perspective; **feeling** never runs), and the lane writes no file — no staged fix, no report; its resume scratch, if armed, is deleted at the end. Workers never spawn and never ask; only main picks each seat's model (including any Fable seat, gated by `fableConsent`), verifies ground-truth, and applies to live — on your consent.
 
 Full series matrix + the must-fail set: [Permission Matrix](https://github.com/TheColliery/.github/blob/main/PERMISSION-MATRIX.md)
 

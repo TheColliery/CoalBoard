@@ -1,12 +1,12 @@
 {
   "name": "coalboard",
   "owner": { "name": "TheColliery" },
-  "description": "CoalBoard — a diverse-lens consensus & debate board (with consent). Its primary trigger is error-not-allowed work; convened manually it generalizes to any hard problem worth several perspectives. Part of the TheColliery mining series.",
+  "description": "CoalBoard — a diverse-lens consensus & debate board (with consent). Its primary trigger is error-not-allowed work; convened manually it generalizes to any hard problem worth several perspectives — generate or audit; an \"ask CB\" option turns an uncertain decision into a board opinion. Part of the TheColliery mining series.",
   "plugins": [
     {
       "name": "coalboard",
       "source": "./plugin",
-      "description": "Diverse-lens consensus & debate board. Its primary auto-trigger is error-not-allowed work (security/crypto, migrations, high-precision math); convened manually it generalizes to any hard problem worth several perspectives. With consent it convenes diverse epistemic lenses in parallel (empirical/source-grounded, formal, a show-me skeptic), a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Off ~90% of the time. Cross-agent (verified: Claude Code + Antigravity; others designed-for, unverified; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys."
+      "description": "Diverse-lens consensus & debate board. Its primary auto-trigger is error-not-allowed work (security/crypto, migrations, high-precision math); convened manually it generalizes to any hard problem worth several perspectives — generate new work, or audit/review existing work. Opinion lane: an uncertain-decision ask gains an \"ask CB\" option (~4 lenses + judge); the pick IS the consent, never auto-convened. With consent it convenes diverse epistemic lenses in parallel (empirical/source-grounded, formal, a show-me skeptic), a judge synthesizes on VERIFIED inputs, an independent out-of-frame solver breaks ties, and the human signs off. Guarantees bounded cost (no whack-a-mole) and zero-breakage (staging); improves correctness without claiming a reliability number. Off ~90% of the time. Cross-agent (verified: Claude Code + Antigravity; others designed-for, unverified; Claude Code adds cost-optimized tiering). Zero-dependency, offline, no API keys."
     }
   ]
 }
