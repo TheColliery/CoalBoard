@@ -2,6 +2,11 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Fixed
+- **Opinion-seat run/fetch rights are now declared EXPLICITLY in all four rows of the `references/opinion-board.md` seat table — silence no longer carries meaning** (station-3 finding on v1.9.0: `feeling` had an explicit denial and `realtime` an explicit grant, while `reality` and `outdim` were silent — and the README Permissions row read that silence as "no", claiming the run/fetch spike sits on `realtime` alone). Ruled at the SOURCE: **`reality` MAY run** — to DEMONSTRATE what breaks (it inherits the show-me role, whose audit-lane contract already says "you MAY run: tests/build/parse", and a live board that day had its show-me build + run a prototype; a demand-only "show me" seat degrades to rhetoric) — run-only, no network reach (`realtime` stays the lane's only fetch); **`outdim` explicitly may NOT run, fetch, or read the workspace** (ANY environment contact leaks the shared frame its blindness exists outside of — previously implied by "BARE FRAME only", now stated, since a lens spawned with a project cwd could otherwise `ls` its way into the house context). The table gains a Run/fetch column + an anti-silence rail ("a seat added later must declare too"); the README Permissions row corrected to match the table (two seats run; feeling and outdim never). The judge's run-claim-needs-repro rule was already seat-agnostic — unchanged.
+
 ## [1.9.0] - 2026-07-27
 
 **MINOR** — the OPINION lane ("ask CB"): an uncertain-decision question gains a third option that convenes a 4-seat opinion board (USER spec 2026-07-27); plus the config-cascade clamp security rounds (previously unreleased, below).
