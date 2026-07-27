@@ -2,6 +2,11 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Security
+- **The project `.coalboard.json` layer could ESCALATE a consent-bearing key past an explicit global choice** (`coalboardMode`/`updateMode`: `off`/`ask` → `auto`) — a plain `Object.assign` overlay in the conductor's `readCfg()` let an untrusted cloned repo's project config re-activate a hook the user had explicitly turned off. Fixed with a safer-value-wins merge (`hooks-safety.md` §9): the project layer may QUIETEN these two keys (`auto`→`ask`→`off`), never escalate past an explicit global value; every other key stays plain project-wins. Mirrors CoalMine `updateMode` (v3.9.3) and CoalWash `mergeSafety` verbatim.
+
 ## [1.8.1] - 2026-07-24
 
 **PATCH** — doc-truth fix in the shipped skill body; no behavior change.

@@ -73,16 +73,41 @@ function findProjectCfg() {
   return null;
 }
 
-function readCfg() {
-  const out = {};
-  const files = [];
-  try { files.push(path.join(os.homedir(), '.claude', '.coalboard.json')); } catch {}
-  const proj = findProjectCfg();
-  if (proj) files.push(proj); // project overlays global; found by walking UP (cwd may be a subdir)
-  for (const f of files) {
-    try { if (fs.existsSync(f)) Object.assign(out, parseJsonc(fs.readFileSync(f, 'utf8'))); } catch {}
+// SAFER-VALUE-WINS (hooks-safety.md §9): the project layer overlaying global ARRIVES WITH
+// A CLONED REPO -- untrusted. A plain project-wins overlay lets it ESCALATE a consent-bearing
+// key this hook itself reads (coalboardMode, updateMode) from off/ask to auto, re-activating
+// the AND-gate / self-update nudge a user explicitly silenced. Index 0 = safest end. Mirrors
+// CoalMine hooks/_shared/node-config.js SAFER_ENUM + CoalWash scripts/lib/config-load.mjs
+// mergeSafety verbatim (one flock, one color) -- do not invent a different shape here.
+// Non-consent keys (criticalPaths/criticalImports/criticalKeywords/updateCheckDays) are
+// intentionally absent: they are additive detection seeds or numeric caps, never a
+// consent/spend gate, and stay plain project-wins.
+const SAFER_ENUM = { coalboardMode: ['off', 'ask', 'auto'], updateMode: ['off', 'remind', 'ask', 'auto'] };
+function mergeSafety(global, project) {
+  const out = { ...global, ...project };
+  for (const [key, order] of Object.entries(SAFER_ENUM)) {
+    // Only constrain against an EXPLICIT global choice; if global uses the factory default
+    // (key absent) the project is free to set anything -- there is no user preference to defend.
+    if (global[key] === undefined || project[key] === undefined) continue;
+    const gi = order.indexOf(String(global[key]).toLowerCase());
+    const pi = order.indexOf(String(project[key]).toLowerCase());
+    if (gi === -1 || pi === -1) continue; // unknown value: leave the shallow-merge result (schema validates downstream)
+    out[key] = pi <= gi ? project[key] : global[key]; // project may not move PAST global toward the louder end
   }
-  return out; // project overlays global (project read last -> wins per key)
+  return out;
+}
+
+function readCfgFile(f) {
+  try { return fs.existsSync(f) ? parseJsonc(fs.readFileSync(f, 'utf8')) : {}; } catch { return {}; }
+}
+
+function readCfg() {
+  let globalPath = null;
+  try { globalPath = path.join(os.homedir(), '.claude', '.coalboard.json'); } catch {}
+  const global = globalPath ? readCfgFile(globalPath) : {};
+  const proj = findProjectCfg(); // found by walking UP (cwd may be a subdir)
+  const project = proj ? readCfgFile(proj) : {};
+  return mergeSafety(global, project); // project overlays global per key, EXCEPT SAFER_ENUM keys (never louder than global)
 }
 
 function boardOff(cfg) {

@@ -213,6 +213,54 @@ test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-sil
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('SAFER-VALUE-WINS: project cannot escalate coalboardMode past global (off -> auto rejected, hooks-safety.md §9)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { coalboardMode: 'off', updateMode: 'off' }); // GLOBAL: user explicitly turned everything off
+    writeCfg(root, { coalboardMode: 'auto' });                   // PROJECT (untrusted clone) tries to escalate coalboardMode only
+    const r1 = run({ hook_event_name: 'SessionStart' }, root, home);
+    const r2 = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r1.status, 0); assert.equal(r1.stdout, '', 'global coalboardMode:off must survive a project escalation attempt to auto');
+    assert.equal(r2.status, 0); assert.equal(r2.stdout, '', 'the AND-gate must stay silent -- off was not escalated');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('SAFER-VALUE-WINS: project MAY quieten coalboardMode (auto -> off accepted)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { coalboardMode: 'auto', updateMode: 'off' }); // GLOBAL: standing opt-in
+    writeCfg(root, { coalboardMode: 'off' });                     // PROJECT: this one project opts out
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a project quietening coalboardMode to off must be honored');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('SAFER-VALUE-WINS: project cannot escalate updateMode past global (off -> auto rejected, hooks-safety.md §9)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { updateMode: 'off' });
+    writeCfg(root, { updateMode: 'auto' });
+    const r = run({ hook_event_name: 'SessionStart' }, root, home);
+    assert.equal(r.status, 0);
+    assert.doesNotMatch(r.stdout, /self-update due/, 'global updateMode:off must survive a project escalation attempt to auto');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('SAFER-VALUE-WINS: project MAY quieten updateMode (auto -> off accepted)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { updateMode: 'auto' });
+    writeCfg(root, { updateMode: 'off' });
+    const r = run({ hook_event_name: 'SessionStart' }, root, home);
+    assert.equal(r.status, 0);
+    assert.doesNotMatch(r.stdout, /self-update due/, 'a project quietening updateMode to off must be honored');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 test('a __proto__-poisoned project config cannot inject settings through the prototype (proto-pollution guard)', () => {
   const tmp = mk();
   try {
