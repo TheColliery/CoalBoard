@@ -82,17 +82,24 @@ function findProjectCfg() {
 // Non-consent keys (criticalPaths/criticalImports/criticalKeywords/updateCheckDays) are
 // intentionally absent: they are additive detection seeds or numeric caps, never a
 // consent/spend gate, and stay plain project-wins.
-const SAFER_ENUM = { coalboardMode: ['off', 'ask', 'auto'], updateMode: ['off', 'remind', 'ask', 'auto'] };
+// `default` = the schema's declared factory default (config-schema.mjs -- not shipped, mirrored
+// here per Phoenix #2 zero-dep, same class as D_PATHS/D_IMPORTS/D_KEYWORDS above). An ABSENT
+// global config is NOT "no preference to defend" -- the factory default IS the un-configured
+// user's stance (round-4 review, R2): a project must not be free to escalate past it just
+// because the user never wrote a global file (the single most common case).
+const SAFER_ENUM = {
+  coalboardMode: { order: ['off', 'ask', 'auto'], default: 'ask' },
+  updateMode: { order: ['off', 'remind', 'ask', 'auto'], default: 'ask' },
+};
 function mergeSafety(global, project) {
   const out = { ...global, ...project };
-  for (const [key, order] of Object.entries(SAFER_ENUM)) {
-    // Only constrain against an EXPLICIT global choice; if global uses the factory default
-    // (key absent) the project is free to set anything -- there is no user preference to defend.
-    if (global[key] === undefined || project[key] === undefined) continue;
-    const gi = order.indexOf(String(global[key]).toLowerCase());
+  for (const [key, { order, default: def }] of Object.entries(SAFER_ENUM)) {
+    if (project[key] === undefined) continue; // project didn't touch this key -- nothing to clamp
+    const globalValue = global[key] !== undefined ? global[key] : def; // absent global = its schema default, not "anything goes"
+    const gi = order.indexOf(String(globalValue).toLowerCase());
     const pi = order.indexOf(String(project[key]).toLowerCase());
     if (gi === -1 || pi === -1) continue; // unknown value: leave the shallow-merge result (schema validates downstream)
-    out[key] = pi <= gi ? project[key] : global[key]; // project may not move PAST global toward the louder end
+    out[key] = pi <= gi ? project[key] : globalValue; // project may not move PAST the (explicit-or-default) global toward the louder end
   }
   return out;
 }

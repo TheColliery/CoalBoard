@@ -261,6 +261,17 @@ test('SAFER-VALUE-WINS: project MAY quieten updateMode (auto -> off accepted)', 
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+test('SAFER-VALUE-WINS: case-fold — mixed-case values still clamp correctly (R4, hooks-safety.md §9)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { coalboardMode: 'OFF', updateMode: 'off' }); // GLOBAL: uppercase
+    writeCfg(root, { coalboardMode: 'Auto' });                   // PROJECT: mixed-case escalation attempt
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a case-varied escalation attempt must still be rejected');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 test('a __proto__-poisoned project config cannot inject settings through the prototype (proto-pollution guard)', () => {
   const tmp = mk();
   try {
