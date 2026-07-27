@@ -109,6 +109,20 @@ check('conductor inline detect lists match trigger.mjs (no silent drift)', () =>
   return null;
 });
 
+// Self-fence rail pin — a leak-class rail: an unfenced .coalboard/ planted in a PUBLIC repo
+// sits one `git add -A` from publishing an internal audit + its vulnerability map (measured
+// live 2026-07-27, three public forks). Runtime planting is PROSE (Fork-A: no CoalBoard code
+// runs in the target repo at write time; Phoenix #10 bars the hook from project writes), so
+// this gate pins the rail TEXT into every commit/build — a body carve cannot drop it silently.
+check('self-fence rail present (SKILL.md exact fence line + audit.md pointer)', () => {
+  const FENCE = '# CoalBoard reports are machine-local - never committed (self-fence)';
+  const skill = fs.readFileSync(path.join(root, 'skills', 'coalboard', 'SKILL.md'), 'utf8');
+  if (!skill.includes(FENCE)) return `SKILL.md lost the self-fence rail (fence line not found)`;
+  const audit = fs.readFileSync(path.join(root, 'skills', 'coalboard', 'references', 'audit.md'), 'utf8');
+  if (!audit.includes('self-fence')) return `references/audit.md lost its self-fence pointer`;
+  return null;
+});
+
 check('shipped hook has no NUL byte (control-char/BOM hazard)', () => {
   const buf = fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'));
   return buf.includes(0) ? 'a 0x00 byte is present in coalboard-conductor.js (build it from char codes, never typed literals)' : null;
