@@ -89,6 +89,16 @@ Start a new Antigravity session; `coalboard` appears in the skills list. The boa
 
 **Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — *design-supported, unverified*) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VALIDATED on Claude Code and Antigravity** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours.
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/coalboard` | Convene the board manually on any hard problem worth several diverse perspectives. An interactive setup offers the picks and shows the bill before anything spawns. Two modes: **generate** new work, or **audit / review** existing work. |
+| `/coalboard:stats` | Session report — boards convened, which lenses ran and at what model tier, verdicts, staged vs applied. Read-only; it modifies no file. |
+| `/coalboard:update` | Check for a newer CoalBoard version and offer to apply it, or set how updates are handled (`updateMode`). It offers — it never applies by itself. |
+
+Slash commands are the Claude Code form. On any other agent the board is invoked the way your agent invokes a skill — by name (`coalboard`), or by just saying *"convene the board"*. The other two doors in — the auto-trigger and the **"ask CB"** opinion option — are not typed at all; see **What it is** above.
+
 ## ⚙️ Configure
 
 Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.json` overlaid per key by the nearest project `.claude/.coalboard.json` (project wins), so you can **tune or shut off a globally-installed skill per project** (off-switch: `coalboardMode: off`) — a skill you don't need in a given project stops loading (and burning tokens) there. The headline dial is **`rigor`** — `relaxed | standard | high | nasa` — a preset that sets the board's strictness; any individual key overrides it. (`nasa` = maximum paranoia: trust nothing, the human signs off — *not* a `10⁻⁹` claim.) The high-impact keys:
@@ -105,7 +115,7 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 
 Full key reference: every key + default lives in [`scripts/lib/config-schema.mjs`](scripts/lib/config-schema.mjs) and the commented template [`platform-configs/.coalboard.json`](platform-configs/.coalboard.json).
 
-## 🔐 Permissions
+## Permissions
 
 CoalBoard reads the target and writes only to its own scratch — staged fixes in `.coalboard/proposed/`, reports in `.coalboard/reports/`, a worker's private resume checkpoint in `.coalboard/memory/` — and every `.coalboard/` dir it plants is self-fenced by its own two-line `.gitignore` (created before the first file, so the dir can never ride a commit; the host repo's own `.gitignore` is never touched). Nothing touches a live file until you approve it. On the main board two lens seats carry a capability spike beyond read: **show-me**, and (when active) **adversary**, may run commands to prove a claim; **empirical** alone reaches the network, and no other seat gets either. In the opinion lane two seats may run — **realtime** (measures what is; the lane's only network reach) and **reality** (runs the breaking case it built, to demonstrate); **feeling** and **outdim** never run or fetch (outdim's blindness bars even reading the workspace), and the lane writes no file — no staged fix, no report; its resume scratch, if armed, is deleted at the end. Workers never spawn and never ask; only main picks each seat's model (including any Fable seat, gated by `fableConsent`), verifies ground-truth, and applies to live — on your consent.
 
@@ -121,7 +131,18 @@ Full series matrix + the must-fail set: [Permission Matrix](https://github.com/T
 
 ## 🧭 Part of TheColliery
 
-CoalBoard is the **consensus & debate board** of the mining series, alongside [CoalMine](https://github.com/HetCreep/CoalMine) (quality canaries), [CoalTipple](https://github.com/TheColliery/CoalTipple) (model/effort routing), [CoalHearth](https://github.com/TheColliery/CoalHearth) (session warm-resume), [CoalFace](https://github.com/TheColliery/CoalFace) (fan-out discipline), [CoalWash](https://github.com/TheColliery/CoalWash) (memory defrag), and [CoalLedger](https://github.com/TheColliery/CoalLedger) (docs health). Install one and it stands alone; install all and they compose without conflict. Shared doctrine: Phoenix-13 hooks (zero-dependency, no network, fail-silent, no child processes, deterministic), single-source-of-truth config schemas, and a strict no-overkill discipline. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
+CoalBoard is the **consensus & debate board** of the mining series, alongside its six siblings:
+
+- [CoalMine](https://github.com/HetCreep/CoalMine) — quality canaries
+- [CoalTipple](https://github.com/TheColliery/CoalTipple) — model/effort routing
+- [CoalHearth](https://github.com/TheColliery/CoalHearth) — session warm-resume
+- [CoalFace](https://github.com/TheColliery/CoalFace) — fan-out discipline
+- [CoalWash](https://github.com/TheColliery/CoalWash) — memory defrag
+- [CoalLedger](https://github.com/TheColliery/CoalLedger) — docs health
+
+Install one, it stands alone; install all, they compose without conflict.
+
+Shared doctrine: Phoenix-13 hooks (zero-dependency, no network, fail-silent, no child processes, deterministic), single-source-of-truth config schemas, and a strict no-overkill discipline. Series doctrine: [`TheColliery/.github`](https://github.com/TheColliery/.github).
 
 Zero-dependency, offline, no API keys.
 
