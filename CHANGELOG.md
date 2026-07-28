@@ -2,6 +2,21 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Changed
+- **SKILL.md enumerability carve (the variance-walk lab, station 2 — no version until the walk passes; the walk is this change's real gate).** Every counting-shaped rail rehoused into a numbered home so a reader TRANSCRIBES counts instead of interpreting prose — the new `## The ledgers` section: **consent gates numbered GATE 1/2/3** (GATE 1 = the convene bill in each lane's form; GATE 2 = the conditional fable money-gate; GATE 3 = the disposition; an explicit NOT-gates line for the transient-clone ask + the sub4/post-mortem escalations) · **absolute prohibitions P1–P18** (the Step-0 "Hard rules" block absorbed as P1–P5 verbatim; the scattered absolutes indexed P6–P18 with their owning step; a closing rule makes un-listed in-step "never"s sequencing, not additional absolutes) · **the on-disk output set** (5 paths; `<name>` defined, `references/audit.md`'s more-specific filename shape declared the winner) · **fail routes F1–F10** · **a references table: 4 MANDATORY-at-their-moment, 3 on-demand** (each also labeled inline at its mention).
+- **Step 0 consent is decided as ONE box:** the "THEN a 2nd safety gate, a pre-flight CHECKPOINT" sentence is gone — three chat blocks, one CONFIRM/CHANGE/CANCEL box, the CHANGE loop re-fires the SAME gate on a fresh bill. The sign-off IS the CONFIRM; no rail content removed.
+- **The gaps the lab measured walkers inventing answers for are now stated:** `rigor` def `standard` (the factory config's own shipped value, now visible in the body) + a preset table (relaxed/standard/high/nasa × `adversaryLens` · `contestedRound` · `tier2Verify` · `qaStrictness` · `observerOnMaxStakes` · `diversifyModels` · `applyConsent`) + inline defs for `consensusThreshold` (80) · `fuzzTimeboxSeconds` (60) · `sastCommand`/`formalCommand` (empty) · the AUTO-bar grade rubric inline (sensitive-path OUTRANKS size; a domain hit grades ≥4 regardless of size) + below-the-bar behavior (no auto-convene, NO unsolicited offer; P4 still binds a fired stakes signal) · the auto lane derives the wizard's outputs (`{target}`/`{scope}`/work-type/`{depth}` L2/`{rigor}`) instead of orphaning them · the report FILE is the user's language.
+
+### Fixed
+- **`coalboardMode:auto` no longer skips the TARGET cheap-catch:** the Step-0 chat blocks render on EVERY lane — `auto` skips the QUESTION, never the render; a TARGET that will not resolve under `auto` falls back to `ask` for that run (fail toward the human, never spend on an unverified target).
+- **A `stop` now covers `proposed/`:** staging happens before GATE 3 by pipeline necessity (verify runs on the staged copies), so `stop` DELETES anything the run staged — "leave no file behind" no longer silently excludes the staged patches. Full `proposed/` disposition stated: apply → consumed · report-only → persists fenced beside the report · stop → deleted. Audit runs declared to stage the same way (staging = the proposal medium, never an apply intent).
+- A re-routed/re-spawned lens takes the dead lens's freed slot — `maxConcurrentSubagents` counts LIVE workers, so a replacement never queues behind the wave.
+
+### Notes
+- Regrowth-ratchet (skill-authoring §5): body 32,889 → **42,416 ch (LF-normalized)**. The +9,527 is COUNTABLE-HOME structure (ledgers + stated defaults + gate labels), zero explanation prose — the variance-walk lab ruled enumerable the FIRST goal and lean the second; a lean pass comes only after the walk holds at zero variance. This is the new baseline the next release diffs against.
+
 ## [1.10.0] - 2026-07-27
 
 **MINOR** — self-fence: every `.coalboard/` dir the board plants now carries its own `.gitignore`, created before the first file, so a planted report/staging dir can never ride a host repo's commit; plus the v1.9.0 station-3 findings-back (below), previously unreleased.
