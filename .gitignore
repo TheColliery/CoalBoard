@@ -7,24 +7,6 @@ AGENTS.md
 COALBOARD_DESIGN.md
 COALBOARD_BLUEPRINT.md
 
-# Dependencies / build cruft
-node_modules/
-
-# Runtime staging (created inside a target project at run-time, never committed)
-.coalboard/
-
 # Generated SkillSpector scan reports (provenance recorded in SECURITY.md; the raw report is not shipped)
 skillspector-*
 
-# OS / editor cruft
-.DS_Store
-Thumbs.db
-*.log
-*.swp
-
-# editor / env / tmp (preventive)
-.vscode/
-.idea/
-.env
-.env.*
-*.tmp
