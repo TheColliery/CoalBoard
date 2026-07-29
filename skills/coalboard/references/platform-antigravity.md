@@ -6,7 +6,8 @@
 | step | Claude Code | Antigravity |
 |---|---|---|
 | spawn a lens | `Agent`/`Task` | `define_subagent(enable_write_tools=false, enable_subagent_tools=false)` → `invoke_subagent` |
-| read-only + leaf | by-instruction | **TOOL-LEVEL** — the write/spawn tools are ABSENT from the sub (stronger than CC) |
+| read-only + leaf | TOOL-LEVEL via the `Explore` type (the removals SKILL.md Step 1 enumerates) | **TOOL-LEVEL** — the write/spawn tools are ABSENT from the sub |
+| per-seat run/fetch minimum (P19) | **NOT expressible** — `Explore` passes every other tool through, so the ledger is contract-only | `define_subagent` is called PER SEAT, so anything it can toggle is per-seat by construction — but only the write/spawn flags are VERIFIED. **A shell/fetch toggle is UNVERIFIED: check `define_subagent`'s live parameters before claiming a seat's row is enforced here** |
 | reap (no-zombie) | return / `TaskStop` | a returned sub stays ACTIVE → `manage_subagents` `kill_all` (MANDATORY) |
 | worker model | `Agent` `model` param | NONE — workers inherit the parent model |
 
