@@ -6,6 +6,8 @@ AGENTS.md
 .agents/
 COALBOARD_DESIGN.md
 COALBOARD_BLUEPRINT.md
+COALBOARD_DESIGN.pre-edit.md
+COALBOARD_BLUEPRINT.pre-edit.md
 
 # Generated SkillSpector scan reports (provenance recorded in SECURITY.md; the raw report is not shipped)
 skillspector-*
