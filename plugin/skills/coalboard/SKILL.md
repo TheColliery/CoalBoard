@@ -51,7 +51,7 @@ A "never" inside a Step and not listed here is that step's sequencing mechanics,
 - **P19 — Grant every seat exactly its Seat-permissions row, never the union** (the ledger below).
 
 ### Seat permissions — the MINIMUM tool set per seat (least privilege; grant no more)
-**Read-class = `Read`·`Grep`·`Glob`.** NO seat ever holds a write tool or the spawn tool. Run (`Bash`) and fetch (web) are granted ONLY to the seats whose epistemic function is impossible without them — a seat denied `Bash` is the only kind whose no-write guarantee is structural rather than promised (Step 1). Declare each seat's row IN its prompt (`references/lens-prompts.md`, which owns why each row is sufficient).
+**Read-class = `Read`·`Grep`·`Glob`.** NO seat ever holds a write tool or the spawn tool. Run (`Bash`) and fetch (web) are granted ONLY to the seats whose epistemic function is impossible without them — Step 1 owns what granting a shell costs. Declare each seat's row IN its prompt (`references/lens-prompts.md`, which owns why each row is sufficient).
 
 | seat | Read-class | run (`Bash`) | fetch (web) |
 |---|---|---|---|

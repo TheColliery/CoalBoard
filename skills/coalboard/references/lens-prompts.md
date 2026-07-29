@@ -8,7 +8,7 @@ main INSTANTIATES one prompt per lens from this template — fill the `{placehol
 - `{scope}` + `{excludes}` — the in-scope file set + exclusions (from the Step-2 scan).
 - `{work-type-checklist}` — the known-failure checklist for the chosen work-type (below).
 - `{rigor}` · `{depth}` — the chosen preset · read-level.
-- `{seat-rights}` — this seat's row from SKILL.md's Seat-permissions ledger, written out (e.g. `Read·Grep·Glob only — no shell, no fetching`). Never the union, never blank.
+- `{seat-rights}` — this seat's row, written out (e.g. `Read·Grep·Glob only — no shell, no fetching`). **Two ledgers, by LANE: the board lanes' five rows live in SKILL.md's Seat-permissions ledger; the opinion lane's four live in `references/opinion-board.md`'s rights column.** Read the row from the ledger the lane owns — never the union, never blank, never the other lane's row.
 
 ## FIXED rules — every lens prompt carries these verbatim
 - **You are ONE blind, independent lens** in a CoalBoard review (rigor `{rigor}`, depth `{depth}`). **LEAF: never spawn a subagent** — you are spawned WITHOUT the spawn tool (structural); if you somehow CAN, you still MUST NOT, and MUST report it in your output if you did (issue #2: a spawned grandchild orphans into an unreapable zombie).
@@ -37,7 +37,7 @@ main INSTANTIATES one prompt per lens from this template — fill the `{placehol
 - **research / math / translation:** every-claim-sourced + currency · substitute-back/simulate · term-base/back-translate/native-corpus.
 
 ## Seat permissions (the `{seat-rights}` fill — WHY each minimum is sufficient)
-SKILL.md's Seat-permissions ledger owns the rows; this owns the argument, so a future editor widening a cell has to beat the argument first. **Read-class = `Read`·`Grep`·`Glob`** — every seat gets it, because every seat must cite `path:line` in the target and must be able to say what it did NOT inspect. Beyond that, a right is granted only where the seat's function is IMPOSSIBLE without it:
+SKILL.md's Seat-permissions ledger owns the five BOARD rows; `references/opinion-board.md`'s rights column owns the four OPINION rows; this owns the argument for both, so a future editor widening a cell has to beat the argument first. **Read-class = `Read`·`Grep`·`Glob` — every seat in the board lanes gets it** (all five), because each must cite `path:line` in the target and say what it did NOT inspect. **Exactly ONE seat in the product gets less: the opinion lane's `outdim`, whose row is NO tools at all** — its blindness IS its function, so it is an exception the opinion ledger declares, never a gap here. Beyond Read-class, a right is granted only where the seat's function is IMPOSSIBLE without it:
 - **data** `+fetch, no shell` — fetching current sources IS its authority; nothing in its contract runs anything, and a fetch tool is the one exfiltration channel the board must keep to a single seat.
 - **truth** `Read-class only` — its own role line already forbids fetching, and a proof needs no execution; granting either would contradict the contract it is judged against.
 - **feeling (show-me)** `+shell, no fetch` — "show it RUNS" is unmeetable without a shell; its show-the-date/source demands are ROUTED to `data` (SKILL.md Step 2), so a fetch tool would duplicate another seat's job rather than enable its own.
