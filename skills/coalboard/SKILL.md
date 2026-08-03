@@ -29,7 +29,7 @@ The judge's verdict is not itself an ask. **ACT on it — present the dispositio
 - **Changes what the product PROMISES a user** (a shipped claim, a platform tier, a permission).
 - **The seats did NOT converge, or converged at a stated LOW confidence.**
 
-This ledger decides whether the VERDICT is re-asked; it never relaxes the confirm-before-irreversible-or-outward-facing rule you already hold.
+This ledger decides whether the VERDICT is re-asked; it never relaxes the confirm-before-irreversible-or-outward-facing rule you already hold (your platform's own confirm-before-destructive rail).
 
 ### Consent gates — exactly THREE, numbered
 - **GATE 1 — CONVENE (the bill), before the first spend.** ONE consent per convene; the LANE sets its form: **auto lane** → by `coalboardMode`: `ask` = the Step-0 box · `auto` = standing consent already given in config, so the box is skipped — the Step-0 chat render is NOT · **manual lane** → the wizard's bill-confirm box (the wizard's TARGET/settings boxes are order-taking setup, NOT consent gates) · **opinion lane** → the user's "ask CB" PICK (the pick IS this gate). The CHANGE loop re-fires GATE 1 on a fresh bill — a re-fire, never a second gate; there is NO separate pre-flight checkpoint box.
