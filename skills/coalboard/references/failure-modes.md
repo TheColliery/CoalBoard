@@ -2,6 +2,9 @@
 
 > Loaded ON-DEMAND when a lens misbehaves (spawned a grandchild), a lens/session flattens or dies, or a run must resume after a budget/limit hit. The RAILS live in `SKILL.md` (Step 1 Bounds · Memory & resume); this reference holds the war-stories + deep mechanics that PROVE why those rails are structural, not prose.
 
+## Why "bounded cost" is the claim — the thrash mechanic (moved from the body; Run 12 measured 6/6 upper-tier walkers reading it there as a rail)
+A solo agent on a hard bug THRASHES — fix A breaks B, an unbounded token bleed; the board's single-turn + judge-finality + bounded-verify CONVERGES: pay a known premium to cap the tail. This is the WHY behind the bounded-cost guarantee, and it is an ECONOMICS note about a board already convened — **it is NOT a trigger and licenses nothing**: being in a thrash does not, by itself, warrant a FULL board (the error-not-allowed bar still gates AUTO; the opinion lane's ceiling-breach/repeat-loop shapes are the sanctioned thrash exits, and they OFFER — never convene).
+
 ## Why LEAF is enforced STRUCTURALLY, not by prose (issue #2)
 A prose-only LEAF rule FAILED live: an opus show-me lens spawned a background subagent → an orphan GRANDCHILD that, once the lens RETURNED, was UNREAPABLE by main (main holds no handle; `TaskStop`/`TaskList` find nothing — only the now-gone parent could reap it) → a ~27-min / ~213k-token runaway. PREVENT the grandchild structurally (spawn every lens WITHOUT the spawn tool — SKILL.md Step 1 ENFORCE STRUCTURALLY); do NOT rely on reaping it (on CC you cannot). The Backstop rail (main surfaces + stops any lens whose returned text REPORTS it spawned a subagent) exists because a slipped grandchild is the one escape from the no-zombie guarantee.
 
