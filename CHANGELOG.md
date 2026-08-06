@@ -4,6 +4,9 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+- **LAYMAN wizard box's change affordance restated as an unconditional property, not an optional mention (board #57, `95b762e`).** `references/wizard.md` step 3 already specified the four-option LAYMAN box (`Go ✓ · cheaper · more thorough · cancel`) and that `cheaper`/`more thorough` map to the RIGOR and DEPTH levers — the prose was not silent — but this is a Fork-A prose-only skill with no code enforcement, and the wording described the box's change options as a fact stated ABOUT the box rather than a property the box unconditionally IS. A live manual `/coalboard` run auto-picked defaults and convened with no visible way to change them first. Reworded: "the box IS `[Go ✓ · cheaper · more thorough · cancel]` — four options, every LAYMAN render, never `[Go · cancel]` alone" — both levers (RIGOR, DEPTH) named explicitly behind the same plain-language labels the user still sees (no opaque jargon reaches the box itself), and cross-referenced against the PROGRAMMER path's own Call 3 change→recompute→re-render loop so both paths read as equally mandatory. PROGRAMMER path's mechanics were already sufficient, left untouched. Dist rebuilt (`plugin/skills/coalboard/references/wizard.md`); verify.mjs 12/12, test.mjs 64/64.
+
 ## [2.0.0] - 2026-08-04
 
 **MAJOR — two things break for an existing user on update, read this before you update:**
