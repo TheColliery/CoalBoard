@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
-import { textFilesEqual } from './lib/dist-compare.mjs';
+import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -88,7 +88,7 @@ check('plugin/ dist has no orphan (every dist file has an in-sync source)', () =
       const rel = path.relative(distRoot, abs).replace(/\\/g, '/');
       const src = path.join(root, rel);
       if (!fs.existsSync(src)) return `plugin/${rel} is a dist ORPHAN (no source) — it would ship unverified`;
-      if (!textFilesEqual(src, abs)) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
+      if (!filesEqual(src, abs)) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
     }
     return null;
   };
