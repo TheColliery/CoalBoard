@@ -40,6 +40,17 @@ test('textFilesEqual: a real content edit under CRLF still FAILS LOUD', () => {
   }
 });
 
+test("filesEqual: a CRLF-only difference reads as IN-SYNC (the orphan-check's own EOL-tolerant path)", () => {
+  const src = tmpFile('src.md', 'line one\nline two\nline three\n');
+  const dst = tmpFile('dst.md', 'line one\r\nline two\r\nline three\r\n');
+  try {
+    assert.equal(filesEqual(src.path, dst.path), true);
+  } finally {
+    fs.rmSync(src.dir, { recursive: true, force: true });
+    fs.rmSync(dst.dir, { recursive: true, force: true });
+  }
+});
+
 test('filesEqual: two DIFFERENT binary files are not masked as equal by a lossy UTF-8 decode', () => {
   const src = tmpFile('icon-a.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01]));
   const dst = tmpFile('icon-b.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x02]));
