@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
+import { textFilesEqual } from './lib/dist-compare.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -66,7 +67,7 @@ check('plugin/ dist in sync with source', () => {
   for (const rel of SHIP) {
     const dst = path.join(root, 'plugin', rel);
     if (!fs.existsSync(dst)) return `plugin/${rel} missing — run scripts/build-plugin.mjs`;
-    if (fs.readFileSync(path.join(root, rel), 'utf8') !== fs.readFileSync(dst, 'utf8')) {
+    if (!textFilesEqual(path.join(root, rel), dst)) {
       return `plugin/${rel} is stale vs source — run scripts/build-plugin.mjs`;
     }
   }
@@ -87,7 +88,7 @@ check('plugin/ dist has no orphan (every dist file has an in-sync source)', () =
       const rel = path.relative(distRoot, abs).replace(/\\/g, '/');
       const src = path.join(root, rel);
       if (!fs.existsSync(src)) return `plugin/${rel} is a dist ORPHAN (no source) — it would ship unverified`;
-      if (Buffer.compare(fs.readFileSync(src), fs.readFileSync(abs)) !== 0) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
+      if (!textFilesEqual(src, abs)) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
     }
     return null;
   };
