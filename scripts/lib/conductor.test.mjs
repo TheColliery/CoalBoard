@@ -26,6 +26,19 @@ const writeCfg = (dir, cfg) => {
   fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(dir, '.claude', '.coalboard.json'), JSON.stringify(cfg));
 };
+// Namespace campaign (#69+#39): write a config at an explicit read-order candidate --
+// own-dir (.claude/coal/coalboard.json), another known agent dir (.agents/.../.gemini/...),
+// or the LEGACY shape (reuses writeCfg above).
+const writeCfgOwnDir = (dir, cfg) => {
+  const p = path.join(dir, '.claude', 'coal', 'coalboard.json');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg));
+};
+const writeCfgAgentsDir = (dir, cfg) => {
+  const p = path.join(dir, '.agents', 'coal', 'coalboard.json');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg));
+};
 
 test('SessionStart -> board contract, exit 0, no stderr', () => {
   const tmp = mk();
@@ -287,4 +300,116 @@ test('a __proto__-poisoned project config cannot inject settings through the pro
     assert.match(r.stdout, /\[CoalBoard\].*board/i, 'the board contract must still fire: a coalboardMode injected via __proto__ must NOT be honored');
     assert.equal(r.stderr, '');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------
+// Namespace campaign (#69+#39, owner-designated 2026-08-08): per-project config read
+// order -- own-dir (.claude/coal/coalboard.json) -> other known agent dirs (fixed
+// order) -> LEGACY (.claude/.coalboard.json). Precedence x3 + the clamp-unchanged
+// regression (incl. seedList additive) + the move-on-write grep-proof + the
+// update-check stamp's read-new-fallback-old / write-new-drop-old shape.
+// ---------------------------------------------------------------------------
+
+test('namespace campaign precedence 1/3: own-dir wins over another known agent dir AND legacy, even when all three exist', () => {
+  const root = mk();
+  const home = mk(); // a DIFFERENT home so the global read can never supply the value
+  try {
+    writeCfgOwnDir(root, { coalboardMode: 'off', updateMode: 'off' });   // own-dir: silence
+    writeCfgAgentsDir(root, { coalboardMode: 'auto' });                  // other known dir: would NOT be silent
+    writeCfg(root, { coalboardMode: 'auto' });                           // LEGACY: would NOT be silent either
+    const r1 = run({ hook_event_name: 'SessionStart' }, root, home);
+    const r2 = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r1.status, 0); assert.equal(r1.stdout, '', 'own-dir silence must win even with louder values at .agents and the legacy path');
+    assert.equal(r2.status, 0); assert.equal(r2.stdout, '');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('namespace campaign precedence 2/3: own-dir absent -> the other-known-dir candidate wins over LEGACY', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfgAgentsDir(root, { coalboardMode: 'off', updateMode: 'off' }); // other known dir: silence
+    writeCfg(root, { coalboardMode: 'auto' });                           // LEGACY: would NOT be silent
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'the .agents candidate must be read when own-dir is absent, ahead of legacy');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('namespace campaign precedence 3/3: nothing new-shape exists anywhere -> the LEGACY config is still read normally (no breakage for an existing user)', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(root, { coalboardMode: 'off', updateMode: 'off' }); // ONLY the legacy shape exists
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a legacy-only project must read exactly as it did before the campaign');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('clamp-unchanged regression: safer-value-wins rejects escalation regardless of which read-order candidate supplied the project value', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    writeCfg(home, { coalboardMode: 'off' });          // GLOBAL: explicit off
+    writeCfgOwnDir(root, { coalboardMode: 'auto' });   // PROJECT value arrives via the NEW own-dir shape, not legacy
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a project may not escalate past global off regardless of which candidate file supplied the value -- only the ADDRESS moved, the clamp did not');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('clamp-unchanged regression: criticalKeywords stay UNION/additive regardless of which read-order candidate supplied them', () => {
+  const root = mk();
+  const home = mk();
+  try {
+    // a project-added keyword via the NEW own-dir shape -- must ADD to, not replace, the built-in seed
+    writeCfgOwnDir(root, { criticalKeywords: ['bespoke-term'] });
+    const rCustom = run({ hook_event_name: 'UserPromptSubmit', prompt: 'a bespoke-term appears here' }, root, home);
+    const rBuiltin = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+    assert.match(rCustom.stdout, /CRITICAL signal/, 'the project-added keyword must fire on its own');
+    assert.match(rBuiltin.stdout, /CRITICAL signal/, 'the built-in default keywords must still fire -- the project addition did not REPLACE the seed list');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('move-on-CONFIG-WRITE-only (Phoenix #5): no code path anywhere writes .coalboard.json -- the fableConsent persistence is agent prose (SKILL.md), never a code path here', () => {
+  const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const dirs = [path.join(repo, 'scripts'), path.join(repo, 'scripts', 'lib'), path.join(repo, 'hooks')];
+  const offenders = [];
+  for (const dir of dirs) {
+    for (const f of fs.readdirSync(dir)) {
+      const full = path.join(dir, f);
+      if (fs.statSync(full).isDirectory()) continue;
+      if (!/\.(mjs|js)$/.test(f) || f.endsWith('.test.mjs')) continue;
+      const text = fs.readFileSync(full, 'utf8');
+      if (/writeFileSync\([^)]*coalboard\.json/i.test(text)) offenders.push(path.relative(repo, full));
+    }
+  }
+  assert.deepStrictEqual(offenders, [], 'if this ever fires, the room now has a real writer and the design-doc write-new-drop-old step is owed for real, in code');
+});
+
+test('update-check stamp: read-new-fallback-old -- a stamp only at the OLD root location is honored (migration read)', () => {
+  const home = mk();
+  try {
+    writeCfg(home, { updateMode: 'auto' }); // GLOBAL: self-update on
+    const oldStamp = path.join(home, '.claude', '.coalboard-update-check');
+    fs.mkdirSync(path.dirname(oldStamp), { recursive: true });
+    fs.writeFileSync(oldStamp, String(Date.now() - 86400000)); // 1 day ago -- well inside the default 14-day window
+    const r = run({ hook_event_name: 'SessionStart' }, home, home);
+    assert.equal(r.status, 0);
+    assert.doesNotMatch(r.stdout, /self-update due/, 'a recent OLD-location stamp must be READ via fallback and throttle the nudge -- if it were ignored, last would read 0 and fire immediately');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('update-check stamp: write-new-drop-old -- scheduling moves the stamp to the new home and deletes the old one', () => {
+  const home = mk();
+  try {
+    writeCfg(home, { updateMode: 'auto' });
+    const oldStamp = path.join(home, '.claude', '.coalboard-update-check');
+    const newStamp = path.join(home, '.claude', 'coal', 'coalboard', 'update-check');
+    fs.mkdirSync(path.dirname(oldStamp), { recursive: true });
+    fs.writeFileSync(oldStamp, String(Date.now() - 30 * 86400000)); // 30 days ago -- past the window, due
+    const r = run({ hook_event_name: 'SessionStart' }, home, home);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /self-update due/, 'a stale OLD stamp is due -- fires the nudge');
+    assert.equal(fs.existsSync(newStamp), true, 'the NEW stamp location must now exist');
+    assert.equal(fs.existsSync(oldStamp), false, 'the OLD stamp must be dropped in the same write (no-old-version-leftover)');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });

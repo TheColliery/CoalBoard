@@ -52,10 +52,42 @@ function physical(p) {
   try { return fs.realpathSync(p); } catch { return path.resolve(p); }
 }
 
-// Find the nearest project .coalboard.json by walking UP from cwd (a CC hook cwd may be a
-// SUBDIR, not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
-// STOP at the home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing
-// above your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
+// Namespace campaign (#69+#39, owner-designated 2026-08-08). Per-project config lives
+// under an agent dir, never bare at the project root -- and CoalBoard's actual PRE-
+// migration shape was already NESTED (`.claude/.coalboard.json`), not a bare root
+// dotfile, so the legacy candidate below reflects that, not CoalWash's bare-root shape.
+// THE READ ORDER IS A RAIL -- identical wording in every room's readCfg comment and
+// README Configure section, one flock:
+//   1. <project>/.<the running agent's OWN dir>/coal/coalboard.json -- the dir of the
+//      agent actually executing. CoalBoard activates ONLY through Claude Code's own
+//      hook system (`hooks/hooks.json`); it has no other running-agent identity to
+//      branch on, so for THIS room "own dir" is always `.claude` and collapses onto
+//      the first entry of step 2 below rather than needing a separate check.
+//   2. Other known agent dirs, fixed order: `.claude` -> `.agents` -> `.gemini`
+//      (first FOUND wins).
+//   3. LEGACY: <project>/.claude/.coalboard.json -- CoalBoard's actual pre-migration
+//      shape -- read normally, no breakage for an existing user.
+// WRITE target = where the config was found; absent everywhere, the running agent's
+// own dir. Hooks never perform this move on a READ (Phoenix #5, no side effects) --
+// and CoalBoard has NO project-config WRITER anywhere in this codebase (verified: no
+// code path in scripts/ or hooks/ ever calls the write API against this config's
+// filename); the `fableConsent:"always"` persistence is AGENT PROSE (SKILL.md), not
+// a code path here.
+const AGENT_DIR_ORDER = ['.claude', '.agents', '.gemini'];
+function projectCandidates(dir) {
+  const c = AGENT_DIR_ORDER.map((d) => path.join(dir, d, 'coal', 'coalboard.json'));
+  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY, always last
+  return c;
+}
+
+// Find the nearest project config by walking UP from cwd (a CC hook cwd may be a SUBDIR,
+// not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
+// At EACH level, check all 4 read-order candidates above before moving to the parent --
+// this room's existing upward walk has NO root-marker concept (unlike CoalWash's
+// findProjectRoot), so the read order is applied per-level rather than by first resolving
+// a single root, which would change existing nearest-wins-per-level behavior. STOP at the
+// home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing above
+// your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
 // another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
 function findProjectCfg() {
   try {
@@ -63,8 +95,9 @@ function findProjectCfg() {
     let dir = physical(process.cwd());
     for (let i = 0; i < 40; i++) {
       if (dir === home) break; // reached home: its config is the GLOBAL (already read), and nothing above home is "this project"
-      const f = path.join(dir, '.claude', '.coalboard.json');
-      if (fs.existsSync(f)) return f;
+      for (const f of projectCandidates(dir)) {
+        if (fs.existsSync(f)) return f;
+      }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
@@ -150,18 +183,49 @@ function detect(prompt, cfg) {
   return { reasons, scriptFlag };
 }
 
+// GLOBAL (not project-bound) state -> the coal/coalboard/ namespace (#39 half of the
+// namespace campaign). Same read-new/fallback-old + write-new/delete-old shape as the
+// per-project read order above (CoalWash's caliper.mjs readUpdateStamp/writeUpdateStamp
+// is the exemplar this mirrors).
+function updateStampPath() {
+  return path.join(os.homedir(), '.claude', 'coal', 'coalboard', 'update-check');
+}
+function oldUpdateStampPath() {
+  return path.join(os.homedir(), '.claude', '.coalboard-update-check');
+}
+// Read the update-check timestamp: the new location, else the old root stamp (migration
+// read). 0 when neither exists / is unreadable.
+function readUpdateStamp() {
+  for (const p of [updateStampPath(), oldUpdateStampPath()]) {
+    try {
+      const n = Number(String(fs.readFileSync(p, 'utf8')).trim());
+      if (Number.isFinite(n) && n > 0) return n;
+    } catch {} // try the next location
+  }
+  return 0;
+}
+// Write the update-check timestamp to the new location + delete the old stamp
+// (no-old-version-leftover). Fail-silent.
+function writeUpdateStamp(now) {
+  try {
+    const p = updateStampPath();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, String(now));
+    try { fs.rmSync(oldUpdateStampPath(), { force: true }); } catch {} // best-effort
+    return true;
+  } catch { return false; }
+}
+
 // Self-update is kind-1 (plugin version): the HOOK only SCHEDULES (a throttled stamp);
 // the AGENT verifies the tag online (the /coalboard:update procedure). No network here.
 function updateDue(cfg) {
   if (lc(cfg.updateMode || 'ask') === 'off') return false;
   try {
     const days = (Number.isInteger(cfg.updateCheckDays) && cfg.updateCheckDays >= 1 && cfg.updateCheckDays <= 365) ? cfg.updateCheckDays : 14;
-    const stamp = path.join(os.homedir(), '.claude', '.coalboard-update-check');
-    let last = 0;
-    try { last = Number(String(fs.readFileSync(stamp, 'utf8')).trim()) || 0; } catch {}
+    const last = readUpdateStamp();
     const now = Date.now();
     if (last && now - last < days * 86400000) return false; // inside the window: not due
-    try { fs.mkdirSync(path.dirname(stamp), { recursive: true }); fs.writeFileSync(stamp, String(now)); } catch {} // schedule: stamp the check now
+    writeUpdateStamp(now); // schedule: stamp the check now
     return true; // due — first run (last === 0) or the window has elapsed
   } catch { return false; }
 }
@@ -194,56 +258,10 @@ function main() {
     // turn (e.g. a bare "ledger" mention) fires this block while CT's cue stays silent that turn.
     // The Triage sentence below is BYTE-IDENTICAL in CoalTipple's conductor (one flock, one
     // colour) -- CB authors it, CT copies verbatim; edit both rooms in the same batch or not at
-    // all. Run-13 carve (2026-08-02): STAKES bound to the Layer-2 VERDICT (an acquittal stands --
-    // the old "in doubt WITH any stakes signal" let a keyword hit overturn Layer 2's own
-    // acquittal, the measured S1 mechanism); the triage binds on single-hook turns too (the old
-    // sibling-scoped form made "trivial -> neither" dead text on 17 of 23 live fires); the
-    // stakes set keeps its bounded 4-token parenthetical (rail D measured 11.1% -- healthy)
-    // with middots replacing the double-duty slash.
-    // WAVE 2 (Run 14 FAIL: that carve went to 0% variance, unanimously WRONG on S1; action rail
-    // regressed 11.1%->33.3%) -- the partition (stakes/capability-gap/trivial) did not cover the
-    // input space, so ordinary non-trivial non-stakes work fell into "capability gap" by
-    // elimination. Re-keyed on the stakes/no-stakes axis so "neither" is the true catch-all, not
-    // "trivial": stakes -> CoalBoard; no stakes + a real CT routing need -> CoalTipple; no stakes
-    // otherwise -> neither. Also closes Rail B (11.1%->33.3%): "CoalBoard leads" now says WHAT
-    // that means, SELF-CONTAINED -- never "above": the clause is byte-identical in CoalTipple's
-    // conductor, which carries no HALT-and-ask sentence of its own, so a positional reference
-    // dangles there (CT's coder caught it as a findings-back on wave 2). Name the action inline.
-    // WAVE 3 (Run 17: partition now covers the input space -- unchanged -- but strong tier
-    // acquits S1 while weak+medium route it to CoalTipple, a clean tier boundary, 33.3%): the
-    // walkers' own E) answers name it -- "a real CoalTipple routing need" was never defined, so
-    // weak/medium fill the gap with the fired grade itself (the SAME failure shape stakes had).
-    // Defined it the same way: the grade is Layer-1 evidence, never the verdict; the verdict is
-    // whether the WORK itself needs a different tier.
-    // WAVE 4 (Run 18: variance ROSE to 44.4%, the Run-17 tier boundary DISSOLVED, modal still
-    // CoalTipple -- the prediction that removing the wave-3 shortcut would fall to NEITHER was
-    // FALSIFIED). Rising variance is the expected signature of removing a shortcut (weak/medium
-    // had been terminating on the fired grade; now they must reason and the text didn't say how)
-    // -- three undefined boundaries surfaced, and this carves ONE: "needs a different tier" was
-    // STILL only defined by negation (a THIRD occurrence of that shape, after stakes/wave-1 and
-    // routing-need/wave-3) -- the nearest fillable signal is CoalTipple's OWN fired grade for
-    // this same turn, so the shortcut just moved rather than closed. Gave the POSITIVE test
-    // instead: CT's own named actions (delegate-down/escalate-up), anchored on the work's SIZE/
-    // COMPLEXITY, not its keyword-triggered grade. Left uncarved, deliberately: the stakes-domain
-    // vs error-not-allowed vocabulary gap (1 witness, doesn't move a scored rail) and the quoted-
-    // DATA-vs-live-instruction keyword question (3 witnesses, S1's own designed axis -- the next
-    // candidate if this fix doesn't converge, not folded in here per the one-gap-per-wave rail).
-    // WAVE 5, TRIED AND REVERTED (Run 19 named two real defects -- D1: "delegate-down or
-    // escalate-up" never said MODEL TIER, tier-stratified 0/3-2/3-3/3 on S1; D2: "never
-    // surface it" collided with the stakes branch's own "HALT and ask the user", 44.4% on
-    // S2/S5. Both landed together in ONE clause). Run 20 measured the shipped result: S1
-    // (D1's own target) UNCHANGED at 44.4% -- D1 bought nothing -- while FIVE clean rails
-    // (S2-S5 lead, S1 tell) each REGRESSED 0.0%->11.1%. Mechanism: the clause grew 685->854
-    // ch (+25%) and "BOTH" -- chosen by nobody in Run 19 -- appeared 5x in Run 20, all weak
-    // tier: the can't-decide signature of a longer, more-qualified instruction. WORSE: a
-    // walker named D2's own defect unprompted -- "the arbitration" is scoped but never
-    // DEFINED, the identical defined-by-negation pattern Run 18 had already named three
-    // times. PROCESS LESSON (why this reverted whole, not half): two defects landed in ONE
-    // clause change, so Run 20 cannot attribute the 5-rail regression to D1 or D2
-    // separately -- D1's inert target rail is suggestive, not measured. Reverted to the
-    // wave-4 clause (685 ch) -- the best-measured state in the series (four lead rails at
-    // 0.0%, every modal correct). If D2 is retried it goes ALONE, isolable, and DEFINES
-    // "the arbitration" instead of gesturing at it.
+    // all. Full wave-by-wave tuning history (Run-13's original carve through wave 5's revert) is
+    // NOT re-narrated here -- it is dated + verbatim in MEMORY.md's "TASK #6 + CB HALF OF #10"
+    // entry (`dc6b595`) and its "ARBITRATION CUE WAVE 2" through "WAVE 5" entries. Read those
+    // before touching this cue again; do not duplicate their content back into this comment.
     const nonLatin = scriptFlag ? ' (non-English prompt: apply the AND-gate by MEANING -- the English seed under-fires here)' : '';
     const conf = (Number.isInteger(cfg.triggerConfidence) && cfg.triggerConfidence >= 0 && cfg.triggerConfidence <= 100) ? cfg.triggerConfidence : 90;
     const floor = (Number.isInteger(cfg.triggerGradeFloor) && cfg.triggerGradeFloor >= 1 && cfg.triggerGradeFloor <= 5) ? cfg.triggerGradeFloor : 4;

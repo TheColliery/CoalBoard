@@ -95,12 +95,6 @@
   // # Default value: 1
   "maxRounds": 1,
 
-  // ## Per-worker / per-round debate soft cap in seconds. Matters most when maxRounds > 1; in the single-turn
-  // ## default the hard stall-reap (subagentTimeoutSeconds) is what actually bounds wall-clock.
-  // # Setting type: Integer (range 5-600)
-  // # Default value: 60
-  "debateTimeoutSeconds": 60,
-
   // ## Hard stall-reap: a silent worker past this many seconds is treated as FAILED (no zombies) and the board
   // ## proceeds with a flag or re-spawns once. The real wall-clock bound on a single-turn round.
   // # Setting type: Integer (range 5-3600)

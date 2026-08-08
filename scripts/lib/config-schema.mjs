@@ -30,7 +30,6 @@ export const CONFIG_SCHEMA = [
   { key: 'consensusThreshold', type: 'int', min: 0, max: 100, flags: ['-t'], help: 'Below this worker-agreement % = deadlock -> summon the out-of-frame sub4 (default: 80)' },
   { key: 'observerOnMaxStakes', type: 'bool', flags: ['-o'], help: 'Summon the out-of-frame sub4 even on CONSENSUS (not just on deadlock). The rigor preset sets it (on under nasa, off under standard/high); set it here to force. Same-model agreement is weak evidence' },
   { key: 'maxRounds', type: 'int', min: 1, max: 5, flags: ['-r'], help: '1 = single-turn (max independence); >1 = multi-round cross-examination (less independence). Default 1' },
-  { key: 'debateTimeoutSeconds', type: 'int', min: 5, max: 600, flags: ['-d'], help: 'Per-worker/round debate soft cap in seconds (default: 60)' },
   { key: 'subagentTimeoutSeconds', type: 'int', min: 5, max: 3600, flags: ['-s'], help: 'Hard stall-reap: a silent worker past this is treated as failed (default: 150)' },
   { key: 'maxConcurrentSubagents', type: 'int', min: 1, max: 16, flags: ['--concurrency'], help: 'Concurrent worker cap — they share one rate limit (board needs 3-4; default: 4)' },
   { key: 'lensTiers', type: 'obj', noFlag: true, validate: validateLensTiers, help: 'Optional per-role tier/model pin { data | truth | feeling | observer | judge: "model" | ["priority","chain"] }; overrides BOTH rigorLensTiers and the inherit-CT default' },
