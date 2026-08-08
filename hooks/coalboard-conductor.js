@@ -73,6 +73,10 @@ function physical(p) {
 // code path in scripts/ or hooks/ ever calls the write API against this config's
 // filename); the `fableConsent:"always"` persistence is AGENT PROSE (SKILL.md), not
 // a code path here.
+// `.gemini` has no CoalBoard consumer today (no Gemini activation path exists in this
+// room) -- probed anyway for flock-rail consistency, since the read order is identical
+// wording across every Coal* room and some already do have a `.gemini` consumer. Do not
+// "clean this up" as dead code; it is deliberate cross-room symmetry, not a leftover.
 const AGENT_DIR_ORDER = ['.claude', '.agents', '.gemini'];
 function projectCandidates(dir) {
   const c = AGENT_DIR_ORDER.map((d) => path.join(dir, d, 'coal', 'coalboard.json'));

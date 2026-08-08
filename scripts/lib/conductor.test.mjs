@@ -345,28 +345,43 @@ test('namespace campaign precedence 3/3: nothing new-shape exists anywhere -> th
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+// INSPECT findings-back: the two clamp-unchanged tests below originally wrote ONLY via
+// writeCfgOwnDir -- the "regardless of which candidate" claim was true by construction
+// (candidate identity is erased before the merge), never actually demonstrated across
+// more than one candidate. Both now loop over three genuinely different candidates
+// (own-dir, another known agent dir, and the legacy shape) in independent sandboxes.
+const CANDIDATE_WRITERS = [
+  ['own-dir (.claude/coal/coalboard.json)', writeCfgOwnDir],
+  ['another known agent dir (.agents/coal/coalboard.json)', writeCfgAgentsDir],
+  ['the legacy shape (.claude/.coalboard.json)', writeCfg],
+];
+
 test('clamp-unchanged regression: safer-value-wins rejects escalation regardless of which read-order candidate supplied the project value', () => {
-  const root = mk();
-  const home = mk();
-  try {
-    writeCfg(home, { coalboardMode: 'off' });          // GLOBAL: explicit off
-    writeCfgOwnDir(root, { coalboardMode: 'auto' });   // PROJECT value arrives via the NEW own-dir shape, not legacy
-    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
-    assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a project may not escalate past global off regardless of which candidate file supplied the value -- only the ADDRESS moved, the clamp did not');
-  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+  for (const [label, writeProjectCfg] of CANDIDATE_WRITERS) {
+    const root = mk();
+    const home = mk();
+    try {
+      writeCfg(home, { coalboardMode: 'off' });           // GLOBAL: explicit off
+      writeProjectCfg(root, { coalboardMode: 'auto' });   // PROJECT value arrives via THIS candidate
+      const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+      assert.equal(r.status, 0); assert.equal(r.stdout, '', `a project may not escalate past global off via ${label} -- only the ADDRESS moved, the clamp did not`);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+  }
 });
 
 test('clamp-unchanged regression: criticalKeywords stay UNION/additive regardless of which read-order candidate supplied them', () => {
-  const root = mk();
-  const home = mk();
-  try {
-    // a project-added keyword via the NEW own-dir shape -- must ADD to, not replace, the built-in seed
-    writeCfgOwnDir(root, { criticalKeywords: ['bespoke-term'] });
-    const rCustom = run({ hook_event_name: 'UserPromptSubmit', prompt: 'a bespoke-term appears here' }, root, home);
-    const rBuiltin = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
-    assert.match(rCustom.stdout, /CRITICAL signal/, 'the project-added keyword must fire on its own');
-    assert.match(rBuiltin.stdout, /CRITICAL signal/, 'the built-in default keywords must still fire -- the project addition did not REPLACE the seed list');
-  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+  for (const [label, writeProjectCfg] of CANDIDATE_WRITERS) {
+    const root = mk();
+    const home = mk();
+    try {
+      // a project-added keyword via THIS candidate -- must ADD to, not replace, the built-in seed
+      writeProjectCfg(root, { criticalKeywords: ['bespoke-term'] });
+      const rCustom = run({ hook_event_name: 'UserPromptSubmit', prompt: 'a bespoke-term appears here' }, root, home);
+      const rBuiltin = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
+      assert.match(rCustom.stdout, /CRITICAL signal/, `the project-added keyword via ${label} must fire on its own`);
+      assert.match(rBuiltin.stdout, /CRITICAL signal/, `the built-in default keywords must still fire via ${label} -- the project addition did not REPLACE the seed list`);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+  }
 });
 
 test('move-on-CONFIG-WRITE-only (Phoenix #5): no code path anywhere writes .coalboard.json -- the fableConsent persistence is agent prose (SKILL.md), never a code path here', () => {
