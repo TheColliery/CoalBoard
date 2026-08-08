@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.1.0] - 2026-08-09
 
 ### Added
 - **Namespace campaign #69+#39: per-project config gains more valid homes, fully backward-compatible (`afeeca7`).** A project's `.coalboard.json` is now found via a 4-candidate read order, first found wins: your own agent's dir (`.claude/coal/coalboard.json` on Claude Code) → other known agent dirs, fixed order `.agents` → `.gemini` → the **legacy** `.claude/.coalboard.json` (CoalBoard's actual pre-migration shape — still read normally, no breakage for an existing project). Write target = wherever the config was found; if nothing exists yet, the running agent's own dir is the default. The self-update throttle stamp moved the same way: `~/.claude/.coalboard-update-check` → `~/.claude/coal/coalboard/update-check` (read-new-fallback-old, write-new-drop-old, fail-silent). `fableConsent: "always"` persistence (the board's only project-config write) now targets wherever the config lives per this same read order. `hooks/coalboard-conductor.js`, `skills/coalboard/SKILL.md`, and `references/platform-cc.md` all updated and dist rebuilt. 8 new tests (precedence · clamp-unchanged regression · move-on-write grep-proof · update-stamp read/write).
