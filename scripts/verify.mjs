@@ -177,6 +177,26 @@ for (const [label, p, isSkill] of descTargets) {
   });
 }
 
+// Leading-BOM strip for the plugin.json description check below, built from a char code
+// rather than a typed escape sequence (board #64, CoalMine's own fix: retyping the literal
+// BOM escape in an editor/tool-call can silently insert the actual BOM character in transit).
+const BOM_RE = new RegExp('^' + String.fromCharCode(0xfeff));
+
+// board #64: the loop above walked skill/command FRONTMATTER only -- .claude-plugin/plugin.json's
+// OWN description field (the string a marketplace/plugin listing actually renders) was never
+// read by this gate at all. CoalLedger shipped one at 1067 chars (over the 1024 cap) before a
+// human eye caught it. plugin.json is plain JSON, not YAML frontmatter, so it reads the field
+// directly rather than through frontmatterField; DESC_CAP is the same constant above, never
+// redefined.
+check('description length: .claude-plugin/plugin.json', () => {
+  const pjPath = path.join(root, '.claude-plugin', 'plugin.json');
+  const pj = JSON.parse(fs.readFileSync(pjPath, 'utf8').replace(BOM_RE, ''));
+  const len = typeof pj.description === 'string' ? pj.description.length : 0;
+  if (!pj.description) return 'description missing';
+  if (len > DESC_CAP) return `description ${len} chars exceeds the ${DESC_CAP}-char cap`;
+  return null;
+});
+
 check('factory config valid against schema', () => {
   const raw = fs.readFileSync(path.join(root, 'platform-configs', '.coalboard.json'), 'utf8');
   let cfg;
