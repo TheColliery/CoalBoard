@@ -59,7 +59,7 @@ A "never" inside a Step and not listed here is that step's sequencing mechanics,
 - **P19 — Grant every seat exactly its Seat-permissions row, never the union** (the ledger below).
 
 ### Seat permissions — the MINIMUM tool set per seat (least privilege; grant no more)
-**Read-class = `Read`·`Grep`·`Glob`.** NO seat ever holds a write tool or the spawn tool. Run (`Bash`) and fetch (web) are granted ONLY to the seats whose epistemic function is impossible without them — Step 1 owns what granting a shell costs. Declare each seat's row IN its prompt (`references/lens-prompts.md`, which owns why each row is sufficient). **All five rows EXIST at every rigor** — a rigor preset merely leaves a row UNSEATED (off / not summoned to a deadlock), never removes it from this ledger.
+**Read-class = `Read`·`Grep`·`Glob`.** NO seat ever holds a write tool or the spawn tool. Run (`Bash`) and fetch (web) are granted ONLY to the seats whose epistemic function is impossible without them — Step 1 owns what granting a shell costs. Declare each seat's row IN its prompt (`references/lens-prompts.md`, which owns why each row is sufficient). **All five rows EXIST at every rigor** — a rigor preset merely leaves a row UNSEATED (off / not summoned to a deadlock), never removes it from this ledger. **These rows govern the platform's BUILT-IN tools only — an MCP server attached to the user's session (a browser, a spawn-chip, any server-provided tool) sits outside every row's reach; on such a session a seat's real footprint is larger than its row, contract-bound only (never platform-enforced beyond what the platform itself enforces).**
 
 | seat | Read-class | run (`Bash`) | fetch (web) |
 |---|---|---|---|
