@@ -389,9 +389,19 @@ test('move-on-CONFIG-WRITE-only (Phoenix #5): no code path anywhere writes .coal
   const dirs = [path.join(repo, 'scripts'), path.join(repo, 'scripts', 'lib'), path.join(repo, 'hooks')];
   const offenders = [];
   for (const dir of dirs) {
-    for (const f of fs.readdirSync(dir)) {
+    // board #117 (CodeQL js/file-system-race, CWE-367): withFileTypes:true returns each
+    // entry's type from the SAME readdir syscall that enumerated it -- entry.isDirectory()
+    // is not a second stat-by-name call, so there is no separate check-then-use pair on
+    // `full` between "is it a dir" and "read its contents" (the prior statSync(full) + a
+    // later readFileSync(full) were two independent lookups of the same NAME, the exact
+    // CWE-367 shape). readFileSync below is still one lookup-by-name, same as any file
+    // read; a full fd-based open+fstat+read would close that too, but this is a test
+    // reading its OWN checked-out source tree in CI, not an untrusted multi-writer
+    // environment -- over-engineering that for a threat model that does not apply here.
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = entry.name;
       const full = path.join(dir, f);
-      if (fs.statSync(full).isDirectory()) continue;
+      if (entry.isDirectory()) continue;
       if (!/\.(mjs|js)$/.test(f) || f.endsWith('.test.mjs')) continue;
       const text = fs.readFileSync(full, 'utf8');
       if (/writeFileSync\([^)]*coalboard\.json/i.test(text)) offenders.push(path.relative(repo, full));
