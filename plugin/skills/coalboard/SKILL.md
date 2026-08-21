@@ -87,7 +87,7 @@ A recovery move inside a Step and not listed here is that step's mechanics, not 
 - **F4** — a lens looping on an unavailable tool → fail FAST, return "couldn't reach it — flagged" (Step 1).
 - **F5** — deadlock (consensus below `consensusThreshold`) → `contestedRound` cross-exam (high/nasa) → sub4 blind-solve → matched camp WINS / matches neither → the HUMAN (Step 3).
 - **F6** — verify FAILS → discard staging → climb ONCE (a stronger tier) or sub4 (one attempt) → still failing → the human + the post-mortem file (Step 4.6).
-- **F7** — near a budget/quota limit → fewer workers, or inline-self for the WHOLE board — never main-as-one-lens (P11) (Steps 1–2).
+- **F7** — near a budget/quota limit, or a spawn denial (Grants & denials) → fewer workers, or inline-self for the WHOLE board — never main-as-one-lens (P11) (Steps 1–2).
 - **F8** — mid-run death / overflow / limit-hit → resume from the memory net on the un-done remainder (Memory & resume).
 - **F9** — headless, no human reachable → report-only forced (P2).
 - **F10** — an unverifiable tail (correlated blind spot · unprovable logic) → "could not verify — human decision", carried into GATE 3's digest, never a fake green (Step 4.2).
@@ -104,6 +104,18 @@ A recovery move inside a Step and not listed here is that step's mechanics, not 
 | `references/platform-cc.md` | on-demand — fable cost/plan-rate/safeguard adapter facts (GATE 2 · F2) |
 | `references/platform-antigravity.md` | on-demand — the Antigravity tool mapping |
 | `references/failure-modes.md` | on-demand — the WHY behind the structural rails; never needed to execute |
+
+## Grants & denials (CLASSIFY-BLOCK — declared)
+The Seat-permissions ledger above governs what a SEAT gets. This one governs what MAIN itself needs to run the Steps, and what happens when one is denied.
+
+| class | step it powers | grant | on denial |
+|---|---|---|---|
+| read | reading the TARGET, the merged config, and every MANDATORY reference before any spawn or write (P8) | `Read`·`Grep`·`Glob` | refuse before scanning — say the target/config/reference could not be read; never proceed on an unread target, never report a scan that didn't happen (an unreadable TARGET specifically routes through F12's own fall-back, not a fresh branch here) |
+| write | staging to `proposed/`, the report/post-mortem, the `.coalboard/memory/` net, the one project-config key (GATE 2's `fableConsent:"always"`) | `Write`·`Edit` | report the write as DENIED, not absent — a blocked stage never reads as "nothing to apply", a blocked delete never reads as `stop`'s own P13 disposition; courier the intended content (the fix, the report, the persisted key) to the human instead |
+| spawn | Step 1's lens fan-out + Step 3's sub4 tiebreak | `Agent`/`Task` (Claude Code) · `define_subagent` (Antigravity) | degrade to the existing F7 inline-self collapse, but SAY it: name the denial (not merely near-budget), name which seats never ran, carry the gap into GATE 3's digest as NOT-CHECKED — never a silent single-perspective answer worn as a converged board |
+| network | Step 1's `data`/sub1 seat — the ONLY seat with fetch; main itself never fetches directly | `WebFetch`/`WebSearch`, `data` seat only | the seat's existing NOT-CHECKED honesty rule already carries this: a fetch denial reads exactly like an unreachable source — declare it NOT-CHECKED (`references/lens-prompts.md`'s own "couldn't verify" = a gap, never clean), never fill the gap from training memory |
+
+A denial reaches the WORKER as a visible message and propagates NO further — not to the dispatcher, not as a catchable condition. Every row above states a branch or an explicit death; a step that dies says so in the output. Never report a denied step as done, skipped, or clean.
 
 ## Step 0 — Convene? (gate + consent)
 **Auto-trigger signals — exactly 3, any one fires Step 0** (a manual `/coalboard` arrives at this SAME gate via a different door — the Entry manual lane — and is not counted here; it renders the wizard's bill-confirm box under `ask`/`auto`, same as every lane: `off` → never convene, GATE 1):
