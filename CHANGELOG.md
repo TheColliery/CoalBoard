@@ -4,6 +4,11 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-21
+
+### Fixed
+- **Two Bash/PowerShell grants missing from the CLASSIFY-BLOCK section shipped in v2.2.0 (board #141, found by CM/CL's own INSPECTs during F22).** (A) The write row's on-denial branch already named a delete sub-case (P13's `stop`-deletes-staged), but its grant column named only `Write`·`Edit` — Claude Code has no native file-delete tool, so the delete actually needs `Bash`/`PowerShell`; the grant column now names it, and the on-denial branch states the delete can be denied ALONE (Write/Edit still granted) and must be reported as denied too, never a silent stale `proposed/`. (B) Step 4.2's verify-run (compile/test/SAST/ground-truth/formal gates, run by main, never delegated to a seat) had NO covering row or branch at all — not `write` (verify writes nothing), not `spawn` (Step 4.2's own text explicitly excludes delegating verify to a worker), not F6 (F6 presupposes verify already RAN and produced a result; a Bash-denied verify never runs at all). New `execute` row, grant `Bash`/`PowerShell`, routes a denial through the EXISTING F10 mechanism ("could not verify — human decision," carried into GATE 3's digest, never a fake green) — the same reuse-an-existing-mechanism idiom every other row in this section already follows (write reuses P13, spawn reuses F7, network reuses the data seat's honesty rule). CoalWash is the flock exemplar for naming an execute-tool explicitly in a write-class row; this room's own v2.2.0 section missed it on first pass. Both findings verified independently at source (own available-tool list confirms no native delete tool exists; `SKILL.md`'s F6/F10 text read directly, not assumed) before the fix. No change to the section's promise — main still declares grants/denials for its own steps exactly as v2.2.0 shipped; one row added (4 -> 5), one corrected, both making an existing declaration complete rather than adding a new promise.
+
 ## [2.2.0] - 2026-08-21
 
 ### Added
