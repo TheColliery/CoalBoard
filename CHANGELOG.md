@@ -4,6 +4,11 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-22
+
+### Added
+- **Lens findings now tag (E) exploitable vs (C) conformance; a `(C)`-tagged CRITICAL/HIGH is a re-grade prompt, not an automatic downgrade (board #132).** Validated live on 2026-06-23 external-audit work and never shipped until now (`grep -rn "exploitable" skills/coalboard/` returned 0 hits before this change). Live-proven case: sub1 inflated an RFC-6455 fragmentation gap to CRITICAL because it measured spec-deviation, not attacker-gain; sub4 — whose prompt already carried the E/C split — rated the same gap LOW correctly; the judge confirmed LOW by ground-truth. `references/lens-prompts.md` gains a new `**E/C tagged:**` FIXED-rule bullet (every finding carries `(E)` — someone/something actually gains or breaks — or `(C)` — deviates from a stated standard with no demonstrated gain/break; domain-general, not security-only) plus `(E|C)` in the Output line's FINDINGS schema: `` [CRITICAL|HIGH|MEDIUM|LOW] (E|C) path:line | finding | evidence | conf=NN | FALSIFIER ``. `SKILL.md` Step 2 gains one new judge rail: a `(C)`-tagged CRITICAL/HIGH finding is a RE-GRADE PROMPT — the judge re-runs the same ground-truth check on it and states its reason if it re-grades, never a silent automatic downgrade. The tag does not itself set severity; it gives the judge a signal a conformance gap was never carrying before. Cross-checked for shipped drift: no other live surface (`SKILL.md`, `README.md`, `COALBOARD_BLUEPRINT.md`, `references/audit.md`, `references/wizard.md`) restates the FINDINGS schema or a lens-output field list — `lens-prompts.md` is the sole canonical home, and `CHANGELOG.md`'s own historical `[x.y.z]` entries describing the pre-tag schema are left as history, not amended. **Ruled: the opinion lane does not inherit this tag** — `references/opinion-board.md` says so explicitly, because that lane has no TARGET and emits no `path:line` FINDINGS at all (its seats return refutations and walked scenes, not severity-rated findings).
+
 ## [2.2.1] - 2026-08-21
 
 ### Fixed
