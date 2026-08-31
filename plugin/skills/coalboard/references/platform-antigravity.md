@@ -6,8 +6,8 @@
 | step | Claude Code | Antigravity |
 |---|---|---|
 | spawn a lens | `Agent`/`Task` | `define_subagent(enable_write_tools=false, enable_subagent_tools=false)` → `invoke_subagent` ⚠️ 2026-08-15: unconfirmed against current docs (see caveat below) |
-| read-only + leaf | TOOL-LEVEL via the `Explore` type (the removals SKILL.md Step 1 enumerates) | **TOOL-LEVEL** — the write/spawn tools are ABSENT from the sub ⚠️ 2026-08-15: unconfirmed against current docs (see caveat below) |
-| per-seat run/fetch minimum (P19) | **NOT expressible** — `Explore` passes every other tool through, so the ledger is contract-only | `define_subagent` is called PER SEAT, so anything it can toggle is per-seat by construction — but only the write/spawn flags are VERIFIED. **A shell/fetch toggle is UNVERIFIED: check `define_subagent`'s live parameters before claiming a seat's row is enforced here** |
+| read-only + leaf | TOOL-LEVEL via each seat's own custom agent def (`agents/cb-*.md`, `tools:` frontmatter — SKILL.md Step 1) | **TOOL-LEVEL** — the write/spawn tools are ABSENT from the sub ⚠️ 2026-08-15: unconfirmed against current docs (see caveat below) |
+| per-seat run/fetch minimum (P19) | **Expressible for 3 of 5** — `data`/`truth`/`observer`'s `tools:` lists carry no `Bash`, fully enforced; `feeling`/`adversary` keep `Bash` (load-bearing), CONTRACT-only for that one grant | `define_subagent` is called PER SEAT, so anything it can toggle is per-seat by construction — but only the write/spawn flags are VERIFIED. **A shell/fetch toggle is UNVERIFIED: check `define_subagent`'s live parameters before claiming a seat's row is enforced here** |
 | reap (no-zombie) | return / `TaskStop` | a returned sub stays ACTIVE → `manage_subagents` `kill_all` (MANDATORY) |
 | worker model | `Agent` `model` param | define-time tier pick (`inherit`/`flash`/`pro`, default `inherit`) — set on the subagent's own definition, not passed at `invoke_subagent` call time |
 

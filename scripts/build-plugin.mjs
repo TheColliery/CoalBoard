@@ -1,5 +1,5 @@
-// Build the clean plugin/ dist from source: ship skills/ + hooks/ + commands/ + the
-// plugin manifest; EXCLUDE scripts/ (lib, tests, build/verify are dev-only) and the
+// Build the clean plugin/ dist from source: ship skills/ + hooks/ + commands/ + agents/ +
+// the plugin manifest; EXCLUDE scripts/ (lib, tests, build/verify are dev-only) and the
 // internal design docs. Zero-dep. (cpSync recursive — never flat copyFileSync on a dir.)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,7 @@ function copy(rel) {
   fs.cpSync(src, dst, { recursive: true });
 }
 
-for (const d of ['skills', 'hooks', 'commands']) copy(d);
+for (const d of ['skills', 'hooks', 'commands', 'agents']) copy(d);
 copy(path.join('.claude-plugin', 'plugin.json'));
 
-console.log('plugin/ dist built (skills + hooks + commands + plugin.json) from source.');
+console.log('plugin/ dist built (skills + hooks + commands + agents + plugin.json) from source.');
