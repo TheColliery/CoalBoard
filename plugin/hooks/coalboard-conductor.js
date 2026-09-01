@@ -69,10 +69,13 @@ function physical(p) {
 //      shape -- read normally, no breakage for an existing user.
 // WRITE target = where the config was found; absent everywhere, the running agent's
 // own dir. Hooks never perform this move on a READ (Phoenix #5, no side effects) --
-// and CoalBoard has NO project-config WRITER anywhere in this codebase (verified: no
-// code path in scripts/ or hooks/ ever calls the write API against this config's
-// filename); the `fableConsent:"always"` persistence is AGENT PROSE (SKILL.md), not
-// a code path here.
+// and THIS HOOK never writes the config (it only reads). CWK-023 added the room's
+// first real writer, `scripts/configure.mjs` -- a repo-checkout-only CLI (excluded
+// from the shipped plugin dist by build-plugin.mjs's copy list, so an installed-only
+// user never receives it), ported from CoalMine's own configure.mjs shape and reading
+// the SAME AGENT_DIR_ORDER/projectCandidates order as this hook so the two never
+// disagree about where the config lives. Distinct from `fableConsent:"always"`
+// persistence, which remains AGENT PROSE (SKILL.md), not a code path here.
 // `.gemini` has no CoalBoard consumer today (no Gemini activation path exists in this
 // room) -- probed anyway for flock-rail consistency, since the read order is identical
 // wording across every Coal* room and some already do have a `.gemini` consumer. Do not

@@ -1,9 +1,10 @@
 // Single source of truth for every .coalboard.json key.
 // verify.mjs validates the factory config (platform-configs/.coalboard.json) against it —
 // a key added here is automatically validated and documented, so they cannot drift apart.
-// The `flags`/`noFlag` fields feed a configure.mjs CLI (a planned CoalMine/CoalTipple parity
-// follow-up — NOT yet shipped; today the JSONC factory config is hand-edited).
-// (Mirrors CoalMine/CoalTipple config-schema.mjs for series parity.)
+// The `flags`/`noFlag` fields feed `scripts/configure.mjs`'s CLI (CWK-023, owner-signed
+// ใบ D — configure.mjs is a flock standard, ported from CoalMine's shape): a key added
+// here is automatically settable, validated, and documented from this one table.
+// (Mirrors CoalMine/CoalTipple/CoalLedger config-schema.mjs for series parity.)
 //
 // Spec fields:
 //   key       canonical .coalboard.json key

@@ -19,6 +19,7 @@ const TESTS = [
   'scripts/lib/conductor.test.mjs',
   'scripts/lib/ladder.test.mjs',
   'scripts/lib/dist-compare.test.mjs',
+  'scripts/configure.test.mjs',
 ];
 
 const missing = TESTS.filter((t) => !fs.existsSync(path.join(repo, t)));
