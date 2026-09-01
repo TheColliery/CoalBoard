@@ -4,6 +4,11 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-08-31
+
+### Changed
+- **The conductor's CRITICAL-signal halt-ask now carries a one-line class reason (CWK-022, owner-signed ใบ C).** `hooks/coalboard-conductor.js`'s injected instruction previously told the agent to "HALT and ask the user (question-box) whether to convene the board" with no label naming why. Now the instruction tells the agent to OPEN that question-box ask with a one-line class label naming which of the four auto-trigger classes fired — `security/crypto` · `DB/financial migrations` · `high-precision math` · another catastrophic-on-error class (three verbatim from `SKILL.md`'s own frontmatter, the catch-all compressed for the pick-one slot) — before asking whether to convene. **Not a Phoenix #13 violation:** asking the user is already user-visible surfacing; a class label on a question already being asked is not silent-arbitration narration (#13 bans narrating the arbitration's internal reasoning, never labelling the question itself). The label names ONLY the class — the confidence/reasons/grade detail earlier in the same instruction is explicitly excluded from ever reaching the label, so no mechanism-internal detail leaks into what the user sees. No change to Layer 2's judgment instructions or the CT↔CB triage/arbitration rules — those sentences are untouched.
+
 ## [2.4.0] - 2026-08-31
 
 ### Added
