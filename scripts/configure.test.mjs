@@ -233,6 +233,27 @@ test('configure: strArr keys clear to [] on an empty-string value (the CL strArr
   } finally { clean(sb); }
 });
 
+// The `lower` normalization hole (findings-back CWK-052b): the enumerate-
+// every-key test above generates strArr values that are ALREADY lowercase
+// ('alpha'/'beta', or spec.values[0] for an enum-restricted strArr like
+// 'lenses'), so it never actually exercises parseValue's `if (spec.lower)
+// items = items.map(toLowerCase)` line -- deleting that line fails no test.
+// This one drives a genuinely MIXED-CASE value through criticalKeywords
+// (lower: true, free-form -- not enum-restricted, so no risk of the
+// mixed-case form failing an enum membership check first) and asserts the
+// written value is lowercased.
+test('configure: a lower:true strArr key (criticalKeywords) normalizes a MIXED-CASE value to lowercase', () => {
+  const sb = sandbox();
+  try {
+    const spec = CONFIG_SCHEMA.find((s) => s.key === 'criticalKeywords');
+    assert.ok(spec?.lower, 'this test assumes criticalKeywords is lower:true -- if the schema changed, retarget it at another free-form lower:true key');
+    const r = run(['--criticalKeywords', 'ALPHA,Beta'], sb);
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    const cfg = JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'));
+    assert.deepStrictEqual(cfg.criticalKeywords, ['alpha', 'beta'], 'a lower:true strArr key must lowercase a mixed-case input, not store it verbatim');
+  } finally { clean(sb); }
+});
+
 // The bool-STRICTNESS hole CoalLedger's own round found: only the literal
 // strings "true"/"false" are valid -- anything else (a truthy-looking
 // string, a number) must be rejected, never silently coerced.

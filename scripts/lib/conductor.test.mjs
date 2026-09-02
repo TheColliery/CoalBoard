@@ -384,7 +384,7 @@ test('clamp-unchanged regression: criticalKeywords stay UNION/additive regardles
   }
 });
 
-test('move-on-CONFIG-WRITE-only (Phoenix #5): no code path anywhere writes .coalboard.json -- the fableConsent persistence is agent prose (SKILL.md), never a code path here', () => {
+test("move-on-CONFIG-WRITE-only (Phoenix #5): no code path OUTSIDE configure.mjs writes .coalboard.json -- configure.mjs (CWK-023) is the room's one DECLARED writer, and its write-new-drop-old migration is already implemented (configure.mjs:255-257), not merely owed", () => {
   const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const dirs = [path.join(repo, 'scripts'), path.join(repo, 'scripts', 'lib'), path.join(repo, 'hooks')];
   const offenders = [];
@@ -402,12 +402,22 @@ test('move-on-CONFIG-WRITE-only (Phoenix #5): no code path anywhere writes .coal
       const f = entry.name;
       const full = path.join(dir, f);
       if (entry.isDirectory()) continue;
+      // DELIBERATE, VISIBLE exemption -- configure.mjs is a real, designed-for
+      // writer (CWK-023) whose write path uses a COMPUTED path variable
+      // (writePath), which the literal-filename regex below cannot and should
+      // not be made to see (see this file's own findings-back entry for why a
+      // blanket "writeFileSync + mentions coalboard.json anywhere in the file"
+      // heuristic was considered and rejected -- it false-positives on
+      // hooks/coalboard-conductor.js, which writes an unrelated update-check
+      // stamp and separately reads/mentions coalboard.json for its own config
+      // lookup).
+      if (f === 'configure.mjs') continue;
       if (!/\.(mjs|js)$/.test(f) || f.endsWith('.test.mjs')) continue;
       const text = fs.readFileSync(full, 'utf8');
       if (/writeFileSync\([^)]*coalboard\.json/i.test(text)) offenders.push(path.relative(repo, full));
     }
   }
-  assert.deepStrictEqual(offenders, [], 'if this ever fires, the room now has a real writer and the design-doc write-new-drop-old step is owed for real, in code');
+  assert.deepStrictEqual(offenders, [], 'if this ever fires, a SECOND code path (besides the already-exempted configure.mjs) now writes .coalboard.json -- decide whether it belongs in the exemption above or is a genuine new writer needing its own write-new-drop-old migration');
 });
 
 test('update-check stamp: read-new-fallback-old -- a stamp only at the OLD root location is honored (migration read)', () => {
