@@ -51,7 +51,7 @@ export const CONFIG_SCHEMA = [
   { key: 'tier2Verify', type: 'bool', flags: ['--tier2'], help: 'Ground-truth verification beyond example tests: property-based + fuzz (timeboxed) + differential (vs sub4 blind impl) + metamorphic (no-oracle domains) + mutation (test quality) — non-model ground-truth beats correlated agreement. rigor sets it (on under high/nasa). Default off' },
   { key: 'fuzzTimeboxSeconds', type: 'int', min: 5, max: 3600, flags: ['--fuzz-timebox'], help: 'Hard per-run cap so tier2Verify stays bounded-cost (default: 60)' },
   { key: 'formalCommand', type: 'str', flags: ['--formal'], help: 'OPTIONAL external formal-methods command (TLA+/Alloy/SPARK) for the most critical checkable properties; empty (default) = skip (no hard dependency — present-use/absent-degrade)' },
-  { key: 'applyConsent', type: 'bool', flags: ['-a'], help: 'Require the 2nd consent gate (the staged diff) before writing to live files (default: true)' },
+  { key: 'applyConsent', type: 'bool', flags: ['-a'], help: "Require GATE 3's apply consent (the staged diff) before writing to live files (default: true)" },
   { key: 'stagingDir', type: 'str', flags: ['--staging'], help: 'Staging sandbox path, relative to the project (default: .coalboard/proposed/)' },
   // — strictness preset (bundles the above; individual keys override) —
   { key: 'rigor', type: 'enum', values: ['nasa', 'high', 'standard', 'relaxed'], flags: ['-R'], help: 'Strictness preset: relaxed | standard (default) | high | nasa. A preset that sets defaults for the keys above — "nasa" = maximum-paranoia (trust nothing, human signs off), NOT a 10^-9 / 0.01-defects-per-KLOC reliability claim' },
