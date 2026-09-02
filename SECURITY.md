@@ -6,7 +6,7 @@ CoalBoard is verified under the same framework as **[CoalMine](https://github.co
 
 ## 🔒 Reporting a Vulnerability
 
-Open an issue at `github.com/TheColliery/CoalBoard`, or request a private channel for sensitive PoC logs. We investigate promptly.
+Report a security issue in this repo through GitHub's private vulnerability reporting — [Security → Report a vulnerability](https://github.com/TheColliery/CoalBoard/security/advisories/new) — never a public issue. In scope: the conductor hook's detection and its config-cascade merge-safety clamp, the lens spawn/leaf-ness mechanism and each seat's tool grants, the staging/apply pipeline (`.coalboard/proposed/`, the verify gate, the secrets scrubber), the Fable consent-gate (the one path that spends real money), and `scripts/configure.mjs`'s config writes. Out of scope: a defect found IN the code a board run reviews — that belongs to that code's own maintainer, not CoalBoard — and a SkillSpector false positive. This is a one-person-maintained project: expect the report to be read and acknowledged, triaged against the scope above, and disclosed once a fix ships, with no fixed response-time SLA. A public GitHub issue remains the right channel for an ordinary, non-security bug.
 
 ---
 
