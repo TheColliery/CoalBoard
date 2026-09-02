@@ -37,6 +37,16 @@
 //     to migrate TO, per the schema's own "do NOT resurrect" comment — not
 //     renamed. A migration block exists to move an old VALUE onto a new
 //     KEY; there is no new key here to migrate it onto).
+//   - parseJsonc (below) THROWS on a malformed/non-object root where the
+//     hook's own parseJsonc swallows to {} -- deliberate (a CLI fails loud,
+//     scripts-quality.md §1, where a hook fails silent, Phoenix #4); the
+//     mechanism and reasoning live on the function itself, this line only
+//     NAMES the divergence so this list stays the complete "what differs
+//     from CM" answer.
+//   - findProjectCfg (below) takes a startDir parameter instead of reading
+//     process.cwd() internally the way the hook's own findProjectCfg does --
+//     needed so the CLI's root-walk is testable against a sandboxed
+//     directory without mutating the real process.cwd() per test.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
