@@ -30,6 +30,12 @@ node scripts/test.mjs     # runs the zero-dependency test suite (node --test)
 * **Add unit tests:** every shared helper gets a `*.test.mjs`; the conductor change gets a hermetic spawn test. Register new files in `scripts/test.mjs` (the runner fails on an unlisted orphan).
 * **Language & tone:** shipped source and docs stay in English.
 
+### Reading a green check on a docs-only change
+
+Both checks the branch ruleset requires — `all-green` (CI) and `analyze (javascript)` (CodeQL) — now run on **every** push, including one that touches only root docs. On such a push each check reports success **so the ruleset stays satisfiable**, not because anything was verified: the workflows decide per-run, from the changed paths, whether their suite has any work to do.
+
+**So read the job summary, never the green tick alone.** Each check states which of three things happened — the path classifier failed (the check refuses), the suite ran (with its result), or there was nothing to run (naming the changed paths that produced that verdict). A summary saying nothing ran is not a clean bill of health. The two workflows exempt deliberately different path sets: CI still runs on a shipped markdown artifact, because `verify.mjs` checks dist-sync, while CodeQL skips all markdown, because it analyzes JS/TS.
+
 ---
 
 ## 🖥️ Supported Platforms
