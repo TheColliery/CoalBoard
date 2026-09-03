@@ -38,7 +38,12 @@ jobs:
   # DOCS_GLOBS is the only room-specific value here: an adopting room edits this DATA and
   # nothing else. It must mirror what this workflow's own analysis genuinely does not need.
   changes:
-    name: changed-paths
+    # Named ci-changed-paths, not the generic changed-paths (CWK-058 findings-back LOW-2):
+    # codeql.yml's own classifier job emits the identical generic name today, which is
+    # harmless while neither is a required check but becomes a real collision the day either
+    # is added to a ruleset -- two check-runs on one commit sharing one name. Cheap to avoid
+    # now rather than disambiguate later.
+    name: ci-changed-paths
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.detect.outputs.code }}
@@ -134,6 +139,15 @@ jobs:
       # classifier itself fails: it would report "nothing to run" when the truth is that
       # nothing could be determined. This branch refuses instead.
       - name: what this check actually did
+        # MEDIUM-1 (CWK-058 findings-back): `files` is git-diff-derived, repository-controlled
+        # data -- a filename like `` `id` `` or `$(curl ...)` would be expanded INTO the script
+        # text before bash ever parses it if interpolated directly (the same
+        # `${{ github.event.* }}` script-injection class lens-prompts.md already names, applied
+        # to a needs.*.outputs.* value instead of an event field). Routed through env: so
+        # Actions hands it to the shell as DATA, in an environment variable, never as script
+        # text -- the same pattern codeql.yml's own `detect` step already uses for DOCS_GLOBS.
+        env:
+          FILES: ${{ needs.changes.outputs.files }}
         run: |
           if [ "${{ needs.changes.result }}" != "success" ]; then
             {
@@ -145,6 +159,16 @@ jobs:
             echo "changes=${{ needs.changes.result }} -- refusing"
             exit 1
           fi
+          # LOW-1 (CWK-058 findings-back): `changes` can SUCCEED while emitting no verdict at
+          # all (code neither true nor false) -- reachability is low (emit() is unconditional
+          # on every path, and set -euo pipefail would fail the step first if the
+          # $GITHUB_OUTPUT write itself failed), but an unguarded fall-through would take the
+          # false branch below and report "NO SUITE RAN" as if a real classification had
+          # happened. Refuse instead of guessing.
+          case "${{ needs.changes.outputs.code }}" in
+            true|false) ;;
+            *) echo "classifier emitted no verdict -- refusing"; exit 1 ;;
+          esac
           if [ "${{ needs.changes.outputs.code }}" = "true" ]; then
             {
               echo "### all-green: the suite RAN"
@@ -164,7 +188,7 @@ jobs:
               echo ""
               echo "Changed paths:"
               echo '```'
-              echo "${{ needs.changes.outputs.files }}"
+              echo "$FILES"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
