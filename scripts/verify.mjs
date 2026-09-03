@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
+import { checkConfigKeys } from './lib/config-keys.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -196,6 +197,58 @@ check('description length: .claude-plugin/plugin.json', () => {
   if (len > DESC_CAP) return `description ${len} chars exceeds the ${DESC_CAP}-char cap`;
   return null;
 });
+
+// config-key drift (CWK-060, ported from CoalMine's CWK-059): every config key
+// NAMED on a user-facing surface must RESOLVE in config-schema.mjs, or be declared
+// in PENDING_KEYS / NOT_CONFIG / BLIND_KEYS (scripts/lib/config-keys.mjs owns the
+// detection rule, the three declaration lists, and the full port-trap writeup --
+// not restated here).
+//
+// SCOPE DERIVATION, stated rather than implied (AGENTS.md, THE MEASUREMENT'S OWN
+// FOURTH TENSE): references/*.md is WALKED (readdir) -- a new reference file is
+// covered the day it lands, no roster to keep complete. SKILL.md/README.md/
+// PRIVACY.md/SECURITY.md are an ENUMERATED roster -- there is no stable "root
+// docs" directory to walk without also picking up CHANGELOG.md, a DELIBERATE
+// exclusion (config-keys.mjs's own SURFACES comment has the measured reason).
+const ckRefsDir = path.join(root, 'skills', 'coalboard', 'references');
+const ckMdFiles = [
+  'skills/coalboard/SKILL.md',
+  ...fs.readdirSync(ckRefsDir).filter((f) => f.endsWith('.md')).map((f) => path.join('skills', 'coalboard', 'references', f).replace(/\\/g, '/')),
+  'README.md',
+  'PRIVACY.md',
+  'SECURITY.md',
+];
+const ckHookFiles = ['hooks/coalboard-conductor.js'];
+const { findings: ckFindings, coverage: ckCoverage } = checkConfigKeys({
+  schemaKeys: CONFIG_SCHEMA.map((s) => s.key),
+  mdFiles: ckMdFiles,
+  hookFiles: ckHookFiles,
+  read: (f) => fs.readFileSync(path.join(root, f), 'utf8'),
+  keyTables: [{ file: 'README.md', heading: 'Configure' }],
+});
+// PER-LOCATOR COVERAGE, printed every run regardless of pass/fail -- BYTES, never
+// lines (this hook's own CRITICAL-signal notice is one very long line, so a line
+// count would flatter it). This is what lets a reader tell a legitimate empty
+// result apart from a silently-broken locator without re-deriving the numbers.
+console.log('config keys coverage:');
+console.log(`  --   md files scanned: ${ckCoverage.mdFiles.count} (${ckCoverage.mdFiles.bytes} bytes)`);
+console.log(`  --   hook files scanned: ${ckCoverage.hookFiles.count}, write-call sites found: ${ckCoverage.hookFiles.sitesFound} (${ckCoverage.hookFiles.bytes} bytes)`);
+for (const t of ckCoverage.keyTables) {
+  console.log(`  --   key table ${t.file} ("${t.heading}"): ${t.found ? `${t.rows} row(s)` : 'HEADING NOT FOUND'}`);
+}
+const ckSkips = ckFindings.filter((f) => f.level === 'SKIP');
+const ckHard = ckFindings.filter((f) => f.level !== 'SKIP');
+for (const f of ckSkips) console.log('  --   ' + f.msg);
+// The pass line is QUALIFIED when the gate has declared blind spots -- an
+// unqualified "every config key ... resolves" is false while a declared key is
+// being read and discarded, and a gate whose success line overclaims is the same
+// defect it exists to catch.
+const ckScope = ckSkips.some((f) => f.msg.startsWith('blind to')) ? 'every DETECTABLE config key' : 'every config key';
+if (ckHard.length === 0) {
+  check(`config keys: ${ckScope} named across ${ckMdFiles.length} doc + ${ckHookFiles.length} hook surface(s) resolves in the schema`, () => null);
+} else {
+  ckHard.forEach((f, idx) => check(`config keys: finding ${idx + 1}/${ckHard.length}`, () => f.msg));
+}
 
 check('factory config valid against schema', () => {
   const raw = fs.readFileSync(path.join(root, 'platform-configs', '.coalboard.json'), 'utf8');
