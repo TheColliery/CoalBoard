@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# cancel-in-progress: TRUE -- this workflow only lints and reports (continue-on-error: true
+# below); it writes no external state, so a superseded run has nothing to leave half-done.
+concurrency:
+  group: markdownlint-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
