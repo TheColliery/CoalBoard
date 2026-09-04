@@ -79,10 +79,12 @@ jobs:
           # a diff containing a file literally named `EOF` terminates the `files<<EOF` block
           # early, and the NEXT line of $changed then parses as a fresh top-level `key=value`
           # pair -- a file named `code=false` overwrites the real classifier verdict with no
-          # code execution at all, and a file named `code=x$(...)` / `` code=x`...` `` makes
-          # outputs.code ATTACKER-CHOSEN TEXT. Proven end-to-end with the real emit() shape, a
-          # real $GITHUB_OUTPUT parser, and the real consumer line, run in bash:
-          # scratchpad/dispatch/cwk074-harness.sh (`bash cwk074-harness.sh vuln`).
+          # code execution at all (a forged green with nothing run), and a file named
+          # `code=x$(...)` / `` code=x`...` `` makes outputs.code ATTACKER-CHOSEN TEXT. Proven
+          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real consumer
+          # line, run in bash) -- see the CWK-074 commit message (82a9235) for the payload
+          # families and results; the harness itself is a gitignored scratch file, not a
+          # citable path.
           #
           # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
           # someone will later "strengthen" a property that never came from here: $RANDOM is
@@ -154,8 +156,8 @@ jobs:
         # filename can no longer overwrite this output), but an interpolated `${{ }}` consumer
         # is a live sink the day anything else influences the value -- defence in depth, not
         # a claim that this alone was the vulnerability. Proven end-to-end (3 of 4 payload
-        # families execute against this exact line's un-fixed form):
-        # scratchpad/dispatch/cwk074-harness.sh.
+        # families execute against this exact line's un-fixed form) -- see the CWK-074 commit
+        # message (82a9235) for the payload families and results.
         env:
           FILES: ${{ needs.changes.outputs.files }}
           CODE: ${{ needs.changes.outputs.code }}
@@ -182,9 +184,11 @@ jobs:
           esac
           if [ "$CODE" = "true" ]; then
             {
-              echo "### analyze (javascript): a REAL CodeQL analysis ran"
+              echo "### analyze (javascript): a REAL CodeQL analysis will run"
               echo ""
-              echo "Non-doc paths changed, so init + analyze executed and the SARIF was uploaded."
+              echo "Non-doc paths changed, so init + analyze run NEXT in this job. This step runs"
+              echo "FIRST, before them -- it states intent, not a verified result. See the final"
+              echo "step's summary line below for whether they actually succeeded."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
@@ -204,12 +208,40 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
-      - uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+      - id: init
+        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
         with:
           languages: javascript-typescript
           queries: security-and-quality
-      - uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+      - id: analyze
+        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
+      # LOW-1 (CWK-074 findings-back): the FIRST honesty step above runs BEFORE checkout/init/
+      # analyze exist in this job, so its own "will run" branch can only state INTENT -- it
+      # cannot consult a step outcome that has not happened yet. Asserting COMPLETION there
+      # ("...executed and the SARIF was uploaded", the wording this step replaced) would be
+      # exactly the assert-without-consulting defect this whole campaign exists to close, one
+      # level in. This step runs LAST (if: always(), ids above) and reports the REAL outcome.
+      # THE GATE ITSELF IS NOT FOOLED EITHER WAY: a failed init/analyze already fails this job
+      # and the required check `analyze (javascript)` goes red regardless of what any summary
+      # line says -- so the defect this closes is a LYING SUMMARY BESIDE A RED CHECK, never a
+      # forged green (do not inflate this into the same class as the heredoc-forgery finding).
+      - name: what this check actually verified
+        if: always()
+        env:
+          CODE: ${{ needs.changes.outputs.code }}
+        run: |
+          if [ "$CODE" != "true" ]; then
+            echo "no analysis was scheduled this run -- nothing to verify"
+            exit 0
+          fi
+          {
+            echo ""
+            echo "### analyze (javascript): verified outcome"
+            echo ""
+            echo "checkout: \`${{ steps.checkout.outcome }}\` | init: \`${{ steps.init.outcome }}\` | analyze: \`${{ steps.analyze.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

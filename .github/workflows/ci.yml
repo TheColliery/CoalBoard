@@ -76,10 +76,12 @@ jobs:
           # a diff containing a file literally named `EOF` terminates the `files<<EOF` block
           # early, and the NEXT line of $changed then parses as a fresh top-level `key=value`
           # pair -- a file named `code=false` overwrites the real classifier verdict with no
-          # code execution at all, and a file named `code=x$(...)` / `` code=x`...` `` makes
-          # outputs.code ATTACKER-CHOSEN TEXT. Proven end-to-end with the real emit() shape, a
-          # real $GITHUB_OUTPUT parser, and the real ci.yml:172 consumer line, run in bash:
-          # scratchpad/dispatch/cwk074-harness.sh (`bash cwk074-harness.sh vuln`).
+          # code execution at all (a forged green with nothing run), and a file named
+          # `code=x$(...)` / `` code=x`...` `` makes outputs.code ATTACKER-CHOSEN TEXT. Proven
+          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real ci.yml:172
+          # consumer line, run in bash) -- see the CWK-074 commit message (82a9235) for the
+          # payload families and results; the harness itself is a gitignored scratch file, not
+          # a citable path.
           #
           # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
           # someone will later "strengthen" a property that never came from here: $RANDOM is
@@ -173,8 +175,8 @@ jobs:
         # filename can no longer overwrite this output), but an interpolated `${{ }}` consumer
         # is a live sink the day anything else influences the value -- defence in depth, not
         # a claim that this alone was the vulnerability. Proven end-to-end (3 of 4 payload
-        # families execute against this exact line's un-fixed form):
-        # scratchpad/dispatch/cwk074-harness.sh.
+        # families execute against this exact line's un-fixed form) -- see the CWK-074 commit
+        # message (82a9235) for the payload families and results.
         env:
           FILES: ${{ needs.changes.outputs.files }}
           CODE: ${{ needs.changes.outputs.code }}
