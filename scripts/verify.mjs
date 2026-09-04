@@ -3,11 +3,13 @@
 // Each check is wrapped so one failure yields a clean FAIL line and the rest still run.
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
+import { checkPointers } from './lib/pointer-check.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -248,6 +250,82 @@ if (ckHard.length === 0) {
   check(`config keys: ${ckScope} named across ${ckMdFiles.length} doc + ${ckHookFiles.length} hook surface(s) resolves in the schema`, () => null);
 } else {
   ckHard.forEach((f, idx) => check(`config keys: finding ${idx + 1}/${ckHard.length}`, () => f.msg));
+}
+
+// pointer gate (CWK-075, ported from CoalMine's CWK-075 at 092fd24): ship-text names a file,
+// and nothing resolved it against this tree. scripts/lib/pointer-check.mjs owns the
+// detection rule, the funnel measurement, and the two named blind spots -- not restated here.
+//
+// SCOPE, same discipline as the config-keys gate above: references/*.md is WALKED (readdir);
+// SKILL.md/commands/*.md/README.md/SECURITY.md/CONTRIBUTING.md/PRIVACY.md/NOTICE are an
+// ENUMERATED roster. CHANGELOG.md is included but marked historyOnly -- a running log, so a
+// path that was correct when an entry was written is not a defect now; the gitignored-root
+// branch still binds it regardless (pointer-check.mjs's own rule), so a scratchpad citation
+// there still FAILs. scripts/*.mjs + scripts/lib/*.mjs + hooks/*.js are scanned by their
+// // line-comment text only, never their code bodies (a code body's own backticked-looking
+// tokens inside a string are not a ship-text claim about this tree).
+function pcLineComments(text) {
+  return (text.match(/\/\/[^\n]*/g) || []).join('\n');
+}
+const pcRefsDir = path.join(root, 'skills', 'coalboard', 'references');
+const pcCommandsDir = path.join(root, 'commands');
+const pcSurfaces = [
+  { label: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(root, 'skills', 'coalboard', 'SKILL.md'), 'utf8') },
+  ...fs.readdirSync(pcRefsDir).filter((f) => f.endsWith('.md')).map((f) => {
+    const rel = path.join('skills', 'coalboard', 'references', f).replace(/\\/g, '/');
+    return { label: rel, text: fs.readFileSync(path.join(root, rel), 'utf8') };
+  }),
+  ...fs.readdirSync(pcCommandsDir).filter((f) => f.endsWith('.md')).map((f) => {
+    const rel = path.join('commands', f).replace(/\\/g, '/');
+    return { label: rel, text: fs.readFileSync(path.join(root, rel), 'utf8') };
+  }),
+  ...['README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'PRIVACY.md', 'NOTICE'].map((f) => ({
+    label: f, text: fs.readFileSync(path.join(root, f), 'utf8'),
+  })),
+  {
+    label: 'CHANGELOG.md',
+    text: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'),
+    historyOnly: true,
+  },
+];
+for (const dir of ['scripts', 'scripts/lib', 'hooks']) {
+  const abs = path.join(root, dir);
+  if (!fs.existsSync(abs)) continue;
+  for (const f of fs.readdirSync(abs)) {
+    if (!f.endsWith('.mjs') && !f.endsWith('.js')) continue;
+    const rel = path.join(dir, f).replace(/\\/g, '/');
+    pcSurfaces.push({ label: rel, text: pcLineComments(fs.readFileSync(path.join(root, rel), 'utf8')) });
+  }
+}
+const PC_OUR_ROOTS = new Set(['agents', 'commands', 'hooks', 'platform-configs', 'plugin', 'scripts', 'skills']);
+const PC_IGNORED_ROOTS = new Set(['.claude', 'AGENTS.md', 'CLAUDE.md', 'COALBOARD_BLUEPRINT.md', 'MEMORY.md', 'scratchpad', 'skillspector-20260702.json']);
+function pcResolve(rel) {
+  try {
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe' });
+    return 'tracked';
+  } catch {
+    return fs.existsSync(path.join(root, rel)) ? 'untracked' : 'missing';
+  }
+}
+const pcFindings = checkPointers({
+  surfaces: pcSurfaces,
+  ourRoots: PC_OUR_ROOTS,
+  ignoredRoots: PC_IGNORED_ROOTS,
+  resolve: pcResolve,
+});
+const pcSkips = pcFindings.filter((f) => f.level === 'SKIP');
+const pcHard = pcFindings.filter((f) => f.level !== 'SKIP');
+for (const f of pcSkips) console.log('  --   ' + f.msg);
+// PARTIAL COVERAGE, STATED rather than implied: PATH is machine-checked; SECTION and SYMBOL
+// are not checked at all (scripts/lib/pointer-check.mjs's own header has the measurement that
+// decided this). Naming the file HERE by its own real path (not a bare filename) means this
+// very line is itself a citation the gate could check -- a bare "pointer-check.mjs" would be
+// dropped at the gate's own step 5 (no directory component), which would be the wrong shape
+// for a line whose whole point is not overclaiming.
+if (pcHard.length === 0) {
+  check(`pointer check: every in-scope path citation resolves or is declared (scripts/lib/pointer-check.mjs -- PATH only, section/symbol not checked)`, () => null);
+} else {
+  pcHard.forEach((f, idx) => check(`pointer check: finding ${idx + 1}/${pcHard.length}`, () => f.msg));
 }
 
 check('factory config valid against schema', () => {
