@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security issue
-    url: https://github.com/TheColliery/CoalBoard/blob/main/SECURITY.md
-    about: "Please read SECURITY.md first — request a private channel before posting a PoC."
+    url: https://github.com/TheColliery/CoalBoard/security/advisories/new
+    about: "Read SECURITY.md for scope and what to expect. Do not post a PoC in a public issue."
