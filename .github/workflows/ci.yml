@@ -71,7 +71,28 @@ jobs:
           # FAIL-SAFE POLARITY, and it is the whole safety argument: anything this step
           # cannot determine counts as CODE, never as docs-only. A wrong "docs-only" skips a
           # real analysis silently; a wrong "code" costs one cheap job. Never invert this.
-          emit() { echo "code=$1" >> "$GITHUB_OUTPUT"; echo "files<<EOF" >> "$GITHUB_OUTPUT"; echo "${2:-}" >> "$GITHUB_OUTPUT"; echo "EOF" >> "$GITHUB_OUTPUT"; }
+          #
+          # RUN-TIME RANDOM HEREDOC DELIMITER (CWK-074). A FIXED delimiter ("EOF") is forgeable:
+          # a diff containing a file literally named `EOF` terminates the `files<<EOF` block
+          # early, and the NEXT line of $changed then parses as a fresh top-level `key=value`
+          # pair -- a file named `code=false` overwrites the real classifier verdict with no
+          # code execution at all, and a file named `code=x$(...)` / `` code=x`...` `` makes
+          # outputs.code ATTACKER-CHOSEN TEXT. Proven end-to-end with the real emit() shape, a
+          # real $GITHUB_OUTPUT parser, and the real ci.yml:172 consumer line, run in bash:
+          # scratchpad/dispatch/cwk074-harness.sh (`bash cwk074-harness.sh vuln`).
+          #
+          # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
+          # someone will later "strengthen" a property that never came from here: $RANDOM is
+          # generated AFTER the attacker's filenames are already frozen in $changed, so $RANDOM
+          # not being a CSPRNG is irrelevant. An attacker cannot forge a value they cannot see
+          # in advance, however guessable that value's distribution is.
+          emit() {
+            local delim="cwk074_${GITHUB_RUN_ID:-0}_${RANDOM}${RANDOM}${RANDOM}_$$"
+            echo "code=$1" >> "$GITHUB_OUTPUT"
+            echo "files<<$delim" >> "$GITHUB_OUTPUT"
+            echo "${2:-}" >> "$GITHUB_OUTPUT"
+            echo "$delim" >> "$GITHUB_OUTPUT"
+          }
           if [ "${{ github.event_name }}" != "push" ]; then
             echo "not a push event -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
@@ -146,8 +167,17 @@ jobs:
         # to a needs.*.outputs.* value instead of an event field). Routed through env: so
         # Actions hands it to the shell as DATA, in an environment variable, never as script
         # text -- the same pattern codeql.yml's own `detect` step already uses for DOCS_GLOBS.
+        #
+        # CODE (CWK-074): the same routing, for the same reason, for `outputs.code`. The
+        # run-time random delimiter in `emit()` already closes today's forgery path (a diff
+        # filename can no longer overwrite this output), but an interpolated `${{ }}` consumer
+        # is a live sink the day anything else influences the value -- defence in depth, not
+        # a claim that this alone was the vulnerability. Proven end-to-end (3 of 4 payload
+        # families execute against this exact line's un-fixed form):
+        # scratchpad/dispatch/cwk074-harness.sh.
         env:
           FILES: ${{ needs.changes.outputs.files }}
+          CODE: ${{ needs.changes.outputs.code }}
         run: |
           if [ "${{ needs.changes.result }}" != "success" ]; then
             {
@@ -165,11 +195,11 @@ jobs:
           # $GITHUB_OUTPUT write itself failed), but an unguarded fall-through would take the
           # false branch below and report "NO SUITE RAN" as if a real classification had
           # happened. Refuse instead of guessing.
-          case "${{ needs.changes.outputs.code }}" in
+          case "$CODE" in
             true|false) ;;
             *) echo "classifier emitted no verdict -- refusing"; exit 1 ;;
           esac
-          if [ "${{ needs.changes.outputs.code }}" = "true" ]; then
+          if [ "$CODE" = "true" ]; then
             {
               echo "### all-green: the suite RAN"
               echo ""
