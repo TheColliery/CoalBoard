@@ -212,13 +212,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
       - id: init
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
         with:
           languages: javascript-typescript
           queries: security-and-quality
       - id: analyze
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
       # LOW-1 (CWK-074 findings-back): the FIRST honesty step above runs BEFORE checkout/init/
       # analyze exist in this job, so its own "will run" branch can only state INTENT -- it
