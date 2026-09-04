@@ -58,7 +58,7 @@
 // construction do not exist in ours. Steps 5-8 are four ways of saying the same thing: only
 // a path ROOTED IN OUR OWN TREE is a claim this repo can be wrong about.
 //
-// TWO NAMED BLIND SPOTS, so a clean run is never read as coverage -- both found BY this
+// FOUR NAMED BLIND SPOTS, so a clean run is never read as coverage -- all found BY this
 // room's own measurement, not inherited from the exemplar's:
 //
 //   1. Step 7 excludes EVERY dot-dir, `.github/` included -- and `.github` IS TRACKED here
@@ -98,6 +98,22 @@
 //      convention, which is exactly the false-positive flood step 8 exists to avoid. The cheap
 //      backstop is the same one blind spot 2 already leans on: `historyOnly` for what
 //      published history can no longer act on, and a human `grep` for the rest.
+//
+//   4. An UNBACKTICKED path is invisible to the ENTIRE funnel, at step 0, before any of the
+//      eight filters run -- `pointerCandidates()` only reads inside `` `...` `` pairs, so a
+//      path written in plain prose is never even a candidate. This is the funnel's WIDEST
+//      limit, and it is a DIFFERENT thing from blind spot 3 above: 3 is a backticked,
+//      well-formed token that the funnel reads and then drops; this is a path the funnel
+//      never reads at all. Measured cost: the same three CHANGELOG.md citations blind spot 3
+//      names were found by a plain `grep -rn "scratchpad/"` run AFTER `verify.mjs` was
+//      already GREEN (CWK-075 round 3) -- a clean gate run means no BACKTICKED pointer
+//      dangles, never that ship-text has no dangling pointer at all. Why the rule is not
+//      widened to scan plain prose: a backtick is the only delimiter this funnel has to
+//      anchor on; without it, every slash-shaped phrase in a sentence becomes a candidate
+//      ("see the docs/notes on this" is not a path), which is exactly the false-positive
+//      flood step 0 through 8 exist to keep out. The standing backstop is a human
+//      `grep -rn "scratchpad/"` (or the equivalent for a room's own gitignored roots) run by
+//      hand, same as blind spot 3's.
 //
 // ============================================================================
 // WHAT IS NOT SHIPPED. Section and symbol resolvers were considered and are NOT built here,
