@@ -32,19 +32,28 @@ function runVerify(env) {
 }
 
 test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when git is unavailable', () => {
-  // Only pcResolve() and the new pcDeriveRootSets() shell out to git in this file (grep-
-  // confirmed) -- stripping any PATH entry that could resolve `git` makes both unreachable,
-  // which is exactly the condition this test exists to exercise, without touching anything
-  // else the gate checks.
-  const scrubbed = (process.env.PATH || process.env.Path || '')
-    .split(path.delimiter)
-    .filter((p) => !/git/i.test(p))
-    .join(path.delimiter);
-  const env = { ...process.env, PATH: scrubbed, Path: scrubbed };
-  const res = runVerify(env);
-  assert.match(res.stdout, /pointer check.*(could not derive|SKIPPED)/i, res.stdout);
-  assert.doesNotMatch(res.stdout, /FAIL pointer check/);
-  assert.equal(res.status, 0, `expected the gate to still PASS overall with git absent -- got:\n${res.stdout}`);
+  // Only pcResolve() and deriveRootSets() shell out to git in this file (grep-confirmed) --
+  // pointing PATH at an EMPTY directory makes both unreachable, which is exactly the
+  // condition this test exists to exercise, without touching anything else the gate checks.
+  //
+  // A NAME-FILTER on the real PATH's entries (`.filter(p => !/git/i.test(p))`) was tried
+  // first and is WRONG -- a platform-shaped heuristic standing in for a capability probe
+  // (node/runtime.md §4's own class). `C:\Program Files\Git\cmd` matches `/git/i` and
+  // disappears; POSIX git lives at `/usr/bin/git`, and `/usr/bin` does not match `/git/i` --
+  // so the filter hid git on Windows and left it fully reachable on ubuntu/macOS, and this
+  // test passed on the one OS it was authored on while failing on the other two in CI
+  // (CWK-078 RED round 3). An empty directory has no name to dodge and is unreachable the
+  // same way on every OS.
+  const emptyPathDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-empty-path-'));
+  try {
+    const env = { ...process.env, PATH: emptyPathDir, Path: emptyPathDir };
+    const res = runVerify(env);
+    assert.match(res.stdout, /pointer check.*(could not derive|SKIPPED)/i, res.stdout);
+    assert.doesNotMatch(res.stdout, /FAIL pointer check/);
+    assert.equal(res.status, 0, `expected the gate to still PASS overall with git absent -- got:\n${res.stdout}`);
+  } finally {
+    fs.rmSync(emptyPathDir, { recursive: true, force: true });
+  }
 });
 
 test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still FAILs a citation into a non-hidden gitignored dir', () => {
