@@ -21,6 +21,7 @@ const TESTS = [
   'scripts/lib/dist-compare.test.mjs',
   'scripts/lib/config-keys.test.mjs',
   'scripts/lib/pointer-check.test.mjs',
+  'scripts/lib/derive-roots.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/verify.test.mjs',
 ];

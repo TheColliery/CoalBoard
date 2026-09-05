@@ -3,13 +3,14 @@
 // Each check is wrapped so one failure yields a clean FAIL line and the rest still run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
 import { checkPointers } from './lib/pointer-check.mjs';
+import { deriveRootSets } from './lib/derive-roots.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -323,20 +324,10 @@ for (const dir of ['scripts', 'scripts/lib', 'hooks']) {
 // deliberately includes root DOC FILES too, not directories only -- harmless per
 // pointer-check.mjs's own INERTNESS BY CONSTRUCTION note (a file can never prefix a `/`-token
 // at step 5), and simpler than filtering, since a future top-level DIRECTORY must still be
-// caught the day it lands.
-function pcDeriveRootSets(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const fed = entries.length;
-  const ourRoots = new Set();
-  const ignoredRoots = new Set();
-  for (const e of entries) {
-    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir });
-    if (res.error || (res.status !== 0 && res.status !== 1)) return { ok: false, fed };
-    if (res.status === 0) ignoredRoots.add(e.name);
-    else if (!e.name.startsWith('.')) ourRoots.add(e.name);
-  }
-  return { ok: true, fed, ignoredCount: ignoredRoots.size, ourRoots, ignoredRoots };
-}
+// caught the day it lands. Mechanism lives in `./lib/derive-roots.mjs` -- extracted there
+// (findings-back round) so the hidden-entry-never-enters-ourRoots property has a return
+// value `scripts/lib/derive-roots.test.mjs` can assert on directly, which this file's own
+// top-level-executing shape (no main-guard) cannot offer a test that imports it.
 function pcResolve(rel) {
   try {
     execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe' });
@@ -345,11 +336,11 @@ function pcResolve(rel) {
     return fs.existsSync(path.join(root, rel)) ? 'untracked' : 'missing';
   }
 }
-const pcRoots = pcDeriveRootSets(root);
+const pcRoots = deriveRootSets(root);
 if (!pcRoots.ok) {
-  // Every number printed here comes from the instrument, not a typed guess -- `fed` is the
-  // count actually enumerated before git stopped answering, never the full directory size
-  // assumed.
+  // Every number printed here comes from the instrument, not a typed guess -- `fed` is
+  // incremented INSIDE the loop, one entry at a time, so on a mid-loop bail it reports what
+  // was actually visited before git stopped answering, never the full directory size.
   console.log(`  --   pointer check: could not derive ourRoots/ignoredRoots -- git is unavailable or unusable here (${pcRoots.fed} top-level entr${pcRoots.fed === 1 ? 'y' : 'ies'} enumerated before giving up)`);
   check('pointer check: SKIPPED this run -- git is required to derive gitignored roots and none answered', () => null);
 } else {

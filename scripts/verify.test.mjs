@@ -4,6 +4,16 @@
 // convention asks for a gate/CLI entry: spawn the real file, assert exit code and the
 // sanctioned-output shape. Every mutation is reverted in a finally block; nothing here
 // leaves the tree touched on either the pass or the fail path.
+//
+// NOT tested here: whether a hidden entry (the `.github` shape) can ever enter ourRoots.
+// That property is unobservable through this file's own end-to-end behaviour -- a hidden
+// token is dropped by pointerCandidates()'s dot-dir filter BEFORE ourRoots is ever
+// consulted (pointer-check.mjs's blind spot 1), so a spawn-and-grep test asserting the gate
+// "still passes" with a `.github/...` citation planted would pass identically whether the
+// derivation's own hidden-entry filter is correct OR broken -- a vacuous test wearing a
+// real one's name (findings-back on CWK-078, self-caught before shipping). The actual
+// membership property is unit-tested directly against `deriveRootSets`'s return value in
+// `scripts/lib/derive-roots.test.mjs`, which is the only place it is genuinely observable.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
