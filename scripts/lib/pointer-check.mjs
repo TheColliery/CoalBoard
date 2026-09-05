@@ -116,6 +116,34 @@
 //      hand, same as blind spot 3's.
 //
 // ============================================================================
+// INERTNESS BY CONSTRUCTION -- not every entry in either roster can ever matter, and that
+// must be stated so a future reader does not pad either list expecting coverage it cannot
+// buy (measured CWK-078, real fixtures run through checkPointers against this room's own
+// live sets, not asserted from reading the code):
+//
+//   A root FILE (e.g. `MEMORY.md`, `CHANGELOG.md`) can NEVER be the first segment of a
+//   token that reaches the gitignored branch -- step 5 drops any token with no directory
+//   component, and a bare `MEMORY.md` or `MEMORY.md:12` has none (candidates=[] for both,
+//   measured). Consequence: of our own 7-entry ignoredRoots (6 files + 1 directory), SIX
+//   are INERT -- present, correctly gitignored, and structurally unable to ever reach the
+//   branch that checks them. Only `scratchpad` (a non-hidden gitignored DIRECTORY) can --
+//   named here with NO trailing slash, deliberately: adding one would itself form a token
+//   this gate extracts and flags, the same self-reference trap blind spots 3 and 4 already
+//   name and fix the same way.
+//
+//   A path into a HIDDEN ignored root (`.claude/...`) is dropped one step earlier, at step
+//   7 (every dot-dir is excluded unconditionally, the same mechanism as blind spot 1) --
+//   inert for the SAME reason a `.github/...` citation is invisible, not because
+//   ignoredRoots failed to name it.
+//
+//   Symmetrically, ourRoots missing a root DOC FILE (`README.md`, `LICENSE`, ...) costs
+//   NOTHING: step 5 already requires `first` to be followed by `/`, and a file can never be
+//   a directory prefix. Deriving ourRoots to include the files anyway (rather than
+//   filtering to directories only) is still the RIGHT shape -- a future top-level
+//   DIRECTORY must be caught the day it appears -- but the file half of that derivation is
+//   symmetry, never a fix for an exposure that existed.
+//
+// ============================================================================
 // WHAT IS NOT SHIPPED. Section and symbol resolvers were considered and are NOT built here,
 // on the same measurement CoalMine already ran and reported (a section-reference matcher
 // floods on natural-language "X ... below" phrasing -- 8 candidates, 6 dangling, all six

@@ -22,6 +22,7 @@ const TESTS = [
   'scripts/lib/config-keys.test.mjs',
   'scripts/lib/pointer-check.test.mjs',
   'scripts/configure.test.mjs',
+  'scripts/verify.test.mjs',
 ];
 
 const missing = TESTS.filter((t) => !fs.existsSync(path.join(repo, t)));

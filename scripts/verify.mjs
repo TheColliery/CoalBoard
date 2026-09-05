@@ -3,7 +3,7 @@
 // Each check is wrapped so one failure yields a clean FAIL line and the rest still run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
@@ -212,13 +212,29 @@ check('description length: .claude-plugin/plugin.json', () => {
 // PRIVACY.md/SECURITY.md are an ENUMERATED roster -- there is no stable "root
 // docs" directory to walk without also picking up CHANGELOG.md, a DELIBERATE
 // exclusion (config-keys.mjs's own SURFACES comment has the measured reason).
+//
+// THIS ROSTER IS DELIBERATELY NARROWER THAN pcSurfaces BELOW (CWK-078), and the gap is
+// named rather than left as silent drift between two gates scanning "the docs": the
+// pointer gate scans every doc surface a ship-text pointer could hide in; this one scans
+// every surface a CONFIG KEY NAME could hide in, which is a real but smaller set. Measured
+// at the gap: `commands/stats.md` (names `rigor`), `commands/update.md` (names `updateMode`,
+// `updateCheckDays`), and `CONTRIBUTING.md` (names `rigor`) all name REAL keys and were
+// unscanned -- added below. `NOTICE` stays OUT: it names none, and it is a legal text, not
+// ship-text about config. `CHANGELOG.md` stays OUT, same reason config-keys.mjs's own
+// SURFACES comment already gives for excluding it here: it is history, and it legitimately
+// names RETIRED keys (`callFable`, `debateTimeoutSeconds`) that would redden this gate on
+// correct historical text if scanned live rather than as the pointer gate's `historyOnly`
+// surface.
 const ckRefsDir = path.join(root, 'skills', 'coalboard', 'references');
+const ckCommandsDir = path.join(root, 'commands');
 const ckMdFiles = [
   'skills/coalboard/SKILL.md',
   ...fs.readdirSync(ckRefsDir).filter((f) => f.endsWith('.md')).map((f) => path.join('skills', 'coalboard', 'references', f).replace(/\\/g, '/')),
+  ...fs.readdirSync(ckCommandsDir).filter((f) => f.endsWith('.md')).map((f) => path.join('commands', f).replace(/\\/g, '/')),
   'README.md',
   'PRIVACY.md',
   'SECURITY.md',
+  'CONTRIBUTING.md',
 ];
 const ckHookFiles = ['hooks/coalboard-conductor.js'];
 const { findings: ckFindings, coverage: ckCoverage } = checkConfigKeys({
@@ -297,8 +313,30 @@ for (const dir of ['scripts', 'scripts/lib', 'hooks']) {
     pcSurfaces.push({ label: rel, text: pcLineComments(fs.readFileSync(path.join(root, rel), 'utf8')) });
   }
 }
-const PC_OUR_ROOTS = new Set(['agents', 'commands', 'hooks', 'platform-configs', 'plugin', 'scripts', 'skills']);
-const PC_IGNORED_ROOTS = new Set(['.claude', 'AGENTS.md', 'CLAUDE.md', 'COALBOARD_BLUEPRINT.md', 'MEMORY.md', 'scratchpad', 'skillspector-20260702.json']);
+// ROOT-SET DERIVATION (CWK-078): the two rosters above USED TO BE frozen literals -- correct
+// today (verified 7-for-7 against a full re-enumeration before this change), but a snapshot
+// cannot track `.gitignore`; the day an entry is added there, a citation into it is dropped
+// SILENTLY and PERMANENTLY. Derive both from `git check-ignore`, never parse `.gitignore`
+// (one source of truth, the same rule `.gitignore` itself exists to keep). Degrades to a
+// NAMED SKIP -- never a FAIL -- when git cannot answer (CoalHearth's design lesson: a FAIL
+// here would redden a non-git user's gate over a question only git can answer). `ourRoots`
+// deliberately includes root DOC FILES too, not directories only -- harmless per
+// pointer-check.mjs's own INERTNESS BY CONSTRUCTION note (a file can never prefix a `/`-token
+// at step 5), and simpler than filtering, since a future top-level DIRECTORY must still be
+// caught the day it lands.
+function pcDeriveRootSets(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const fed = entries.length;
+  const ourRoots = new Set();
+  const ignoredRoots = new Set();
+  for (const e of entries) {
+    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir });
+    if (res.error || (res.status !== 0 && res.status !== 1)) return { ok: false, fed };
+    if (res.status === 0) ignoredRoots.add(e.name);
+    else if (!e.name.startsWith('.')) ourRoots.add(e.name);
+  }
+  return { ok: true, fed, ignoredCount: ignoredRoots.size, ourRoots, ignoredRoots };
+}
 function pcResolve(rel) {
   try {
     execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe' });
@@ -307,25 +345,35 @@ function pcResolve(rel) {
     return fs.existsSync(path.join(root, rel)) ? 'untracked' : 'missing';
   }
 }
-const pcFindings = checkPointers({
-  surfaces: pcSurfaces,
-  ourRoots: PC_OUR_ROOTS,
-  ignoredRoots: PC_IGNORED_ROOTS,
-  resolve: pcResolve,
-});
-const pcSkips = pcFindings.filter((f) => f.level === 'SKIP');
-const pcHard = pcFindings.filter((f) => f.level !== 'SKIP');
-for (const f of pcSkips) console.log('  --   ' + f.msg);
-// PARTIAL COVERAGE, STATED rather than implied: PATH is machine-checked; SECTION and SYMBOL
-// are not checked at all (scripts/lib/pointer-check.mjs's own header has the measurement that
-// decided this). Naming the file HERE by its own real path (not a bare filename) means this
-// very line is itself a citation the gate could check -- a bare "pointer-check.mjs" would be
-// dropped at the gate's own step 5 (no directory component), which would be the wrong shape
-// for a line whose whole point is not overclaiming.
-if (pcHard.length === 0) {
-  check(`pointer check: every in-scope path citation resolves or is declared (scripts/lib/pointer-check.mjs -- PATH only, section/symbol not checked)`, () => null);
+const pcRoots = pcDeriveRootSets(root);
+if (!pcRoots.ok) {
+  // Every number printed here comes from the instrument, not a typed guess -- `fed` is the
+  // count actually enumerated before git stopped answering, never the full directory size
+  // assumed.
+  console.log(`  --   pointer check: could not derive ourRoots/ignoredRoots -- git is unavailable or unusable here (${pcRoots.fed} top-level entr${pcRoots.fed === 1 ? 'y' : 'ies'} enumerated before giving up)`);
+  check('pointer check: SKIPPED this run -- git is required to derive gitignored roots and none answered', () => null);
 } else {
-  pcHard.forEach((f, idx) => check(`pointer check: finding ${idx + 1}/${pcHard.length}`, () => f.msg));
+  console.log(`  --   top-level entries fed to git check-ignore: ${pcRoots.fed} (files + hidden included) -- ${pcRoots.ignoredCount} gitignored`);
+  const pcFindings = checkPointers({
+    surfaces: pcSurfaces,
+    ourRoots: pcRoots.ourRoots,
+    ignoredRoots: pcRoots.ignoredRoots,
+    resolve: pcResolve,
+  });
+  const pcSkips = pcFindings.filter((f) => f.level === 'SKIP');
+  const pcHard = pcFindings.filter((f) => f.level !== 'SKIP');
+  for (const f of pcSkips) console.log('  --   ' + f.msg);
+  // PARTIAL COVERAGE, STATED rather than implied: PATH is machine-checked; SECTION and SYMBOL
+  // are not checked at all (scripts/lib/pointer-check.mjs's own header has the measurement that
+  // decided this). Naming the file HERE by its own real path (not a bare filename) means this
+  // very line is itself a citation the gate could check -- a bare "pointer-check.mjs" would be
+  // dropped at the gate's own step 5 (no directory component), which would be the wrong shape
+  // for a line whose whole point is not overclaiming.
+  if (pcHard.length === 0) {
+    check(`pointer check: every in-scope path citation resolves or is declared (scripts/lib/pointer-check.mjs -- PATH only, section/symbol not checked)`, () => null);
+  } else {
+    pcHard.forEach((f, idx) => check(`pointer check: finding ${idx + 1}/${pcHard.length}`, () => f.msg));
+  }
 }
 
 check('factory config valid against schema', () => {
