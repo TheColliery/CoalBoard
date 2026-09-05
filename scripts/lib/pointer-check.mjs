@@ -116,6 +116,21 @@
 //      hand, same as blind spot 3's.
 //
 // ============================================================================
+// IGNOREDROOTS IS LEGITIMATELY EMPTY ON A FRESH CLONE OR IN CI (measured CWK-078 RED, the
+// hard way -- a test that cited this repo's own gitignored `scratchpad` directory passed on
+// a dev box and failed identically to CI on a clean checkout). Every one of this repo's 7
+// gitignored top-level entries (`MEMORY.md`, `AGENTS.md`, `CLAUDE.md`,
+// `COALBOARD_BLUEPRINT.md`, `scratchpad`, `.claude`, `skillspector-20260702.json`) is
+// LOCAL-ONLY tooling state, never committed -- a clone or CI checkout has NONE of them on
+// disk, so `readdirSync` never even enumerates them and `ignoredRoots` derives to the EMPTY
+// SET there. The gitignored branch this whole module is built around is therefore DEAD CODE
+// on every CI run and for every ordinary user; it only ever fires on a MAINTAINER's own
+// machine that has actually used this room's tools long enough to accumulate them. This is
+// not a bug in the derivation -- it is exactly what "derive, never freeze" should do when
+// the gitignored state genuinely differs by machine -- but a test asserting against it MUST
+// build its own fixture repo (see `scripts/lib/derive-roots.test.mjs`) rather than depend on
+// this fact being true wherever the test happens to run.
+//
 // INERTNESS BY CONSTRUCTION -- not every entry in either roster can ever matter, and that
 // must be stated so a future reader does not pad either list expecting coverage it cannot
 // buy (measured CWK-078, real fixtures run through checkPointers against this room's own

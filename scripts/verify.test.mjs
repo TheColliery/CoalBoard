@@ -18,8 +18,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import os from 'node:os';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { deriveRootSets } from './lib/derive-roots.mjs';
+import { checkPointers } from './lib/pointer-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
@@ -45,17 +48,35 @@ test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when
 });
 
 test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still FAILs a citation into a non-hidden gitignored dir', () => {
-  const skillPath = path.join(root, 'skills', 'coalboard', 'SKILL.md');
-  const original = fs.readFileSync(skillPath, 'utf8');
+  // CWK-078 RED: the previous version of this test cited a scratchpad path against THIS
+  // repo's own real tree, which only has gitignored top-level entries on a machine that has
+  // actually accumulated this room's local-only tooling state. A fresh clone or CI checkout
+  // has ZERO of them (`scratchpad`, `MEMORY.md`, `.claude`, ... are all local-only), so
+  // `deriveRootSets` legitimately derives an EMPTY `ignoredRoots` there and the planted
+  // citation never resolves to a gitignored match -- the test passed on a dev box and
+  // failed identically to what CI reported, in every OS/Node leg, because the property
+  // being asserted depended on developer machine state rather than the fixture's own
+  // construction. Fixed the same way as `scripts/lib/derive-roots.test.mjs`'s
+  // `.github`-shape test: build a throwaway git repo, derive its roots for real, and run
+  // `checkPointers` directly against that derivation -- never against the real CoalBoard
+  // tree, so this passes identically on a dev box, in a fresh clone, and in CI.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-red-fixture-'));
   try {
-    fs.writeFileSync(
-      skillPath,
-      `${original}\n<!-- verify.test.mjs fixture: see \`scratchpad/verify-test-fixture-cwk078.md\` -->\n`,
-    );
-    const res = runVerify();
-    assert.notEqual(res.status, 0);
-    assert.match(res.stdout, /gitignored `scratchpad\//);
+    execFileSync('git', ['init', '--quiet'], { cwd: dir });
+    fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored-dir/\n');
+    fs.mkdirSync(path.join(dir, 'ignored-dir'));
+    const roots = deriveRootSets(dir);
+    assert.equal(roots.ok, true);
+    assert.ok(roots.ignoredRoots.has('ignored-dir'), 'the fixture ignored dir must actually derive as ignored');
+    const findings = checkPointers({
+      surfaces: [{ label: 'fixture.md', text: 'See `ignored-dir/notes.md` for detail.' }],
+      ourRoots: roots.ourRoots,
+      ignoredRoots: roots.ignoredRoots,
+      resolve: () => 'missing',
+    });
+    assert.equal(findings.length, 1);
+    assert.match(findings[0].msg, /gitignored `ignored-dir\//);
   } finally {
-    fs.writeFileSync(skillPath, original);
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
