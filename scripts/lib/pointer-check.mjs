@@ -266,6 +266,39 @@ export function checkPointers({
       if (seen.has(tok)) continue;
       seen.add(tok);
       const first = tok.split('/')[0];
+
+      // A BACKSLASH CHARACTER (CWK-077 findings-back) is rejected OUTRIGHT, decided
+      // WITHOUT resolving and BEFORE any root classification -- a citation in this room's
+      // own surfaces is `/`-delimited on every platform, so a backslash anywhere in the
+      // token is never legitimate here. Deliberately NOT a widened dot-segment split: the
+      // segment-escape check below splits on `/`, and a token shaped like two directories
+      // up via a BACKSLASH pair, then a filename, splits into exactly two pieces on `/` --
+      // the second piece (everything past the first slash) is never exactly `..`, so
+      // widening the split CHARACTER SET would still miss it (named here WITHOUT a literal
+      // backticked example, deliberately -- the self-reference trap blind spots 3/4 and
+      // the INERTNESS note above already name and avoid). Checking the character here,
+      // before `first` is ever classified, also closes the QUIET half of the same defect:
+      // a token with a backslash BEFORE its first real slash mis-splits `first` into
+      // something that never matches a real root in `ourRoots` -- previously dropped
+      // SILENTLY as "someone else's tree" rather than named as out of scope. Binds a
+      // `historyOnly` surface too, same reasoning as the gitignored-root check below: a
+      // backslash-delimited citation was never valid syntax for this room's own
+      // `/`-only convention, not even on the day it was written.
+      //
+      // NAMED BLIND SPOT: a legitimate Windows-style citation (a human genuinely writing a
+      // backslash) is now dropped unconditionally, never checked -- measured cost on this
+      // tree today is 0 (every real citation here is `/`-delimited; the one backslash
+      // token path-shaped enough to reach this test is a test fixture literal), but the
+      // cost is real, not hypothetical, and this is the trade stated plainly rather than
+      // implied
+      // away.
+      if (tok.includes('\\')) {
+        cited.add(normalise(tok));
+        checked++;
+        findings.push({ level: 'FAIL', msg: `${s.label} cites \`${tok}\`, which contains a backslash -- rejected before resolution (a citation here is always \`/\`-delimited)` });
+        continue;
+      }
+
       // A bare `.` or `..` FIRST SEGMENT is a relative-path marker, not a directory NAME --
       // `./lib/x.mjs` (a common comment convention meaning "relative to this file") must
       // never be treated as a candidate dot-dir ROOT for the carve-out below; it falls

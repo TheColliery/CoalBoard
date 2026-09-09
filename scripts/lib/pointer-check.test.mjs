@@ -254,6 +254,46 @@ test('a `.` or `..` path segment is rejected before resolution -- resolve() is n
   }
 });
 
+// CWK-077 findings-back -- a `/`-only segment-whole scan cannot see a BACKSLASH-delimited
+// segment: `scripts/..<BS>..<BS>escape.md` splits on `/` into two pieces, neither exactly
+// `..`, so the dot-segment check above never fires; and a token with a backslash BEFORE its
+// first real `/` mis-splits `first` into something that never matches a real root, so it was
+// previously dropped SILENTLY rather than named. The backslash is built with
+// String.fromCharCode(92), not typed literally -- this room's own recorded lesson about a
+// bash heredoc eating a literal backslash on write.
+
+test('a backslash anywhere in the token is rejected outright, before any classification -- resolve() is never called (both the escaping and the silently-skipped shape)', () => {
+  const BS = String.fromCharCode(92);
+  const cases = [
+    `scripts/..${BS}..${BS}escape.md`, // the escaping shape -- would resolve OUTSIDE the repo root
+    `scripts${BS}lib/x.mjs`,           // the previously-QUIET shape -- mis-split `first` never matched ourRoots
+  ];
+  for (const tok of cases) {
+    let resolveCalled = false;
+    const findings = checkPointers({
+      surfaces: [{ label: 'a', text: `See \`${tok}\`.` }],
+      ourRoots: OUR_ROOTS,
+      ignoredRoots: IGNORED_ROOTS,
+      resolve: () => { resolveCalled = true; return 'tracked'; },
+      pending: [],
+    });
+    assert.equal(findings.length, 1, tok);
+    assert.match(findings[0].msg, /contains a backslash -- rejected/, tok);
+    assert.equal(resolveCalled, false, `resolve() must never be called for ${tok}`);
+  }
+});
+
+test('a `/`-only citation with no backslash is unaffected -- still resolves normally', () => {
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'See `scripts/lib/pointer-check.mjs`.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: fakeResolve({ 'scripts/lib/pointer-check.mjs': 'tracked' }),
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+});
+
 test('a legitimate ..-containing NAME (not a whole segment) still resolves normally -- segment-WHOLE, never substring', () => {
   const findings = checkPointers({
     surfaces: [{ label: 'a', text: 'See `scripts/..foo/x.mjs`.' }],
