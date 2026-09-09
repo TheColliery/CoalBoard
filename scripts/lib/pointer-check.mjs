@@ -58,7 +58,7 @@
 // construction do not exist in ours. Steps 5-8 are four ways of saying the same thing: only
 // a path ROOTED IN OUR OWN TREE is a claim this repo can be wrong about.
 //
-// FOUR NAMED BLIND SPOTS, so a clean run is never read as coverage -- all found BY this
+// SIX NAMED BLIND SPOTS, so a clean run is never read as coverage -- all found BY this
 // room's own measurement, not inherited from the exemplar's:
 //
 //   1. Step 7 used to exclude EVERY dot-dir; CWK-077 NARROWED it, it did not close it.
@@ -74,20 +74,29 @@
 //      shipping by running the gate, not by re-reading the diff). A GITIGNORED or merely
 //      untracked dot-dir (`.claude/...`, a bare `.coalboard.json` example) stays exactly as
 //      invisible as before this change -- this is a narrow carve-out for one class, never a
-//      general un-blinding. Measured effect on this repo: +4 real citations now covered
-//      (all four occurrences of `.claude-plugin/plugin.json` -- CHANGELOG.md,
-//      CONTRIBUTING.md, commands/update.md -- shipped command text a user reads -- and this
-//      very header's own example two paragraphs up), 0 false positives.
+//      general un-blinding. Measured effect on this repo: `.claude-plugin/plugin.json` is
+//      cited FOUR times (CHANGELOG.md, CONTRIBUTING.md, commands/update.md, and this very
+//      header's own example two paragraphs up) and now reaches resolve() -- but the
+//      CHANGELOG.md occurrence sits on a `historyOnly` surface, so it is CITED, never
+//      CHECKED (it `continue`s before `checked++`, same rule any historyOnly citation
+//      follows). The honest count is +3 checked, +1 cited-on-history, 0 false positives --
+//      never "+4 covered" (findings-back round 2 caught this file's own prior overstatement
+//      of its own carve-out, the exact class this gate exists to catch, committed inside it).
 //      `.github` STAYS excluded, by name, and this is the part still open:
 //      it collides with the ORG's own `.github` repo, cited constantly in our own ship-text
 //      for THAT tree (its benchmarks dir, its dependabot config) -- and no mechanical
 //      discriminator exists yet to tell "our own .github" from "the org repo named
 //      .github". A naive narrowing with no exclusion was measured and produces exactly
-//      four false FAILs on this tree today (a citation into the ORG repo's own
-//      benchmarks doc; two `.github/...` ellipsis placeholders inside this room's own
-//      prose, including this header before this fix; and a correct `.github/.github/workflows/`
-//      citation, a repo named `.github` legitimately nesting its own directory of that
-//      name -- `references/audit.md`'s own documented false-positive class). The day a
+//      four false FAILs on this tree today, and they are NOT the four a first pass named
+//      (a stated count beside its own list must be reconciled against it, or the count
+//      survives only because two errors cancel -- findings-back round 2's own catch): one
+//      `.github/.github/workflows/` citation in `references/audit.md`, one bare
+//      `.github/...` ellipsis placeholder each in `scripts/verify.test.mjs` and this very
+//      module's own header, and a SECOND `.github/.github/workflows/` citation inside this
+//      module's header alongside the first -- a repo named `.github` legitimately nesting
+//      its own directory of that name, `references/audit.md`'s own documented
+//      false-positive class, occurring twice, not once. The ORG repo's own benchmarks-doc
+//      citation does NOT fail: it lives in `CHANGELOG.md`, which is `historyOnly`. The day a
 //      mechanical discriminator exists for "our .github vs the org's", this narrows
 //      further; until then this is prose, not a machine.
 //
@@ -137,6 +146,26 @@
 //      flood step 0 through 8 exist to keep out. The standing backstop is a human
 //      `grep -rn "scratchpad/"` (or the equivalent for a room's own gitignored roots) run by
 //      hand, same as blind spot 3's.
+//
+//   5. A BACKSLASH CHARACTER (CWK-077 findings-back) is rejected outright, decided before
+//      any root classification, rather than resolved -- a `/`-only segment-whole scan
+//      cannot see a backslash-delimited segment, and a mixed-separator token's mis-split
+//      first segment never matches a real root either way, so widening the split character
+//      set would not close that quiet half. Cost, measured on this room's own tree: 18
+//      backticked tokens contain a backslash across every scanned surface, 0 path-shaped
+//      enough to reach this check -- every one is a regex fragment, an escape sequence, or
+//      an already-excluded absolute Windows-path example. Full detail lives at the check
+//      site inside `checkPointers()` (the backslash-rejection branch).
+//
+//   6. A leading `./` or `../` token (a common comment convention meaning "relative to
+//      this file") is not treated as a candidate dot-dir ROOT -- it falls through to the
+//      ordinary ourRoots test, fails it, and is silently out of scope, same as before
+//      CWK-077. Deliberate, not an oversight: admitting a bare `.`/`..` as a root would let
+//      `resolve('.')` trivially match the whole repo, the exact collision the isDotDir
+//      exclusion at the check site exists to avoid. Measured cost: 2 such tokens exist on
+//      this tree today, one a real citation of a real file nothing checks
+//      (`scripts/verify.mjs` citing `./lib/derive-roots.mjs`), the other this header's own
+//      illustrative example (`./lib/x.mjs`, at the isDotDir check site).
 //
 // ============================================================================
 // IGNOREDROOTS IS LEGITIMATELY EMPTY ON A FRESH CLONE OR IN CI (measured CWK-078 RED, the
@@ -225,7 +254,10 @@ export function pointerCandidates(text) {
     if (!tok.includes('/')) continue;      // a bare filename is the USER's repo's
     if (OUTSIDE.test(tok)) continue;       // absolute, home-relative, or a URL
     // A dot-dir is admitted here (CWK-077) -- checkPointers() decides root-by-root which
-    // ones are IN SCOPE (blind spot 1, narrowed not closed: any dot-dir except `.github`).
+    // ones are IN SCOPE (blind spot 1, narrowed not closed: a dot-dir root is admitted only
+    // when it is not `.github` AND resolve() itself reports it TRACKED -- naming only the
+    // `.github` exclusion here, without the TRACKED requirement, is ship-text disagreeing
+    // with the mechanism it introduces, inside the gate built to catch exactly that class).
     out.push(tok);
   }
   return out;
@@ -253,6 +285,20 @@ export function checkPointers({
   const cited = new Set();
   let checked = 0;
 
+  // MEDIUM-3 (CWK-077 findings-back round 2): `resolve(first)` is a real `git ls-files`
+  // subprocess, and `seen` above is per-SURFACE, so the SAME root name was re-probed once
+  // per surface that cited it -- measured live at 39 spawns to answer 5 distinct root
+  // questions, ~+1.8s/~+65% per `verify` run for 4 citations. Memoized here, per
+  // checkPointers() CALL (never across calls -- a fresh run must re-derive trackedness,
+  // this only removes redundancy WITHIN one run), so a root name pays exactly one
+  // subprocess however many surfaces cite it. `.github` is excluded by name before this
+  // cache is ever consulted (see the admission check below), so it never occupies a slot.
+  const dotDirRootCache = new Map(); // first-segment -> boolean tracked
+  const dotDirRootsSeen = new Set();     // every dot-dir root NAME encountered, incl. .github
+  const dotDirRootsAdmitted = new Set(); // roots that passed BOTH not-.github and TRACKED
+  let dotDirCited = 0;   // citations under an admitted root that reached `cited.add`
+  let dotDirChecked = 0; // of those, how many also reached `checked++` (excludes historyOnly)
+
   for (const s of surfaces) {
     if (typeof s.text !== 'string') {
       // NAME what could not be read. A caller that filters unreadable surfaces out first
@@ -267,8 +313,8 @@ export function checkPointers({
       seen.add(tok);
       const first = tok.split('/')[0];
 
-      // A BACKSLASH CHARACTER (CWK-077 findings-back) is rejected OUTRIGHT, decided
-      // WITHOUT resolving and BEFORE any root classification -- a citation in this room's
+      // BLIND SPOT 5 (CWK-077 findings-back) -- A BACKSLASH CHARACTER is rejected OUTRIGHT,
+      // decided WITHOUT resolving and BEFORE any root classification -- a citation in this room's
       // own surfaces is `/`-delimited on every platform, so a backslash anywhere in the
       // token is never legitimate here. Deliberately NOT a widened dot-segment split: the
       // segment-escape check below splits on `/`, and a token shaped like two directories
@@ -299,9 +345,9 @@ export function checkPointers({
         continue;
       }
 
-      // A bare `.` or `..` FIRST SEGMENT is a relative-path marker, not a directory NAME --
-      // `./lib/x.mjs` (a common comment convention meaning "relative to this file") must
-      // never be treated as a candidate dot-dir ROOT for the carve-out below; it falls
+      // BLIND SPOT 6 -- a bare `.` or `..` FIRST SEGMENT is a relative-path marker, not a
+      // directory NAME. `./lib/x.mjs` (a common comment convention meaning "relative to this
+      // file") must never be treated as a candidate dot-dir ROOT for the carve-out below; it falls
       // through to the ordinary ourRoots test, fails it (neither is ever a real root name),
       // and is silently out of scope -- the exact same nothing-happens outcome it had before
       // this ticket, on purpose. The segment-escape check further down (item 2) is what
@@ -325,9 +371,20 @@ export function checkPointers({
       // and is excluded anyway): it collides with the ORG's own `.github` repo, cited
       // constantly in our own ship-text for THAT tree, and no mechanical discriminator
       // exists yet to tell "our own .github" from "the org repo named .github" -- this is
-      // still blind spot 1, narrowed, not closed.
+      // still blind spot 1, narrowed, not closed. The subprocess itself is MEMOIZED
+      // (MEDIUM-3, CWK-077 findings-back round 2) -- `first` is looked up in
+      // `dotDirRootCache` before `resolve()` is ever called, and the answer is cached for
+      // every later citation of the same root within this run.
       if (isDotDir) {
-        if (first === '.github' || resolve(first) !== 'tracked') continue;
+        dotDirRootsSeen.add(first);
+        if (first === '.github') continue;
+        let tracked = dotDirRootCache.get(first);
+        if (tracked === undefined) {
+          tracked = resolve(first) === 'tracked';
+          dotDirRootCache.set(first, tracked);
+        }
+        if (!tracked) continue;
+        dotDirRootsAdmitted.add(first);
       }
 
       // A GITIGNORED ROOT IS THE SHARP CASE, and it is decided WITHOUT resolving: from any
@@ -340,6 +397,7 @@ export function checkPointers({
       if (ignoredRoots.has(first)) {
         cited.add(normalise(tok));
         checked++;
+        if (isDotDir) { dotDirCited++; dotDirChecked++; }
         findings.push({
           level: 'FAIL',
           msg: `${s.label} cites \`${tok}\`, which lives under the gitignored \`${first}/\` -- not reachable from a clone. Cite the durable artefact (a commit SHA, a shipped doc) or commit the file.`,
@@ -350,13 +408,17 @@ export function checkPointers({
       if (!isDotDir && !ourRoots.has(first)) continue; // a path into someone else's tree
 
       cited.add(normalise(tok));
+      if (isDotDir) dotDirCited++;
 
       // Published history is never fixed forward: a path that was correct when the entry
       // was written is not a defect now. Such a surface is checked for the gitignored case
-      // above and nothing else.
+      // above and nothing else. LOW-1 (CWK-077 findings-back round 2): this is exactly why
+      // a `historyOnly` dot-dir citation is CITED but never CHECKED -- the header's own
+      // blind-spot-1 paragraph states the split rather than a single "covered" count.
       if (s.historyOnly) continue;
 
       checked++;
+      if (isDotDir) dotDirChecked++;
       const rel = normalise(tok);
 
       // A `.` OR `..` SEGMENT (CWK-077) survives every filter above and would otherwise
@@ -397,5 +459,18 @@ export function checkPointers({
   }
 
   findings.checked = checked;
+  // MEDIUM-3's coverage half (CWK-077 findings-back round 2): the gate prints CWK-078's root
+  // derivation every run and said NOTHING about the dot-dir admission path -- a silently
+  // broken admission (a resolve() that stops answering 'tracked', a renamed root) produces
+  // byte-identical PASS output to today's correct run, the same legitimate-empty-vs-broken-
+  // locator ambiguity the config-keys gate's per-locator coverage already exists to remove.
+  // Every number here comes from the counters above, never re-derived or guessed.
+  findings.dotDirCoverage = {
+    rootsSeen: dotDirRootsSeen.size,       // every dot-dir NAME encountered, incl. .github
+    rootsProbed: dotDirRootCache.size,     // roots that actually called resolve() (excl. .github)
+    rootsAdmitted: Array.from(dotDirRootsAdmitted),
+    citationsCited: dotDirCited,
+    citationsChecked: dotDirChecked,
+  };
   return findings;
 }

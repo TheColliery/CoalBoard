@@ -360,3 +360,39 @@ test('a bare `./`-relative token is silently out of scope, same as before this t
   });
   assert.equal(findings.length, 0, JSON.stringify(findings));
 });
+
+// CWK-077 findings-back round 2, MEDIUM-3 -- the SAME dot-dir root cited from TWO different
+// surfaces (via two different files, so the per-surface `seen` set cannot dedupe the TOKEN)
+// must call resolve() for the root at most ONCE per checkPointers() run. `.github` never
+// calls resolve() at all, per the existing exclusion test above -- proven again here inside
+// a run that also exercises a real memoized root, so a future regression to "always call
+// resolve()" cannot hide behind a run where `.github` was the only root present.
+test('MEDIUM-3: the dot-dir root probe is memoized -- resolve() is called at most once per root name, however many citations or surfaces name it', () => {
+  const resolveCalls = {};
+  const resolve = (rel) => {
+    resolveCalls[rel] = (resolveCalls[rel] || 0) + 1;
+    if (rel === '.claude-plugin' || rel === '.claude-plugin/plugin.json' || rel === '.claude-plugin/marketplace.json') return 'tracked';
+    return 'missing';
+  };
+  const findings = checkPointers({
+    surfaces: [
+      { label: 'a', text: 'See `.claude-plugin/plugin.json` and `.github/workflows/ci.yml`.' },
+      { label: 'b', text: 'Also `.claude-plugin/marketplace.json` and `.coalboard/proposed/x.md`.' },
+    ],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve,
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+  assert.equal(resolveCalls['.claude-plugin'], 1, 'the root probe must fire once, not once per citing surface');
+  assert.equal(resolveCalls['.github'], undefined, '.github must never be probed at all');
+  assert.equal(resolveCalls['.coalboard'], 1, 'an untracked root is still probed exactly once, not once per citation');
+
+  const dc = findings.dotDirCoverage;
+  assert.equal(dc.rootsSeen, 3, JSON.stringify(dc));           // .claude-plugin, .github, .coalboard
+  assert.equal(dc.rootsProbed, 2, JSON.stringify(dc));         // .github excluded before any probe
+  assert.deepEqual(dc.rootsAdmitted, ['.claude-plugin'], JSON.stringify(dc));
+  assert.equal(dc.citationsCited, 2, JSON.stringify(dc));      // the two .claude-plugin file citations
+  assert.equal(dc.citationsChecked, 2, JSON.stringify(dc));    // neither surface is historyOnly
+});

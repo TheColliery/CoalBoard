@@ -354,6 +354,16 @@ if (!pcRoots.ok) {
   const pcSkips = pcFindings.filter((f) => f.level === 'SKIP');
   const pcHard = pcFindings.filter((f) => f.level !== 'SKIP');
   for (const f of pcSkips) console.log('  --   ' + f.msg);
+  // MEDIUM-3's coverage half (CWK-077 findings-back round 2): printed every run, pass or
+  // fail -- a broken admission (resolve() stops answering 'tracked', a root renamed) would
+  // otherwise produce byte-identical PASS output to today's correct run. Every number comes
+  // straight from checkPointers()'s own counters (pointer-check.mjs's own dotDirCoverage
+  // comment has the mechanism); never re-derived here.
+  {
+    const dc = pcFindings.dotDirCoverage;
+    const dcHistory = dc.citationsCited - dc.citationsChecked;
+    console.log(`  --   dot-dir roots seen: ${dc.rootsSeen} (${dc.rootsProbed} probed via resolve() -- .github excluded by name, never probed) -- ${dc.rootsAdmitted.length} admitted (${dc.rootsAdmitted.join(', ') || 'none'}), ${dc.citationsChecked} citation(s) checked${dcHistory ? ` (+${dcHistory} cited on a historyOnly surface)` : ''}`);
+  }
   // PARTIAL COVERAGE, STATED rather than implied: PATH is machine-checked; SECTION and SYMBOL
   // are not checked at all (scripts/lib/pointer-check.mjs's own header has the measurement that
   // decided this). Naming the file HERE by its own real path (not a bare filename) means this
