@@ -4,6 +4,14 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-09-10
+
+### Fixed
+- **`references/wizard.md`'s Call-3 line claimed DISPATCH defaults were "config-overridable" — no dispatch key exists anywhere in the 31-key schema.** The false half is removed; the true half (defaults dispatch all-at-once, ask only if raised) is unchanged. This correction landed in `516c52c` (CWK-075 findings-back) as a change to the file inside the shipped `plugin/` tree, but `.claude-plugin/plugin.json`'s `version` stayed at `2.4.1` — and per UMB-049, `claude plugin update` resolves a plugin's version from that string on the default branch, keeping the cached copy when it hasn't moved. So a user already on 2.4.1 kept the false sentence while a fresh install got the corrected tree under the identical version number — one string naming two different trees, this room's own CWK-063 hazard, live. This bump is what actually delivers the correction to an existing install.
+
+### Notes
+- **Everything else since `2.4.1` is maintainer-side and reaches no install — stated so this release isn't read as bigger than it is.** The pointer/config-drift gate work this sitting (including the CWK-079 port) and the `.github/` workflow work both touch only `scripts/` and `.github/`, neither of which `build-plugin.mjs` copies into `plugin/` (`for (const d of ['skills', 'hooks', 'commands', 'agents'])`). No skill behaviour, no config key, no command, and no hook changed in this release.
+
 ## [2.4.1] - 2026-08-31
 
 ### Changed
