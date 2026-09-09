@@ -341,8 +341,8 @@ if (!pcRoots.ok) {
   // Every number printed here comes from the instrument, not a typed guess -- `fed` is
   // incremented INSIDE the loop, one entry at a time, so on a mid-loop bail it reports what
   // was actually visited before git stopped answering, never the full directory size.
-  console.log(`  --   pointer check: could not derive ourRoots/ignoredRoots -- git is unavailable or unusable here (${pcRoots.fed} top-level entr${pcRoots.fed === 1 ? 'y' : 'ies'} enumerated before giving up)`);
-  check('pointer check: SKIPPED this run -- git is required to derive gitignored roots and none answered', () => null);
+  console.log(`  --   pointer check: could not derive ourRoots -- git is unavailable or unusable here (${pcRoots.fed} top-level entr${pcRoots.fed === 1 ? 'y' : 'ies'} enumerated before giving up)`);
+  check('pointer check: SKIPPED this run -- git is required to derive ourRoots and none answered', () => null);
 } else {
   console.log(`  --   top-level entries fed to git check-ignore (ourRoots derivation): ${pcRoots.fed} (files + hidden included) -- ${pcRoots.ourRoots.size} of our own`);
 

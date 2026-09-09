@@ -59,7 +59,9 @@
 // a path ROOTED IN OUR OWN TREE is a claim this repo can be wrong about.
 //
 // SIX NAMED BLIND SPOTS, so a clean run is never read as coverage -- all found BY this
-// room's own measurement, not inherited from the exemplar's:
+// room's own measurement, not inherited from the exemplar's. (A SEVENTH bound is not
+// listed here because it belongs to `ignoredRoots`'s own DERIVATION, not to this funnel --
+// the CWK-079 FOREIGN-NAME COLLISION bound, documented at its own `verify.mjs` call site.)
 //
 //   1. Step 7 used to exclude EVERY dot-dir; CWK-077 NARROWED it, it did not close it.
 //      `ourRoots` never contains a dot-dir (deriveRootSets excludes every hidden entry by
@@ -309,7 +311,15 @@ export function pointerCandidates(text) {
 //     over with a further heuristic. A latent accept-side case nobody has hit: the
 //     last-segment test accepts an ALL-DIGIT "extension" (`.[A-Za-z0-9]{1,10}` matches
 //     digits too), so a slash-separated version-shaped token would pass as filename-shaped.
-//     Measured population on this room's tree today: ZERO.
+//     Measured population on this room's tree today: ZERO. A THIRD, live-today case, same
+//     class and same honesty bar: `OUTSIDE` (pointerCandidates, above) only rejects a URL
+//     that carries a SCHEME -- a scheme-less `github.com/...` token reaches this test's
+//     first-segment derivation unfiltered, and a real citation of that shape is on this
+//     tree today (`SKILL.md`'s own issue-tracker URL). It is discovery-excluded only BY
+//     LUCK here (its last segment carries no `.ext`-shaped suffix) -- a URL one path
+//     segment longer, ending in a real filename, would shape-qualify and probe
+//     `github.com` against OUR `.gitignore`. Measured population on this room's tree
+//     today: ZERO (no such longer-shaped citation exists yet).
 //   - DISCOVERY-EXCLUDED, but NOT check-exempt per the non-locality above: an extensionless
 //     real path with no trailing slash is no longer a source of its OWN root. Measured on
 //     this tree: every extensionless dot-dir citation this file's own header and the module's
@@ -395,7 +405,7 @@ export function checkPointers({
       // backslash-delimited citation was never valid syntax for this room's own
       // `/`-only convention, not even on the day it was written.
       //
-      // NAMED BLIND SPOT: a legitimate Windows-style citation (a human genuinely writing a
+      // BLIND SPOT 5, NAMED BOUND: a legitimate Windows-style citation (a human genuinely writing a
       // backslash) is now dropped unconditionally, never checked. Measured on this room's
       // own tree, not ported: 18 backticked tokens contain a backslash across every scanned
       // surface, 0 path-shaped enough to reach this test -- every one is a regex fragment
