@@ -169,8 +169,12 @@ test('pointerCandidates: a bare filename (no directory component) is dropped', (
   assert.deepEqual(pointerCandidates('See `SKILL.md` for the contract.'), []);
 });
 
-test('pointerCandidates: a dot-dir is dropped unconditionally', () => {
+test('pointerCandidates: a bare dot-FILE (no directory component) is dropped -- the no-slash rule, not a dot-dir rule', () => {
   assert.deepEqual(pointerCandidates('The user\'s own `.coalboard.json` lives in their project.'), []);
+});
+
+test('pointerCandidates: a multi-segment dot-dir token now SURVIVES extraction (CWK-077) -- admission is checkPointers()\'s job, not the extractor\'s', () => {
+  assert.deepEqual(pointerCandidates('See `.claude-plugin/plugin.json` for the version.'), ['.claude-plugin/plugin.json']);
 });
 
 test('pointerCandidates: a command or table row (has whitespace) is not a pointer', () => {
@@ -219,6 +223,99 @@ test('a fenced code block is an EXAMPLE, not a ship-text claim -- its backticked
     ourRoots: OUR_ROOTS,
     ignoredRoots: IGNORED_ROOTS,
     resolve: fakeResolve({ 'scripts/real.mjs': 'tracked' }),
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+});
+
+// CWK-077 item 2 -- a `.`/`..` path segment must never reach resolve() verbatim, or a
+// caller's own path.join(root, rel) can escape the repo root and resolve against a REAL
+// sibling room's file (a false "exists here but is UNTRACKED" claim about another tree).
+
+test('a `.` or `..` path segment is rejected before resolution -- resolve() is never called, for any of the four shapes', () => {
+  const cases = [
+    'scripts/../../../etc/passwd',
+    'scripts/../../CoalMine/MEMORY.md',
+    'scripts/./lib/pointer-check.mjs',
+    'scripts/lib/../lib/pointer-check.mjs',
+  ];
+  for (const tok of cases) {
+    let resolveCalled = false;
+    const findings = checkPointers({
+      surfaces: [{ label: 'a', text: `See \`${tok}\`.` }],
+      ourRoots: OUR_ROOTS,
+      ignoredRoots: IGNORED_ROOTS,
+      resolve: () => { resolveCalled = true; return 'tracked'; },
+      pending: [],
+    });
+    assert.equal(findings.length, 1, tok);
+    assert.match(findings[0].msg, /path segment -- rejected/, tok);
+    assert.equal(resolveCalled, false, `resolve() must never be called for ${tok}`);
+  }
+});
+
+test('a legitimate ..-containing NAME (not a whole segment) still resolves normally -- segment-WHOLE, never substring', () => {
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'See `scripts/..foo/x.mjs`.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: fakeResolve({ 'scripts/..foo/x.mjs': 'tracked' }),
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+});
+
+// CWK-077 item 3 -- a dot-dir root is admitted only when it is not `.github` AND resolve()
+// itself reports the root TRACKED; `ourRoots` never contains a dot-dir (CWK-078), so this
+// carve-out cannot go through `ourRoots` membership at all.
+
+test('a tracked dot-dir root (not .github) is admitted -- resolve() then decides tracked/untracked/missing exactly like an ordinary path', () => {
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'See `.claude-plugin/plugin.json` and `.claude-plugin/ghost.json`.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: fakeResolve({
+      '.claude-plugin': 'tracked',
+      '.claude-plugin/plugin.json': 'tracked',
+      '.claude-plugin/ghost.json': 'missing',
+    }),
+    pending: [],
+  });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].msg, /\.claude-plugin\/ghost\.json/);
+  assert.match(findings[0].msg, /does not resolve/);
+});
+
+test('`.github` stays excluded by name -- resolve() is never even asked whether the root itself is tracked', () => {
+  let rootQueried = false;
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'See `.github/workflows/ci.yml`.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: (rel) => { if (rel === '.github') rootQueried = true; return 'tracked'; },
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+  assert.equal(rootQueried, false, '.github must be excluded before resolve() is ever asked about the root');
+});
+
+test('a dot-dir root that is NOT tracked (and is not .github) is silently out of scope -- a shipped doc describing the SCANNED USER\'s own runtime convention', () => {
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'The board plants `.coalboard/proposed/` in the user\'s own project.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: fakeResolve({}), // '.coalboard' never resolves as tracked
+    pending: [],
+  });
+  assert.equal(findings.length, 0, JSON.stringify(findings));
+});
+
+test('a bare `./`-relative token is silently out of scope, same as before this ticket -- never a dot-dir root candidate', () => {
+  const findings = checkPointers({
+    surfaces: [{ label: 'a', text: 'Mechanism lives in `./lib/derive-roots.mjs`.' }],
+    ourRoots: OUR_ROOTS,
+    ignoredRoots: IGNORED_ROOTS,
+    resolve: () => 'tracked', // must never matter -- '.' is never admitted as a root
     pending: [],
   });
   assert.equal(findings.length, 0, JSON.stringify(findings));

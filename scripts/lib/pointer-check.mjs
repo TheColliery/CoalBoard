@@ -61,12 +61,35 @@
 // FOUR NAMED BLIND SPOTS, so a clean run is never read as coverage -- all found BY this
 // room's own measurement, not inherited from the exemplar's:
 //
-//   1. Step 7 excludes EVERY dot-dir, `.github/` included -- and `.github` IS TRACKED here
-//      (`.github/workflows/*.yml`, `.github/dependabot.yml`), unlike CoalMine where the
-//      exemplar's own equivalent note found zero live cost. A shipped doc citing
-//      `.github/workflows/ci.yml` in OUR tree goes UNCHECKED. Measured cost today: zero (no
-//      in-scope surface currently cites `.github/...`). The day one does, this rule must be
-//      revisited by hand -- prose, not a machine.
+//   1. Step 7 used to exclude EVERY dot-dir; CWK-077 NARROWED it, it did not close it.
+//      `ourRoots` never contains a dot-dir (deriveRootSets excludes every hidden entry by
+//      design -- CWK-078's own `.github`-shape unit test pins that property), so admission
+//      cannot go through `ourRoots` membership. Instead a dot-dir root is admitted only
+//      when BOTH hold: its name is not `.github`, AND `resolve()` itself reports the root
+//      TRACKED (`git ls-files --error-unmatch -- <dir>` succeeds as a directory PATHSPEC
+//      whenever any tracked file lives under it) -- a real, run-time git query, never a
+//      hand-kept name list, and never a blanket "any dot-dir" admission (an earlier draft
+//      of this fix tried exactly that and flooded on every `.coalboard/...`-shaped path a
+//      shipped doc uses to describe the SCANNED USER's own repo convention -- caught before
+//      shipping by running the gate, not by re-reading the diff). A GITIGNORED or merely
+//      untracked dot-dir (`.claude/...`, a bare `.coalboard.json` example) stays exactly as
+//      invisible as before this change -- this is a narrow carve-out for one class, never a
+//      general un-blinding. Measured effect on this repo: +4 real citations now covered
+//      (all four occurrences of `.claude-plugin/plugin.json` -- CHANGELOG.md,
+//      CONTRIBUTING.md, commands/update.md -- shipped command text a user reads -- and this
+//      very header's own example two paragraphs up), 0 false positives.
+//      `.github` STAYS excluded, by name, and this is the part still open:
+//      it collides with the ORG's own `.github` repo, cited constantly in our own ship-text
+//      for THAT tree (its benchmarks dir, its dependabot config) -- and no mechanical
+//      discriminator exists yet to tell "our own .github" from "the org repo named
+//      .github". A naive narrowing with no exclusion was measured and produces exactly
+//      four false FAILs on this tree today (a citation into the ORG repo's own
+//      benchmarks doc; two `.github/...` ellipsis placeholders inside this room's own
+//      prose, including this header before this fix; and a correct `.github/.github/workflows/`
+//      citation, a repo named `.github` legitimately nesting its own directory of that
+//      name -- `references/audit.md`'s own documented false-positive class). The day a
+//      mechanical discriminator exists for "our .github vs the org's", this narrows
+//      further; until then this is prose, not a machine.
 //
 //   2. Step 8 admits a SIBLING's file whenever its first segment happens to equal one of
 //      OUR OWN roots too. coalmine-scanner.md (under a SIBLING repo's own agents/ dir) is
@@ -201,7 +224,8 @@ export function pointerCandidates(text) {
     if (GLOB.test(tok)) continue;          // a glob names a SET, not a file
     if (!tok.includes('/')) continue;      // a bare filename is the USER's repo's
     if (OUTSIDE.test(tok)) continue;       // absolute, home-relative, or a URL
-    if (tok.startsWith('.')) continue;     // a dot-dir is an agent/tool home (blind spot 1)
+    // A dot-dir is admitted here (CWK-077) -- checkPointers() decides root-by-root which
+    // ones are IN SCOPE (blind spot 1, narrowed not closed: any dot-dir except `.github`).
     out.push(tok);
   }
   return out;
@@ -242,6 +266,36 @@ export function checkPointers({
       if (seen.has(tok)) continue;
       seen.add(tok);
       const first = tok.split('/')[0];
+      // A bare `.` or `..` FIRST SEGMENT is a relative-path marker, not a directory NAME --
+      // `./lib/x.mjs` (a common comment convention meaning "relative to this file") must
+      // never be treated as a candidate dot-dir ROOT for the carve-out below; it falls
+      // through to the ordinary ourRoots test, fails it (neither is ever a real root name),
+      // and is silently out of scope -- the exact same nothing-happens outcome it had before
+      // this ticket, on purpose. The segment-escape check further down (item 2) is what
+      // actually polices a `.`/`..` segment wherever one appears in an otherwise in-scope
+      // path; this exclusion only keeps item 3's admission test from mis-firing on one.
+      const isDotDir = first.startsWith('.') && first !== '.' && first !== '..';
+
+      // BLIND SPOT 1, NARROWED (CWK-077) -- admission for a dot-dir root happens HERE,
+      // BEFORE the gitignored check below, so nothing about this carve-out un-shadows the
+      // rest of blind spot 1: a citation into a gitignored dot-dir (`.claude/...`) or one
+      // merely describing the SCANNED USER's own repo convention (a shipped skill's own
+      // runtime path, `.coalboard/proposed/` and its kin) stays exactly as invisible as it
+      // was before this change -- this is a NARROW carve-out for one class, never a general
+      // un-blinding. `ourRoots` never contains a dot-dir (deriveRootSets excludes every
+      // hidden entry by design -- CWK-078's own `.github`-shape unit test pins that
+      // property), so admission cannot go through `ourRoots` membership; instead a dot-dir
+      // root is admitted only if `resolve()` itself reports it TRACKED -- `git ls-files
+      // --error-unmatch -- <dir>` succeeds as a directory PATHSPEC whenever any tracked
+      // file lives under it, so this is a real, run-time git query, never a hand-kept name
+      // list. `.github` is excluded by name regardless of trackedness (it IS tracked here,
+      // and is excluded anyway): it collides with the ORG's own `.github` repo, cited
+      // constantly in our own ship-text for THAT tree, and no mechanical discriminator
+      // exists yet to tell "our own .github" from "the org repo named .github" -- this is
+      // still blind spot 1, narrowed, not closed.
+      if (isDotDir) {
+        if (first === '.github' || resolve(first) !== 'tracked') continue;
+      }
 
       // A GITIGNORED ROOT IS THE SHARP CASE, and it is decided WITHOUT resolving: from any
       // other machine "gitignored" and "does not exist" are indistinguishable, so such a
@@ -260,7 +314,8 @@ export function checkPointers({
         continue;
       }
 
-      if (!ourRoots.has(first)) continue; // a path into someone else's tree
+      if (!isDotDir && !ourRoots.has(first)) continue; // a path into someone else's tree
+
       cited.add(normalise(tok));
 
       // Published history is never fixed forward: a path that was correct when the entry
@@ -270,6 +325,21 @@ export function checkPointers({
 
       checked++;
       const rel = normalise(tok);
+
+      // A `.` OR `..` SEGMENT (CWK-077) survives every filter above and would otherwise
+      // reach resolve() verbatim -- a caller's own path.join(root, rel) then ESCAPES the
+      // repo root (two directories up plus a sibling room name resolves against a REAL
+      // sibling room's file, producing a false "exists here but is UNTRACKED" claim about
+      // another room's tree). Reject SEGMENT-WHOLE, before resolution, never a substring
+      // match -- a legitimate name like two dots followed by letters must keep resolving
+      // normally. Bans the shape outright (both a single dot and a double dot), not only
+      // the segments that actually escape: the reference shape this rejects, not
+      // normalises, on purpose.
+      if (rel.split('/').some((seg) => seg === '.' || seg === '..')) {
+        findings.push({ level: 'FAIL', msg: `${s.label} cites \`${tok}\`, which contains a \`.\`/\`..\` path segment -- rejected before resolution (a dot-segment can escape the repo root)` });
+        continue;
+      }
+
       const state = resolve(rel);
       if (state === 'tracked') continue;
       if (pending.some((p) => p && p.path === rel)) continue;
