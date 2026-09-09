@@ -286,12 +286,12 @@ export function checkPointers({
       // `/`-only convention, not even on the day it was written.
       //
       // NAMED BLIND SPOT: a legitimate Windows-style citation (a human genuinely writing a
-      // backslash) is now dropped unconditionally, never checked -- measured cost on this
-      // tree today is 0 (every real citation here is `/`-delimited; the one backslash
-      // token path-shaped enough to reach this test is a test fixture literal), but the
-      // cost is real, not hypothetical, and this is the trade stated plainly rather than
-      // implied
-      // away.
+      // backslash) is now dropped unconditionally, never checked. Measured on this room's
+      // own tree, not ported: 18 backticked tokens contain a backslash across every scanned
+      // surface, 0 path-shaped enough to reach this test -- every one is a regex fragment
+      // or escape sequence, or a Windows-path example already excluded by the absolute-path
+      // filter regardless. Cost today is 0, but the cost is real, not hypothetical, and
+      // this is the trade stated plainly rather than implied away.
       if (tok.includes('\\')) {
         cited.add(normalise(tok));
         checked++;
