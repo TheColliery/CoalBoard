@@ -3,13 +3,13 @@
 // Each check is wrapped so one failure yields a clean FAIL line and the rest still run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
-import { checkPointers } from './lib/pointer-check.mjs';
+import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer-check.mjs';
 import { deriveRootSets } from './lib/derive-roots.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -344,11 +344,89 @@ if (!pcRoots.ok) {
   console.log(`  --   pointer check: could not derive ourRoots/ignoredRoots -- git is unavailable or unusable here (${pcRoots.fed} top-level entr${pcRoots.fed === 1 ? 'y' : 'ies'} enumerated before giving up)`);
   check('pointer check: SKIPPED this run -- git is required to derive gitignored roots and none answered', () => null);
 } else {
-  console.log(`  --   top-level entries fed to git check-ignore: ${pcRoots.fed} (files + hidden included) -- ${pcRoots.ignoredCount} gitignored`);
+  console.log(`  --   top-level entries fed to git check-ignore (ourRoots derivation): ${pcRoots.fed} (files + hidden included) -- ${pcRoots.ourRoots.size} of our own`);
+
+  // IGNORED ROOTS, PATTERN-BASED (CWK-079) -- asked of the CANDIDATES actually cited, never
+  // of what exists on disk. `deriveRootSets`'s OWN ignoredRoots return value (disk-derived,
+  // above) is DELIBERATELY NOT consumed here -- a clean clone carries no gitignored files by
+  // definition, so that disk-derived probe runs at ZERO on every clean clone and every CI
+  // leg while a real ship-text citation into a gitignored root sits invisible. Measured: 28
+  // fed / 7 ignored on a maintainer box that has accumulated this room's local-only tooling
+  // state, against 21 fed / 0 ignored on a fresh clone -- the SAME repo, the SAME commit.
+  // `.gitignore` is TRACKED (`git ls-files .gitignore` succeeds), so `git check-ignore`
+  // answers for an ABSENT path exactly as it would for a present one -- the PATTERN is what
+  // matters, never the directory listing.
+  //
+  // TRAILING SLASH: `looksPathShaped()` (this module) shape-qualifies each candidate before
+  // its first segment is fed here, and every shape it accepts either already ends in `/` or
+  // names a real filename -- feed `first + '/'` regardless, since a `dir/`-anchored
+  // `.gitignore` pattern does not match the bare name given without it (git cannot infer
+  // that an absent path is a directory).
+  //
+  // BATCHED, one process for every distinct shape-qualified first segment actually cited,
+  // never one spawn per candidate.
+  //
+  // NAMED BOUND -- FOREIGN-NAME COLLISION. `candidateRoots` is fed from every CITED first
+  // segment, unlike the disk-derived shape it replaced, which could only ever contain a name
+  // that physically existed as a top-level entry in OUR OWN repo listing. That bound is
+  // gone: a citation describing the SCANNED USER's own tree (a doc line naming the user's
+  // `dist/build.js`, say) now probes `dist` against OUR `.gitignore`, and if a future
+  // pattern of ours happens to share that name, the citation FAILs as "not reachable from a
+  // clone" although it was never ours to be wrong about. Measured POPULATION on THIS tree
+  // today: ZERO (28 shape-qualified first segments, 0 gitignored) -- but population is not
+  // EXPOSURE: population measures today's already-green tree, exposure measures how close
+  // it sits to the class firing. Measured directly by appending one ordinary directory name
+  // to `.gitignore` (an everyday word this room's own prose uses to describe the board's own
+  // staging convention, deliberately not spelled out here as a literal candidate -- doing so
+  // would itself add a new citation of it): FOUR real FAILs, spanning `SKILL.md`, a
+  // reference doc, `PRIVACY.md`, and one on published `CHANGELOG.md` history. `.gitignore`
+  // reverted immediately after, byte-identical. The miss is LOUD BY DESIGN, not by luck -- a
+  // wrong FAIL names the file and the token, unlike a dead citation silently falling out of
+  // scope, the same trade CWK-078 already made in this direction. No narrowing is added
+  // here; inventing one would reach for existence or our own directory listing, the exact
+  // existence-dependence this ticket exists to remove. A dot-dir root (`.github`, `.claude`,
+  // ...) is UNAFFECTED by this bound either way: `checkPointers` admits or excludes a
+  // dot-dir root entirely on its own TRACKED-only test (blind spot 1) before this set is
+  // ever consulted -- PROVEN live on this tree, not asserted: `.claude` and `.agents` both
+  // land in this pattern-based `ignoredRoots` today (real citations describing the shipped
+  // skill's own runtime convention), and produce zero findings, because both are excluded at
+  // dot-dir admission before this branch ever runs.
+  // CITED vs PROBED, printed separately (order's own LOW-1-shaped ask): CITED is every
+  // distinct first segment `pointerCandidates` extracted at all, before the shape filter;
+  // PROBED is the subset `looksPathShaped` let through to `git check-ignore`. A reader
+  // seeing CITED=0 knows nothing was extracted at all (an empty surface set, say); CITED>0
+  // with PROBED=0 would mean the shape filter ate every candidate, a real regression signal
+  // the old single-number line could not distinguish from "nothing to report."
+  const rootsCitedRaw = new Set();
+  const candidateRoots = new Set();
+  for (const s of pcSurfaces) {
+    if (typeof s.text !== 'string') continue;
+    for (const tok of pointerCandidates(s.text)) {
+      const first = tok.split('/')[0];
+      rootsCitedRaw.add(first);
+      if (looksPathShaped(tok)) candidateRoots.add(first);
+    }
+  }
+  const ignoredRoots = new Set();
+  if (candidateRoots.size) {
+    const ci = spawnSync('git', ['check-ignore', '--stdin'],
+      { cwd: root, encoding: 'utf8', input: [...candidateRoots].map((n) => n + '/').join('\n') + '\n' });
+    // Exit 1 means none of the fed patterns are ignored -- not an error. Git itself was
+    // already proven reachable by the ourRoots derivation this whole block is gated on, so
+    // only a genuine spawn error here would mean otherwise, and none has been observed.
+    if (!ci.error && typeof ci.stdout === 'string') {
+      for (const line of ci.stdout.split('\n')) {
+        const t = line.trim();
+        if (t) ignoredRoots.add(t.replace(/\/$/, ''));
+      }
+    }
+  }
+  console.log(`  --   gitignored-root citations: ${rootsCitedRaw.size} distinct first segment(s) cited, ${candidateRoots.size} shape-qualified and probed through one git check-ignore call -- ${ignoredRoots.size} gitignored`);
+
   const pcFindings = checkPointers({
     surfaces: pcSurfaces,
     ourRoots: pcRoots.ourRoots,
-    ignoredRoots: pcRoots.ignoredRoots,
+    ignoredRoots,
     resolve: pcResolve,
   });
   const pcSkips = pcFindings.filter((f) => f.level === 'SKIP');

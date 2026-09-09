@@ -263,6 +263,70 @@ export function pointerCandidates(text) {
   return out;
 }
 
+// LAST-SEGMENT SHAPE TEST (CWK-079) -- feeds ONLY verify.mjs's ignore-probe candidate-root
+// derivation (which first segments get asked of `git check-ignore`), NEVER pointerCandidates'
+// own resolve-path population above. Kept OUT of pointerCandidates deliberately: a token this
+// test rejects may still be a real, existing, TRACKED citation into one of this room's own
+// hidden-but-tracked directories that the ordinary resolve() check must keep seeing --
+// narrowing pointerCandidates itself would silently drop those from resolution checking too,
+// an unrelated regression from the one this test exists to fix. (Deliberately not backticked
+// here -- a real example would itself become a candidate this file's own scan has to explain
+// away, the self-reference trap the blind spots above already name.)
+//
+// THE DEFECT THIS CLOSES: a token containing a `/` is not necessarily a path -- the
+// no-`/` drop above only proves the token HAS a slash, never what the slash SEPARATES.
+// Measured over this room's own candidate tokens (83 distinct, 38 distinct first segments,
+// re-derive live with a throwaway probe over pointerCandidates() -- never quote this number
+// forward): an arithmetic ratio, two rule-force words joined by a slash, a lens-name pair, a
+// CI class label, a model-tier list, and a bare `data`/`security` prose fragment all reach
+// the ignore-probe's first-segment derivation with no path in them at all -- 10 of the 38
+// first segments exist ONLY via such a token. Feeding any one of those bare names to
+// `git check-ignore` and getting a hit would FAIL a real, harmless citation with the remedy
+// "commit the file" -- incoherent for an arithmetic ratio or a rule-force pair.
+//
+// THE TEST: strip a trailing `:line(-line)?` ref (the same suffix `normalise()` strips for
+// resolution below), then either the token ends in `/` (an explicit directory reference) or
+// its LAST segment carries a `.ext`-shaped suffix (a filename). Both are the deliberate,
+// common path conventions this room's own prose already uses; an arithmetic ratio or a
+// rule-force pair carries neither.
+//
+// THIS GATES DISCOVERY ONLY, NEVER JUDGEMENT -- stated because the natural first reading is
+// wrong. This test decides which roots verify.mjs adds to its ignore-probe candidate set; it
+// is never consulted by `checkPointers`' own `ignoredRoots.has(first)` branch below, which
+// judges EVERY token reaching it regardless of shape. So a token this test rejects is NOT
+// excluded from the check -- it is excluded only from CONTRIBUTING ITS OWN ROOT to the set
+// the check runs against. The true property is NON-LOCAL: a citation this test rejects (an
+// extensionless path with no trailing slash) is checked IF AND ONLY IF some OTHER,
+// unrelated, path-shaped citation anywhere in the surface set shares its first segment.
+// Reword this test's own behaviour before "fixing" the sentence above -- making the check
+// local would mean applying this shape test inside `checkPointers` too, which would silently
+// stop FAILing a real gitignored citation that happens to be extensionless.
+//
+// THE RESIDUE, both directions, named rather than hidden:
+//   - STILL LETS THROUGH: a token ending `/` is accepted with no check on what precedes it
+//     -- a function-call-shaped token ending in `/` still reaches the probe. Harmless in
+//     practice (no real `.gitignore` pattern is named that), named here rather than papered
+//     over with a further heuristic. A latent accept-side case nobody has hit: the
+//     last-segment test accepts an ALL-DIGIT "extension" (`.[A-Za-z0-9]{1,10}` matches
+//     digits too), so a slash-separated version-shaped token would pass as filename-shaped.
+//     Measured population on this room's tree today: ZERO.
+//   - DISCOVERY-EXCLUDED, but NOT check-exempt per the non-locality above: an extensionless
+//     real path with no trailing slash is no longer a source of its OWN root. Measured on
+//     this tree: every extensionless dot-dir citation this file's own header and the module's
+//     comments already name (the `.github/...`, `.coalboard/...`, and `.claude/...` shapes
+//     documented above) is discovery-excluded here -- live cost is ZERO regardless, because
+//     none of those roots can ever reach this probe's judgement branch at all: a dot-dir
+//     root is admitted or excluded entirely inside `checkPointers` (blind spot 1, above)
+//     BEFORE the ignoredRoots check ever runs, so this shape test's residue on a dot-dir
+//     token is structurally inert here -- a divergence from the exemplar, which holds a
+//     separate agent-home set out of its probe for the same reason CoalBoard's dot-dir
+//     admission already provides for free.
+export function looksPathShaped(tok) {
+  const t = tok.replace(/:\d+(-\d+)?$/, '');
+  if (t.endsWith('/')) return true;
+  return /\.[A-Za-z0-9]{1,10}$/.test(t.split('/').pop());
+}
+
 // `docs/x.md:12` and `scripts/` both name a real thing; the suffix and the trailing slash
 // are punctuation, not part of the path.
 function normalise(tok) {
@@ -272,7 +336,7 @@ function normalise(tok) {
 export function checkPointers({
   surfaces = [],            // [{ label, text, historyOnly? }]
   ourRoots = new Set(),     // top-level names that belong to THIS repo
-  ignoredRoots = new Set(), // top-level dirs/files this repo gitignores
+  ignoredRoots = new Set(), // first segments of CITED paths that .gitignore matches (CWK-079: existence-independent -- not a listing of dirs/files the caller has on disk)
   resolve,                  // (relPath) => 'tracked' | 'untracked' | 'missing'
   pending = PENDING_POINTERS,
 } = {}) {

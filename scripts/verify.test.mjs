@@ -22,7 +22,7 @@ import os from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deriveRootSets } from './lib/derive-roots.mjs';
-import { checkPointers } from './lib/pointer-check.mjs';
+import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
@@ -32,8 +32,11 @@ function runVerify(env) {
 }
 
 test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when git is unavailable', () => {
-  // Only pcResolve() and deriveRootSets() shell out to git in this file (grep-confirmed) --
-  // pointing PATH at an EMPTY directory makes both unreachable, which is exactly the
+  // pcResolve(), deriveRootSets(), and the CWK-079 candidateRoots ignore-probe are the only
+  // things that shell out to git in this file (grep-confirmed) -- but the candidateRoots
+  // probe sits behind `if (!pcRoots.ok)`, so an unreachable git never lets it run in the
+  // first place; pointing PATH at an EMPTY directory makes both of the FIRST two unreachable,
+  // which is exactly the
   // condition this test exists to exercise, without touching anything else the gate checks.
   //
   // A NAME-FILTER on the real PATH's entries (`.filter(p => !/git/i.test(p))`) was tried
@@ -57,6 +60,12 @@ test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when
 });
 
 test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still FAILs a citation into a non-hidden gitignored dir', () => {
+  // `checkPointers` is generic over WHERE `ignoredRoots` came from -- CWK-079 replaced
+  // verify.mjs's own SOURCE for the pointer gate (disk-derived here -> citation-derived
+  // there), but this test still targets a real, load-bearing property of `deriveRootSets`
+  // itself (kept for its own tested invariants, see derive-roots.mjs's own header), not a
+  // claim about what the pointer gate currently feeds it.
+  //
   // CWK-078 RED: the previous version of this test cited a scratchpad path against THIS
   // repo's own real tree, which only has gitignored top-level entries on a machine that has
   // actually accumulated this room's local-only tooling state. A fresh clone or CI checkout
@@ -85,6 +94,71 @@ test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still
     });
     assert.equal(findings.length, 1);
     assert.match(findings[0].msg, /gitignored `ignored-dir\//);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is still CHECKED once another path-shaped citation shares the root -- discovery and judgement are different questions', () => {
+  // `looksPathShaped()` gates DISCOVERY only -- which roots verify.mjs's own candidateRoots
+  // derivation feeds to `git check-ignore` -- never JUDGEMENT: `checkPointers`' own
+  // `ignoredRoots.has(first)` branch judges every token reaching it regardless of shape. So
+  // a shape-rejected token (an extensionless path, no trailing slash) is NOT exempt from the
+  // check -- it is exempt only from CONTRIBUTING ITS OWN ROOT to the set the check runs
+  // against. Proven with a two-plant pair, mirroring verify.mjs's OWN derivation loop
+  // (candidateRoots -> one batched `git check-ignore --stdin` call -> ignoredRoots) against
+  // a real throwaway git repo, never a hardcoded literal.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk079-nonlocal-'));
+  try {
+    execFileSync('git', ['init', '--quiet'], { cwd: dir });
+    fs.writeFileSync(path.join(dir, '.gitignore'), 'throwaway-build/\n');
+    fs.mkdirSync(path.join(dir, 'throwaway-build'));
+
+    function deriveIgnoredRoots(surfaces) {
+      const candidateRoots = new Set();
+      for (const s of surfaces) {
+        for (const tok of pointerCandidates(s.text)) {
+          if (looksPathShaped(tok)) candidateRoots.add(tok.split('/')[0]);
+        }
+      }
+      const ignoredRoots = new Set();
+      if (candidateRoots.size) {
+        const ci = spawnSync('git', ['check-ignore', '--stdin'],
+          { cwd: dir, encoding: 'utf8', input: [...candidateRoots].map((n) => n + '/').join('\n') + '\n' });
+        if (!ci.error && typeof ci.stdout === 'string') {
+          for (const line of ci.stdout.split('\n')) {
+            const t = line.trim();
+            if (t) ignoredRoots.add(t.replace(/\/$/, ''));
+          }
+        }
+      }
+      return ignoredRoots;
+    }
+
+    // PLANT A alone: an extensionless citation under the gitignored root. Shape-rejected at
+    // discovery -- it can never itself put `throwaway-build` into `ignoredRoots`.
+    const surfacesAlone = [{ label: 'a', text: 'Notes: `throwaway-build/notes`.' }];
+    const ignoredAlone = deriveIgnoredRoots(surfacesAlone);
+    assert.equal(ignoredAlone.has('throwaway-build'), false,
+      'an extensionless citation alone must never discover its own root');
+    const findingsAlone = checkPointers({ surfaces: surfacesAlone, ourRoots: new Set(), ignoredRoots: ignoredAlone, resolve: () => 'missing' });
+    assert.equal(findingsAlone.length, 0, 'plant A alone must stay silent -- its root was never discovered');
+
+    // PLANT B, same tree, a SECOND, path-shaped citation under the SAME root. This one alone
+    // is enough to discover the root -- and once discovered, `checkPointers` judges EVERY
+    // token sharing that root, including plant A's.
+    const surfacesBoth = [
+      { label: 'a', text: 'Notes: `throwaway-build/notes`.' },
+      { label: 'b', text: 'Reference: `throwaway-build/readme.md`.' },
+    ];
+    const ignoredBoth = deriveIgnoredRoots(surfacesBoth);
+    assert.equal(ignoredBoth.has('throwaway-build'), true, 'the path-shaped citation must discover the root');
+    const findingsBoth = checkPointers({ surfaces: surfacesBoth, ourRoots: new Set(), ignoredRoots: ignoredBoth, resolve: () => 'missing' });
+    assert.equal(findingsBoth.length, 2, JSON.stringify(findingsBoth));
+    const findA = findingsBoth.find((f) => f.msg.includes('notes'));
+    const findB = findingsBoth.find((f) => f.msg.includes('readme'));
+    assert.match(findA.msg, /gitignored/, 'plant A must now FAIL -- it was never exempt from the check, only from discovering its own root');
+    assert.match(findB.msg, /gitignored/, 'plant B, the citation that discovered the root, must FAIL too');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -3,7 +3,7 @@
 // whole contract is a pure function over strings and a resolver it is handed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkPointers, pointerCandidates } from './pointer-check.mjs';
+import { checkPointers, pointerCandidates, looksPathShaped } from './pointer-check.mjs';
 
 const OUR_ROOTS = new Set(['scripts', 'skills']);
 const IGNORED_ROOTS = new Set(['scratchpad', 'AGENTS.md']);
@@ -395,4 +395,39 @@ test('MEDIUM-3: the dot-dir root probe is memoized -- resolve() is called at mos
   assert.deepEqual(dc.rootsAdmitted, ['.claude-plugin'], JSON.stringify(dc));
   assert.equal(dc.citationsCited, 2, JSON.stringify(dc));      // the two .claude-plugin file citations
   assert.equal(dc.citationsChecked, 2, JSON.stringify(dc));    // neither surface is historyOnly
+});
+
+// looksPathShaped (CWK-079) -- feeds ONLY verify.mjs's ignore-probe candidate-root
+// derivation, never checkPointers' own judgement. Exhibits are this room's own, measured
+// against the real gate's own surface walk: an arithmetic ratio, two rule-force words, a
+// lens-name pair, a CI class label, and a model-tier list all reach the ignore-probe's
+// first-segment derivation with no path in them at all.
+test('looksPathShaped rejects this room\'s own non-path exhibits', () => {
+  for (const tok of ['chars/4', 'prefer/should', 'sub4/observer', 'js/unused-local-variable', 'haiku/sonnet/opus/fable', '0.01/KLOC']) {
+    assert.equal(looksPathShaped(tok), false, `${tok} is not a path and must not reach the probe`);
+  }
+});
+
+test('looksPathShaped accepts a filename-shaped path, incl. one with a :line ref', () => {
+  for (const tok of ['scripts/lib/pointer-check.mjs', 'docs/x.md:12', 'commands/stats.md:12']) {
+    assert.equal(looksPathShaped(tok), true, `${tok} is filename-shaped and must still reach the probe`);
+  }
+});
+
+test('looksPathShaped accepts an explicit trailing-slash directory reference', () => {
+  for (const tok of ['scripts/lib/', 'skills/coalboard/references/']) {
+    assert.equal(looksPathShaped(tok), true, `${tok} ends in / and must still reach the probe`);
+  }
+});
+
+// THE RESIDUE, both directions, pinned so a future edit cannot silently narrow or widen it
+// without this test noticing -- named, not hidden, per pointer-check.mjs's own comment.
+test('looksPathShaped residue: a trailing-slash token is accepted with no check on what precedes it', () => {
+  assert.equal(looksPathShaped('os.tmpdir()/coalboard/'), true,
+    'a function call ending in / still passes -- harmless in practice, named as residue');
+});
+
+test('looksPathShaped residue: an extensionless real path with no trailing slash is discovery-excluded', () => {
+  assert.equal(looksPathShaped('scripts/lib'), false,
+    'reverts to the OLD silent-discovery miss for this one shape -- non-local judgement (below) still covers it');
 });
