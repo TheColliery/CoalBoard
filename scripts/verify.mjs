@@ -384,7 +384,9 @@ if (!pcRoots.ok) {
   // `dist/build.js`, say) now probes `dist` against OUR `.gitignore`, and if a future
   // pattern of ours happens to share that name, the citation FAILs as "not reachable from a
   // clone" although it was never ours to be wrong about. Measured POPULATION on THIS tree
-  // today: ZERO (28 shape-qualified first segments, 0 gitignored) -- but population is not
+  // today: ZERO (26 shape-qualified first segments, 0 gitignored -- CWK-090's own `.`/`..`
+  // exclusion below dropped this from 28; re-derive live, never quote forward) -- but
+  // population is not
   // EXPOSURE: population measures today's already-green tree, exposure measures how close
   // it sits to the class firing. Measured directly by appending one ordinary directory name
   // to `.gitignore` (an everyday word this room's own prose uses to describe the board's own
