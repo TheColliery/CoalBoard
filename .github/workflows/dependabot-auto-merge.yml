@@ -18,10 +18,12 @@ permissions:
 # .github/SKILL-REPO-PATTERN.md's concurrency: bullet, CoalWorks r29 ruling). The
 # test is ATOMICITY, not read-vs-write: enabling auto-merge (`gh pr merge --auto`)
 # is IDEMPOTENT WITHIN one PR's own group, so a cancelled run corrupts nothing --
-# the next push to that same PR simply re-enables it. A prior version of this
-# comment reasoned from the SHARED-group case (where cancelling could leave
-# auto-merge un-enabled with nobody watching); that reasoning never applies once
-# the key is scoped per-PR, and is retired here rather than restated. Per-PR
+# the next push to that same PR simply re-enables it. OUR prior comment (before
+# this ruling) already grouped per-PR but argued the flag should be FALSE to stop
+# "a newer run cancelling a merge attempt already in flight" -- that premise was
+# wrong: `--auto` only ENABLES a flag GitHub's own merge queue later acts on,
+# there is no merge in flight to interrupt, so a cancelled run leaves nothing
+# half-applied and the retired reasoning is corrected here, not restated. Per-PR
 # grouping, never per-ref: two different Dependabot PRs must not serialise behind
 # each other.
 concurrency:

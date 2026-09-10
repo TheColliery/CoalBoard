@@ -427,10 +427,14 @@ if (!pcRoots.ok) {
       // error) and FATALs the WHOLE BATCH, not just that one line. LIVE ON THIS TREE,
       // discovered by CWK-090 fix a making the fail-open silence loud: BOTH the pre-fix
       // bare feed and the post-fix probe feed already errored on this exact class before
-      // this exclusion was added -- the pre-fix code swallowed the fatal status as
-      // "nothing ignored" (this room's own signature class, live rather than hypothetical
-      // this time); the post-fix code correctly FAILed loud on it, which is what surfaced
-      // the gap.
+      // this exclusion was added -- but the pre-fix code did NOT degrade to "nothing
+      // ignored" (findings-back, INSPECT measured it by execution): `git check-ignore
+      // --stdin` STREAMS each match to stdout BEFORE it fatals, so the fail-open recorded
+      // a PARTIAL set, truncated at the fatal token's position in feed order -- on this
+      // tree the fatal `..` sat 26th of 28, with only one non-ignored root fed after it,
+      // so the truncated set happened to equal the correct one. A fail-open that degrades
+      // to the RIGHT ANSWER by accident, not a visible zero, is the more invisible failure
+      // -- the post-fix code correctly FAILs loud on it instead of trusting feed order.
       if (first === '.' || first === '..') continue;
       if (looksPathShaped(tok)) candidateRoots.add(first);
     }
@@ -441,15 +445,20 @@ if (!pcRoots.ok) {
   const PROBE_SUFFIX = '/.pointer-check-probe';
   // FAIL-OPEN, CLOSED (CWK-090 fix a). The pre-fix call here checked only `!ci.error` --
   // any OTHER non-0 status (128 included: a bad pattern, an unreadable `.gitignore`, a
-  // broken worktree) fell through to "read stdout", silently produced an empty
-  // `ignoredRoots`, and printed a git-derived count over a run that derived NO facts at
-  // all. That comment argued its own safety ("only a genuine spawn error here would mean
-  // otherwise, and none has been observed") -- this room's own recurring signature class,
-  // a defect's argument written as reassurance beside it. The classify-then-fail-or-record
-  // logic now lives in `applyCheckIgnoreProbe` (pointer-check.mjs), DI'd the same way
-  // `collectSurfaces` already is, so a unit test drives this EXACT branch with an injected
-  // `runCheckIgnore` -- never by mutating this call site, which a mutation-tested
-  // reviewer could otherwise flip with the whole suite staying green.
+  // broken worktree) fell through to "read stdout" and trusted whatever `git
+  // check-ignore --stdin` had ALREADY streamed before it fataled -- never empty, never
+  // "no facts at all" (findings-back, INSPECT measured it live on this tree's own
+  // pre-fix commit): a PARTIAL set, truncated at the fatal token's position in the
+  // batch's feed order, therefore FEED-ORDER-DEPENDENT -- one new citation moving a `.`
+  // or `..` earlier in iteration order silently drops a real gitignored root with the
+  // gate still green. That comment argued its own safety ("only a genuine spawn error
+  // here would mean otherwise, and none has been observed") -- this room's own
+  // recurring signature class, a defect's argument written as reassurance beside it. The
+  // classify-then-fail-or-record logic now lives in `applyCheckIgnoreProbe`
+  // (pointer-check.mjs), DI'd the same way `collectSurfaces` already is, so a unit test
+  // drives this EXACT branch with an injected `runCheckIgnore` -- never by mutating this
+  // call site, which a mutation-tested reviewer could otherwise flip with the whole
+  // suite staying green.
   check('pointer check: git check-ignore --stdin probe', () => {
     let msg = null;
     applyCheckIgnoreProbe({
