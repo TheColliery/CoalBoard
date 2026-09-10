@@ -26,6 +26,7 @@ import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
+const NL = String.fromCharCode(10);
 
 function runVerify(env) {
   return spawnSync(process.execPath, [verifyPath], { cwd: root, env: env ?? process.env, encoding: 'utf8' });
@@ -114,6 +115,10 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
     fs.writeFileSync(path.join(dir, '.gitignore'), 'throwaway-build/\n');
     fs.mkdirSync(path.join(dir, 'throwaway-build'));
 
+    // Mirrors verify.mjs's OWN derivation loop exactly, including the CWK-090 fix b
+    // injection-site feed (a path UNDER the root, not the bare root + '/') -- kept in
+    // sync with the real gate so this test's own claim to mirror it stays true.
+    const PROBE_SUFFIX = '/.pointer-check-probe';
     function deriveIgnoredRoots(surfaces) {
       const candidateRoots = new Set();
       for (const s of surfaces) {
@@ -124,11 +129,12 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
       const ignoredRoots = new Set();
       if (candidateRoots.size) {
         const ci = spawnSync('git', ['check-ignore', '--stdin'],
-          { cwd: dir, encoding: 'utf8', input: [...candidateRoots].map((n) => n + '/').join('\n') + '\n' });
-        if (!ci.error && typeof ci.stdout === 'string') {
+          { cwd: dir, encoding: 'utf8', input: [...candidateRoots].map((n) => n + PROBE_SUFFIX).join('\n') + '\n' });
+        if (!ci.error && ci.status !== 128 && typeof ci.stdout === 'string') {
           for (const line of ci.stdout.split('\n')) {
             const t = line.trim();
-            if (t) ignoredRoots.add(t.replace(/\/$/, ''));
+            if (!t) continue;
+            ignoredRoots.add(t.endsWith(PROBE_SUFFIX) ? t.slice(0, -PROBE_SUFFIX.length) : t.replace(/\/$/, ''));
           }
         }
       }
@@ -161,5 +167,76 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
     assert.match(findB.msg, /gitignored/, 'plant B, the citation that discovered the root, must FAIL too');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// CWK-090 fix b -- the bare `first + '/'` feed to `git check-ignore --stdin` can
+// FALSE-MATCH a NONEXISTENT, un-patterned root when the `.gitignore` carries a line
+// whose entire content is a lone stray CR (CoalFace's finding, ported via CoalMine).
+// INDEPENDENTLY RE-MEASURED on THIS box, not assumed: our real `.gitignore` carries zero
+// lone-CR lines today (checked: no live false-match on this tree), but a throwaway
+// fixture reproduces the class on this exact git binary (2.55.0.windows.5) -- see the
+// discriminating pair below, run at the git level first, then the real gate end-to-end.
+test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an absent root under the bare feed; the injection-site feed and the real gate are immune', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-pointer-lonecr-'));
+  try {
+    for (const d of ['scripts', 'skills', 'hooks', 'plugin', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
+      const src = path.join(root, d);
+      if (fs.existsSync(src)) fs.cpSync(src, path.join(tmp, d), { recursive: true });
+    }
+    for (const f of ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md', 'CHANGELOG.md', 'NOTICE']) {
+      fs.copyFileSync(path.join(root, f), path.join(tmp, f));
+    }
+    // A real pattern (this room's own already-gitignored scratchpad root, deliberately
+    // not backticked here -- the self-reference trap this file's own scanned-surface
+    // status makes real: a backticked example here would itself become a candidate)
+    // plus a lone-CR blank line -- the shape that false-matches. Written as raw bytes
+    // so the CR survives untouched through core.autocrlf's smudge filter.
+    fs.writeFileSync(path.join(tmp, '.gitignore'), Buffer.from('scratchpad/\r\n\r\n', 'binary'));
+    // A citation to a root that is ABSENT from disk and named by no pattern -- the
+    // shape that reproduces. Under the bug this would be swallowed into a FALSE
+    // "gitignored" FAIL instead of the silent out-of-scope skip it correctly gets.
+    fs.appendFileSync(path.join(tmp, 'commands', 'stats.md'),
+      NL + 'See `totally-fake-root/notes.md` for details.' + NL);
+
+    const git = (args) => {
+      const r = spawnSync('git', args, { cwd: tmp, encoding: 'utf8' });
+      if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr || r.error?.message}`);
+      return r.stdout;
+    };
+    git(['init', '-q', '-b', 'main']);
+    git(['config', 'user.email', 'test@test.invalid']);
+    git(['config', 'user.name', 'Test']);
+    git(['config', 'commit.gpgsign', 'false']);
+    git(['config', 'core.autocrlf', 'true']);
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'baseline']);
+    assert.ok(fs.readFileSync(path.join(tmp, '.gitignore'), 'utf8').includes('\r\n\r\n'),
+      'the working-tree .gitignore must actually carry the lone-CR blank line');
+    assert.ok(!fs.existsSync(path.join(tmp, 'totally-fake-root')),
+      'the probed root must be genuinely absent -- that absence is what the false match depends on');
+
+    // THE DISCRIMINATING PAIR, at the git level, on this exact fixture.
+    const bare = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, encoding: 'utf8', input: 'totally-fake-root/\n' });
+    assert.equal(bare.status, 0,
+      'RED: the bare feed must reproduce the false match on THIS fixture -- an absent, un-patterned root reported ignored');
+    const probed = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, encoding: 'utf8', input: 'totally-fake-root/.pointer-check-probe\n' });
+    assert.equal(probed.status, 1, 'the injection-site feed correctly reports the SAME root as NOT ignored');
+
+    // CONTROL: a genuinely-ignored root still matches under BOTH feeds -- the fix loses
+    // no true positive.
+    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, encoding: 'utf8', input: 'scratchpad/\n' }).status, 0);
+    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, encoding: 'utf8', input: 'scratchpad/.pointer-check-probe\n' }).status, 0);
+
+    // END-TO-END: the real gate, driven against this exact fixture, must still catch a
+    // genuine gitignored citation and must NOT false-FAIL the absent, un-patterned one.
+    fs.appendFileSync(path.join(tmp, 'commands', 'stats.md'), NL + 'Notes: `scratchpad/notes.md`.' + NL);
+    const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8' });
+    assert.match(r.stdout, /FAIL.*cites `scratchpad\/notes\.md`.*gitignored/,
+      'the real gate, driven end-to-end against the lone-CR fixture, must still catch the genuinely-ignored citation');
+    assert.doesNotMatch(r.stdout, /totally-fake-root/,
+      'the real gate must never false-FAIL the absent, un-patterned root under the lone-CR fixture');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

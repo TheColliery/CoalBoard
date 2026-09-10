@@ -1,7 +1,10 @@
 // CoalBoard rigor preset -> a partial-config bundle. Phoenix-pure, deterministic.
 // The preset sets DEFAULTS for the board knobs; an explicit .coalboard.json key ALWAYS
-// overrides the preset (preset = convenience, never a lock — DESIGN §11). "nasa" is the
-// strictest PRESET NAME (trust-nothing, human-signs-off), NOT a 10^-9 reliability claim.
+// overrides the preset (preset = convenience, never a lock — COALBOARD_BLUEPRINT.md Part A
+// §11, "Config — the selling point"; that file is GITIGNORED and repo-local, unreachable
+// from a clone or CI — cited here for the human maintainer reading source, not as a ship
+// claim a user can follow). "nasa" is the strictest PRESET NAME (trust-nothing,
+// human-signs-off), NOT a 10^-9 reliability claim.
 
 export const RIGOR_PRESETS = {
   // active: does the board engage on a critical task at all

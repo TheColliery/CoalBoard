@@ -1,7 +1,9 @@
 // CoalBoard AND-gate — the STATIC (Layer-1) detection seed.
 // Phoenix-pure: pure functions, no I/O, no network, no LLM. Deterministic.
 //
-// The full AND-gate is two layers (DESIGN §6):
+// The full AND-gate is two layers (COALBOARD_BLUEPRINT.md Part A §6, "Trigger & consent --
+// halt before the work, ask the user"; that file is GITIGNORED and repo-local, unreachable
+// from a clone or CI -- cited for the human maintainer reading source, not a ship claim):
 //   Layer 1 (here) — a deterministic static signal: a critical PATH fragment, a
 //     critical IMPORT name, or a critical KEYWORD appears in the text under review.
 //   Layer 2 — the SEMANTIC check ("is the INTENT severe?"). A fail-silent hook cannot

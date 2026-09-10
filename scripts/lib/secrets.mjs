@@ -1,5 +1,7 @@
 // CoalBoard secret-scrubber — redact credential patterns before ANY log / consent
-// display / post-mortem (DESIGN §8 gap: the debate history + diff may carry secrets).
+// display / post-mortem (COALBOARD_BLUEPRINT.md Part A §8, "Security & threat model" --
+// the debate history + diff may carry secrets; that file is GITIGNORED and repo-local,
+// unreachable from a clone or CI -- cited for the human maintainer, not a ship claim).
 // Phoenix-pure, deterministic. Conservative: over-redact rather than leak.
 // NOT a vault — a defense-in-depth filter on outbound text; it never guarantees a
 // secret is caught, so the staging sandbox + read-only workers remain the real boundary.

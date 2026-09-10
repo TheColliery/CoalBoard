@@ -9,7 +9,7 @@ import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schem
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
-import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer-check.mjs';
+import { checkPointers, pointerCandidates, looksPathShaped, DEFAULT_SURFACE_PLAN, collectSurfaces, applyCheckIgnoreProbe } from './lib/pointer-check.mjs';
 import { deriveRootSets } from './lib/derive-roots.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -281,39 +281,34 @@ if (ckHard.length === 0) {
 // there still FAILs. scripts/*.mjs + scripts/lib/*.mjs + hooks/*.js are scanned by their
 // // line-comment text only, never their code bodies (a code body's own backticked-looking
 // tokens inside a string are not a ship-text claim about this tree).
-function pcLineComments(text) {
+//
+// SURFACE PLAN, DATA (CWK-090 fix c) -- what this block used to build as five separate
+// array-literal/loop constructions is now DRIVEN from `DEFAULT_SURFACE_PLAN`
+// (pointer-check.mjs), one row per walked surface, each carrying its own `why`; that
+// module's own header has the deviation from CoalMine's shape (flat, never recursive
+// walks) and the reason. `io.walkMd`/`io.walkSrc` below are ONE LEVEL DEEP, matching
+// this room's pre-existing behaviour byte-for-byte -- see the SURFACE-IDENTITY proof in
+// this ticket's own return for the before/after measurement.
+function pcCommentLines(text) {
   return (text.match(/\/\/[^\n]*/g) || []).join('\n');
 }
-const pcRefsDir = path.join(root, 'skills', 'coalboard', 'references');
-const pcCommandsDir = path.join(root, 'commands');
-const pcSurfaces = [
-  { label: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(root, 'skills', 'coalboard', 'SKILL.md'), 'utf8') },
-  ...fs.readdirSync(pcRefsDir).filter((f) => f.endsWith('.md')).map((f) => {
-    const rel = path.join('skills', 'coalboard', 'references', f).replace(/\\/g, '/');
-    return { label: rel, text: fs.readFileSync(path.join(root, rel), 'utf8') };
-  }),
-  ...fs.readdirSync(pcCommandsDir).filter((f) => f.endsWith('.md')).map((f) => {
-    const rel = path.join('commands', f).replace(/\\/g, '/');
-    return { label: rel, text: fs.readFileSync(path.join(root, rel), 'utf8') };
-  }),
-  ...['README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'PRIVACY.md', 'NOTICE'].map((f) => ({
-    label: f, text: fs.readFileSync(path.join(root, f), 'utf8'),
-  })),
-  {
-    label: 'CHANGELOG.md',
-    text: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'),
-    historyOnly: true,
-  },
-];
-for (const dir of ['scripts', 'scripts/lib', 'hooks']) {
-  const abs = path.join(root, dir);
-  if (!fs.existsSync(abs)) continue;
-  for (const f of fs.readdirSync(abs)) {
-    if (!f.endsWith('.mjs') && !f.endsWith('.js')) continue;
-    const rel = path.join(dir, f).replace(/\\/g, '/');
-    pcSurfaces.push({ label: rel, text: pcLineComments(fs.readFileSync(path.join(root, rel), 'utf8')) });
-  }
+function pcWalkMd(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => path.join(dir, f));
 }
+function pcWalkSrc(dir, keep) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(keep).map((f) => path.join(dir, f));
+}
+function pcRead(p) {
+  try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
+}
+function pcRel(p) {
+  return path.relative(root, p).replace(/\\/g, '/');
+}
+const pcSurfaces = collectSurfaces(root, DEFAULT_SURFACE_PLAN, {
+  join: path.join, walkMd: pcWalkMd, walkSrc: pcWalkSrc, read: pcRead, rel: pcRel, commentLines: pcCommentLines,
+});
 // ROOT-SET DERIVATION (CWK-078): the two rosters above USED TO BE frozen literals -- correct
 // today (verified 7-for-7 against a full re-enumeration before this change), but a snapshot
 // cannot track `.gitignore`; the day an entry is added there, a citation into it is dropped
@@ -357,11 +352,27 @@ if (!pcRoots.ok) {
   // answers for an ABSENT path exactly as it would for a present one -- the PATTERN is what
   // matters, never the directory listing.
   //
-  // TRAILING SLASH: `looksPathShaped()` (this module) shape-qualifies each candidate before
-  // its first segment is fed here, and every shape it accepts either already ends in `/` or
-  // names a real filename -- feed `first + '/'` regardless, since a `dir/`-anchored
-  // `.gitignore` pattern does not match the bare name given without it (git cannot infer
-  // that an absent path is a directory).
+  // TRAILING SLASH -> INJECTION-SITE PROBE (CWK-090 fix b, ported from CoalFace's finding
+  // via CoalMine). `looksPathShaped()` (this module) shape-qualifies each candidate before
+  // its first segment is fed here; git cannot infer that an ABSENT path is a directory, so
+  // a bare root name is never the right feed for a query that means "is this directory
+  // ignored" -- something must be appended. The bare feed used here before this fix, the
+  // root name with a bare trailing slash appended, can FALSE-MATCH a NONEXISTENT,
+  // un-patterned root when the `.gitignore` carries a line whose entire content is a lone
+  // stray CR (a "blank" line git's own pattern matcher still treats as a wildcard match)
+  // -- CoalFace's finding, reproduced at scale (26 bogus FAILs across 8 roots on first
+  // wiring). INDEPENDENTLY RE-MEASURED on THIS tree, not assumed from CoalMine's own
+  // number even though it shares this box/git version (2.55.0.windows.5): our real
+  // `.gitignore` carries zero lone-CR lines today, so there is no LIVE false-match here --
+  // but a throwaway fixture (a real ignore pattern plus one lone-CR line, with
+  // `core.autocrlf=true` set) reproduces the class on this exact git binary: a bare
+  // trailing-slash feed for an absent, un-patterned root returns exit 0 (a false match),
+  // while the same root probed via the injection-site suffix correctly returns exit 1.
+  // The fix is therefore correct on the CLASS regardless of today's population, not a
+  // patch for a live bug. Feeding `first + PROBE_SUFFIX` -- a path UNDER the root --
+  // carries the identical "is this a directory" information without ever matching the
+  // bare-root lone-CR shape; each returned line has the fixed suffix stripped to recover
+  // the root.
   //
   // BATCHED, one process for every distinct shape-qualified first segment actually cited,
   // never one spawn per candidate.
@@ -404,23 +415,50 @@ if (!pcRoots.ok) {
     for (const tok of pointerCandidates(s.text)) {
       const first = tok.split('/')[0];
       rootsCitedRaw.add(first);
+      // A bare `.`/`..` FIRST SEGMENT (a leading relative-path marker of the exact common
+      // comment-convention shape pointer-check.mjs's own BLIND SPOT 6 names -- real,
+      // path-shaped examples of it live on this tree today, deliberately not backticked
+      // here, the same self-reference trap blind spots 3/4 already avoid) is never a
+      // probeable root -- the same exclusion `checkPointers`' own `isDotDir` test already
+      // applies at judgement time, needed HERE too because `git check-ignore --stdin`
+      // treats such a token as a path escaping the repo (a fatal "outside repository"
+      // error) and FATALs the WHOLE BATCH, not just that one line. LIVE ON THIS TREE,
+      // discovered by CWK-090 fix a making the fail-open silence loud: BOTH the pre-fix
+      // bare feed and the post-fix probe feed already errored on this exact class before
+      // this exclusion was added -- the pre-fix code swallowed the fatal status as
+      // "nothing ignored" (this room's own signature class, live rather than hypothetical
+      // this time); the post-fix code correctly FAILed loud on it, which is what surfaced
+      // the gap.
+      if (first === '.' || first === '..') continue;
       if (looksPathShaped(tok)) candidateRoots.add(first);
     }
   }
   const ignoredRoots = new Set();
-  if (candidateRoots.size) {
-    const ci = spawnSync('git', ['check-ignore', '--stdin'],
-      { cwd: root, encoding: 'utf8', input: [...candidateRoots].map((n) => n + '/').join('\n') + '\n' });
-    // Exit 1 means none of the fed patterns are ignored -- not an error. Git itself was
-    // already proven reachable by the ourRoots derivation this whole block is gated on, so
-    // only a genuine spawn error here would mean otherwise, and none has been observed.
-    if (!ci.error && typeof ci.stdout === 'string') {
-      for (const line of ci.stdout.split('\n')) {
-        const t = line.trim();
-        if (t) ignoredRoots.add(t.replace(/\/$/, ''));
-      }
-    }
-  }
+  // PROBE SUFFIX (CWK-090 fix b): a path UNDER the root, not the bare root -- see the
+  // TRAILING SLASH comment above for why the bare-root feed is retired.
+  const PROBE_SUFFIX = '/.pointer-check-probe';
+  // FAIL-OPEN, CLOSED (CWK-090 fix a). The pre-fix call here checked only `!ci.error` --
+  // any OTHER non-0 status (128 included: a bad pattern, an unreadable `.gitignore`, a
+  // broken worktree) fell through to "read stdout", silently produced an empty
+  // `ignoredRoots`, and printed a git-derived count over a run that derived NO facts at
+  // all. That comment argued its own safety ("only a genuine spawn error here would mean
+  // otherwise, and none has been observed") -- this room's own recurring signature class,
+  // a defect's argument written as reassurance beside it. The classify-then-fail-or-record
+  // logic now lives in `applyCheckIgnoreProbe` (pointer-check.mjs), DI'd the same way
+  // `collectSurfaces` already is, so a unit test drives this EXACT branch with an injected
+  // `runCheckIgnore` -- never by mutating this call site, which a mutation-tested
+  // reviewer could otherwise flip with the whole suite staying green.
+  check('pointer check: git check-ignore --stdin probe', () => {
+    let msg = null;
+    applyCheckIgnoreProbe({
+      toProbe: [...candidateRoots],
+      PROBE_SUFFIX,
+      ignoredRoots,
+      fail: (m) => { msg = m; },
+      runCheckIgnore: (input) => spawnSync('git', ['check-ignore', '--stdin'], { cwd: root, encoding: 'utf8', input }),
+    });
+    return msg;
+  });
   console.log(`  --   gitignored-root citations: ${rootsCitedRaw.size} distinct first segment(s) cited, ${candidateRoots.size} shape-qualified and probed through one git check-ignore call -- ${ignoredRoots.size} gitignored`);
 
   const pcFindings = checkPointers({

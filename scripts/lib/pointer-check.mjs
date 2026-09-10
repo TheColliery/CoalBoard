@@ -225,8 +225,100 @@
 //
 // ============================================================================
 // ADOPTER CONTRACT -- DATA, never LOGIC. Nothing below hardcodes CoalMine's or any other
-// room's layout. A room supplies: its own surfaces (walked), its own ourRoots and
-// ignoredRoots (derived from ITS tree), its own resolve(), and its own pending list.
+// room's layout. A room supplies: its own surfaces (walked -- `DEFAULT_SURFACE_PLAN`
+// below is THIS room's own declaration of that supply, not a hardcoded fact about every
+// room), its own ourRoots and ignoredRoots (derived from ITS tree), its own resolve(),
+// and its own pending list.
+
+// SURFACE PLAN, DECLARED (CWK-090 fix c, ported from CoalMine's DEFAULT_SURFACE_PLAN /
+// collectSurfaces -- CoalHearth's finding, ported through them: "scripts/ comments are a
+// walked surface" was CODE here (`verify.mjs`'s own three-loop construction), not data, so
+// an adopter had to READ the driver to know what it walks. Now it is DATA, one row per
+// walked surface, each carrying its own `why`.
+//
+// THE NARROWING FORM, one sentence an adopter copies rather than guesses: a room that
+// walks fewer surfaces DELETES the row and states its reason in the row's own `why`,
+// never by editing `collectSurfaces` or leaving the row in place unused.
+//
+// DEVIATION FROM COALMINE, NAMED: CoalMine's own `walkMd`/`walkSrc` RECURSE into
+// subdirectories, so a single `scripts` row there also reaches `scripts/lib`. Ours does
+// NOT -- `collectSurfaces`'s own `io.walkMd`/`io.walkSrc` (wired in verify.mjs) are FLAT,
+// one directory level only, matching this room's PRE-EXISTING behaviour byte-for-byte:
+// the three-loop original scanned `scripts`, `scripts/lib`, and `hooks` as three
+// SEPARATE, non-recursive listings (a bare `lib` directory entry never matched the
+// `.mjs`/`.js` filter, so `scripts`'s own listing never reached its `lib/` child).
+// Recursing here would silently DOUBLE the surface count for every `scripts/lib/*.mjs`
+// file (once via a recursive `scripts` row, once via the separate `scripts/lib` row) --
+// kept flat so the surface-IDENTITY proof this fix is measured against (CWK-090's own
+// done-criterion: the pre-fix and post-fix gates must walk the same surfaces and produce
+// the same counts) holds EXACTLY, not approximately.
+//
+// `kind` is one of three -- narrower than CoalMine's four (no `hash-comments`/`.githooks`
+// row exists here today; a room that never walks a `#`-comment surface has nothing to
+// declare for it, not a gap to fill for symmetry): `raw` (a single file's whole text, no
+// `dir`) · `md` (a directory of markdown files, ONE LEVEL, whole text) · `comments` (a
+// directory walk, ONE LEVEL, `//`/`*`-prefixed lines only, ext-filtered). `dir: true`
+// means `root` is a directory to walk; its absence means `root` is one exact file.
+// `historyOnly: true` marks a surface `checkPointers` binds to the gitignored-root case
+// only, never the ordinary resolve check (CHANGELOG.md -- published history is never
+// fixed forward).
+export const DEFAULT_SURFACE_PLAN = [
+  { kind: 'raw', root: 'skills/coalboard/SKILL.md',
+    why: 'the debate contract every lens and the judge follow -- ship-text a user reads' },
+  { kind: 'md', root: 'skills/coalboard/references', dir: true,
+    why: 'the deep-detail surfaces SKILL.md defers to -- ship-text a user reads' },
+  { kind: 'md', root: 'commands', dir: true,
+    why: 'command docs are ship-text a user reads' },
+  { kind: 'raw', root: 'README.md',
+    why: 'the front door -- every install/config claim starts here' },
+  { kind: 'raw', root: 'SECURITY.md',
+    why: 'the disclosure surface, and it cites internal paths (e.g. a hook line ref)' },
+  { kind: 'raw', root: 'CONTRIBUTING.md',
+    why: 'the dev-facing surface, and it cites internal paths' },
+  { kind: 'raw', root: 'PRIVACY.md',
+    why: 'the privacy surface, and it cites internal paths' },
+  { kind: 'raw', root: 'NOTICE',
+    why: 'names no path today, but the enumerated-file roster stays complete rather than silently narrower than what verify.mjs actually reads' },
+  { kind: 'raw', root: 'CHANGELOG.md', historyOnly: true,
+    why: 'published history is never fixed forward -- a path correct when the entry was written is not a defect now, but a gitignored citation was never correct on any day' },
+  { kind: 'comments', root: 'scripts', dir: true, ext: /\.(mjs|js)$/,
+    why: 'a path inside CODE is exercised by the tests; a path inside a COMMENT is exercised by nothing at all' },
+  { kind: 'comments', root: 'scripts/lib', dir: true, ext: /\.(mjs|js)$/,
+    why: 'same class as the scripts/ row, lib/ side -- its OWN row because this room\'s walk is flat, never recursive (see the DEVIATION note above)' },
+  { kind: 'comments', root: 'hooks', dir: true, ext: /\.(mjs|js)$/,
+    why: 'same class as the scripts/ row, hooks/ side' },
+];
+
+// COLLECT -- plan-driven, DI'd fs so this module stays pure (it imports nothing today and
+// must not start). `io.join`/`io.walkMd`/`io.walkSrc`/`io.read`/`io.rel` are the SAME
+// filesystem primitives the caller already owns; `io.commentLines` is the comment-line
+// filter. `io.walkMd(dir)` returns absolute `.md` paths ONE LEVEL DEEP; `io.walkSrc(dir,
+// keep)` returns absolute paths, one level deep, whose basename passes `keep(name)`.
+// Runs the plan in ORDER, so a room's own surface count/order is exactly its plan's --
+// no hidden reordering.
+export function collectSurfaces(repo, plan, io) {
+  const surfaces = [];
+  for (const row of plan) {
+    if (row.dir) {
+      const abs = io.join(repo, row.root);
+      if (row.kind === 'md') {
+        for (const f of io.walkMd(abs)) surfaces.push({ label: io.rel(f), text: io.read(f) });
+      } else {
+        const keep = row.ext ? (n) => row.ext.test(n) : () => true;
+        for (const f of io.walkSrc(abs, keep)) {
+          const src = io.read(f);
+          const text = row.kind === 'comments' && src !== null ? io.commentLines(src) : src;
+          surfaces.push({ label: io.rel(f), text });
+        }
+      }
+    } else {
+      const s = { label: row.root, text: io.read(io.join(repo, row.root)) };
+      if (row.historyOnly) s.historyOnly = true;
+      surfaces.push(s);
+    }
+  }
+  return surfaces;
+}
 
 // A path this room deliberately points at BEFORE it exists. Ships EMPTY: at build time all
 // 43 in-scope resolving pointers were already real, so nothing needed a declaration. The
@@ -237,6 +329,79 @@
 export const PENDING_POINTERS = [
   // { path: 'scripts/lib/thing.mjs', reason: 'CWK-000 -- landing next unit' },
 ];
+
+// CHECK-IGNORE CLASSIFIER (CWK-090 fix a), pure -- takes the exact shape a
+// `spawnSync('git', ['check-ignore', '--stdin'], {...})` result carries and answers ONE
+// question: did this run actually tell us anything? Exit 0 and exit 1 both SUCCEED (1 =
+// "none of the fed paths are ignored", not an error); a spawn error or any OTHER status
+// (128 included -- a bad pattern, an unreadable `.gitignore`, a broken worktree) means
+// the run answered NOTHING, and the caller must not treat an empty stdout as "zero
+// ignored". THE PRE-FIX SHAPE (this room's own, before CWK-090) checked only `!ci.error`
+// -- any non-0 status short of a spawn error fell through to "read stdout", silently
+// produced an empty `ignoredRoots`, and printed a git-derived count over a run that
+// derived no facts at all. That call site's own comment argued its safety ("only a
+// genuine spawn error here would mean otherwise, and none has been observed") -- this
+// room's own recurring signature class, an artefact's prose defending the defect it sits
+// beside.
+//
+// Exported and kept pure so this classification is unit-testable without a real git
+// child. Independently re-derived on THIS box (git 2.55.0.windows.5), never assumed from
+// CoalMine's own measurement even though it runs the same git version: no reliable way
+// was found to force `check-ignore --stdin` itself to a non-0/1 exit while `ls-files`
+// (verify.mjs's own pre-gate, same cwd) still succeeds -- a `.cmd` shim placed first on a
+// custom PATH was tried and never invoked (Node's `spawnSync('git', ...)` resolved
+// straight past it to the real `git.exe`, the identical platform/runtime discrepancy
+// CoalMine recorded on the same box). The one real non-0/1 exit reproduced (129, an
+// unknown option) needs a flag verify.mjs never passes -- it proves the branch is
+// reachable BY GIT, not that this room's own hardcoded call can be driven there today.
+export function classifyCheckIgnoreResult(ci) {
+  if (ci.error) {
+    return { ok: false, message: `git check-ignore --stdin failed to spawn: ${ci.error.message}` };
+  }
+  if (ci.status !== 0 && ci.status !== 1) {
+    const stderrLine = typeof ci.stderr === 'string' ? ci.stderr.split('\n')[0].trim() : '';
+    return {
+      ok: false,
+      message: `git check-ignore --stdin exited ${ci.status}${stderrLine ? ` -- ${stderrLine}` : ''} -- cannot tell which cited roots are gitignored`,
+    };
+  }
+  // NAMED BOUND -- exit 0 means at least one fed path matched, but a non-string or
+  // empty-of-content stdout here would still answer ok with zero recovered roots: git
+  // said something matched, this classifier would conclude nothing did. UNREACHABLE
+  // today: `encoding: 'utf8'` (verify.mjs's own spawnSync call) makes `ci.stdout` a
+  // string whenever the spawn itself did not error (caught above), and verify.mjs never
+  // passes `-q` (the one flag that pairs a silent, empty stdout with exit 0). A stated
+  // bound, not a guard -- adding a branch for a case nothing can reach is the
+  // over-hardening this room's own rules ban.
+  return { ok: true, stdout: typeof ci.stdout === 'string' ? ci.stdout : '' };
+}
+
+// APPLY the check-ignore probe's verdict onto `ignoredRoots`, or FAIL loudly. Built in
+// this DI shape PROACTIVELY, not after a bounce round -- CoalMine's own history shows
+// the naive inline `if (!verdict.ok) fail(...) else {...}` at the call site is
+// untestable-by-mutation: their reviewer mutated that one condition to `if (false)` and
+// their whole suite stayed byte-identically green, because nothing exercised the branch
+// outside the real gate's own run. Moving the classify-then-fail-or-record logic into
+// this exported function, the SAME DI shape `collectSurfaces(repo, plan, io)` already
+// uses for the surface walk, means a unit test drives the EXACT code verify.mjs runs,
+// with an injected `runCheckIgnore` in place of a real `spawnSync` -- no duplicate copy
+// to fall out of sync. `runCheckIgnore(input)` takes the newline-joined probe input and
+// returns the same `{status, stdout, stderr, error}` shape a real `spawnSync` result
+// carries.
+export function applyCheckIgnoreProbe({ toProbe, PROBE_SUFFIX, ignoredRoots, fail, runCheckIgnore }) {
+  if (!toProbe.length) return;
+  const ci = runCheckIgnore(toProbe.map((n) => n + PROBE_SUFFIX).join('\n') + '\n');
+  const verdict = classifyCheckIgnoreResult(ci);
+  if (!verdict.ok) {
+    fail(verdict.message);
+    return;
+  }
+  for (const line of verdict.stdout.split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    ignoredRoots.add(t.endsWith(PROBE_SUFFIX) ? t.slice(0, -PROBE_SUFFIX.length) : t.replace(/\/$/, ''));
+  }
+}
 
 const GLOB = /[*?[\]{}|]/;
 const OUTSIDE = /^([~/]|[A-Za-z]:|[a-z][a-z0-9+.-]*:\/\/)/;
