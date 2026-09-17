@@ -146,6 +146,19 @@ test('CLI: exits 1 on a genuinely empty tracked-.md list -- CoalTipple HIGH-1 le
   assert.ok(res.stdout.includes('0 file(s) to scan'));
 });
 
+// r34 FIXBACK 1: the Write/Edit tool layer can silently convert a typed `\u0000`
+// escape into a literal 0x00 BYTE in source (this room's own recorded hazard,
+// edit-tool-converts-control-escapes) -- git then classifies the file BINARY and
+// hides every future diff. Pinned directly on the byte stream, not on behaviour.
+for (const f of ['scripts/lib/link-check.mjs', 'scripts/lib/link-check.test.mjs']) {
+  test(`${f}: contains zero literal NUL (0x00) bytes`, () => {
+    const buf = readFileSync(path.resolve(REPO_ROOT, f));
+    let count = 0;
+    for (let i = 0; i < buf.length; i++) if (buf[i] === 0) count++;
+    assert.equal(count, 0, `${f} has ${count} literal NUL byte(s) -- git will show it as binary`);
+  });
+}
+
 // Reading a shipped workflow file in a test is legitimate -- main's ruling for
 // CoalHearth (cited per the r34 order's own instruction to name the precedent).
 test('.github/workflows/link-check.yml: the engine step is real, no continue-on-error, and a non-empty-list guard exists', () => {
