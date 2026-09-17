@@ -20,7 +20,7 @@
 
 [Benchmark](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
-**Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/HetCreep/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing) · **[CoalHearth](https://github.com/TheColliery/CoalHearth)** (session warm-resume) · **[CoalFace](https://github.com/TheColliery/CoalFace)** (fan-out discipline) · **[CoalWash](https://github.com/TheColliery/CoalWash)** (memory defrag) · **[CoalLedger](https://github.com/TheColliery/CoalLedger)** (docs health).
+**Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/TheColliery/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing) · **[CoalHearth](https://github.com/TheColliery/CoalHearth)** (session warm-resume) · **[CoalFace](https://github.com/TheColliery/CoalFace)** (fan-out discipline) · **[CoalWash](https://github.com/TheColliery/CoalWash)** (memory defrag) · **[CoalLedger](https://github.com/TheColliery/CoalLedger)** (docs health).
 
 </div>
 
@@ -137,7 +137,7 @@ Full series matrix + the must-fail set: [Permission Matrix](https://github.com/T
 
 CoalBoard is the **consensus & debate board** of the mining series, alongside its six siblings:
 
-- [CoalMine](https://github.com/HetCreep/CoalMine) — quality canaries
+- [CoalMine](https://github.com/TheColliery/CoalMine) — quality canaries
 - [CoalTipple](https://github.com/TheColliery/CoalTipple) — model/effort routing
 - [CoalHearth](https://github.com/TheColliery/CoalHearth) — session warm-resume
 - [CoalFace](https://github.com/TheColliery/CoalFace) — fan-out discipline
