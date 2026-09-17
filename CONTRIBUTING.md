@@ -51,7 +51,7 @@ CoalBoard is **cross-agent** — it runs on any platform with concurrent subagen
 | Path | Purpose |
 |---|---|
 | `skills/coalboard/SKILL.md` | The board contract (the load-bearing prompt). |
-| `scripts/lib/` | Core logic: `config-schema`, `trigger` (AND-gate), `rigor` (preset), `secrets` (scrubber). |
+| `scripts/lib/` | Core logic: `config-schema`, `trigger` (AND-gate), `rigor` (preset), `secrets` (scrubber), `link-check` (repo-internal link/anchor gate). |
 | `scripts/` | Tool scripts: `build-plugin.mjs`, `verify.mjs`, `test.mjs`. |
 | `hooks/coalboard-conductor.js` | Phoenix-pure conductor hook (SessionStart + UserPromptSubmit). Auto-synced by the build. |
 | `plugin/` | Generated Claude Code plugin distribution. |
