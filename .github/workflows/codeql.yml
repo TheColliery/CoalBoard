@@ -12,7 +12,8 @@ permissions:
   contents: read
 
 # The ONE room-specific value in the CWK-058 change. DELIBERATELY WIDER than ci.yml's list and
-# the asymmetry is the point: CodeQL analyzes js/ts, so NO markdown anywhere needs a security
+# the asymmetry is the point: CodeQL now analyzes js/ts AND the workflow files (the `actions`
+# language, CWK-112 part 1, `init` step below), so NO markdown anywhere needs a security
 # scan -- while ci.yml must still run on a SHIPPED markdown artifact, because verify.mjs checks
 # dist-sync. Two different questions, two different exempt sets; collapsing them into one
 # shared list would be wrong for whichever workflow lost.
@@ -215,7 +216,7 @@ jobs:
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
         with:
-          languages: javascript-typescript
+          languages: javascript-typescript, actions
           queries: security-and-quality
       - id: analyze
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
