@@ -6,7 +6,7 @@
 // Exported pure pieces: slug, renderInline, anchorsFor, checkFile, Anchorer -- tests
 // import these directly. `main()` is guarded so importing this file never runs the CLI.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -267,7 +267,23 @@ export function main(argv = process.argv.slice(2)) {
   if (total > 0) process.exitCode = 1;
 }
 
-// Guard: importing this file (tests do) must never run the CLI.
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+// Guard: importing this file (tests do) must never run the CLI. node/runtime.md §4:
+// Node resolves import.meta.url to the file's REALPATH, but path.resolve(argv[1]) does
+// NOT follow a symlink/junction -- through a link the two differ and a bare compare
+// silently never runs main() (exit 0, no output, no signal anything is wrong). Both
+// sides go through fs.realpathSync.native; an unresolvable argv falls back to
+// not-main rather than crashing on import.
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    const invoked = realpathSync.native(process.argv[1]);
+    const self = realpathSync.native(fileURLToPath(import.meta.url));
+    return invoked === self;
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   main();
 }

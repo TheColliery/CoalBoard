@@ -43,8 +43,17 @@ jobs:
       # measured slug oracle. Unlike a wrapped engine whose own exit code is always 0,
       # this engine's CLI sets process.exitCode itself on any finding or an empty file
       # list -- so the bare invocation below IS the gate; no output-grep wrapper needed.
+      #
+      # r34 FIXBACK 2 LOW-1: `|| true` on the grep pipeline is LOAD-BEARING, not
+      # decoration. GitHub's default shell for a `run:` step is `bash -eo pipefail`, and
+      # `grep -v` exits 1 when every line is filtered out -- without `|| true`, `set -e`
+      # aborts the step AT THE PIPELINE, before the `if [ -z "$files" ]` guard below ever
+      # runs, so the ::error:: line this comment describes never prints (the step still
+      # exits 1, but silently). Two separate greps merged into one with two `-e`
+      # patterns for the same reason: a mid-pipeline grep can independently exit 1 the
+      # same way.
       - run: |
-          files=$(git ls-files '*.md' | grep -v '^plugin/' | grep -v '/fixtures/link-check/')
+          files=$(git ls-files '*.md' | grep -v -e '^plugin/' -e '/fixtures/link-check/' || true)
           if [ -z "$files" ]; then
             echo "::error::link-check found NO markdown files to scan -- the scope filter is broken, not the tree"
             exit 1
