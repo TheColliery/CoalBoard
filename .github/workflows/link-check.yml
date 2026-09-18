@@ -1,0 +1,61 @@
+name: link-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.md'
+
+permissions:
+  contents: read
+
+# cancel-in-progress: TRUE (CWK-058, canon: .github/SKILL-REPO-PATTERN.md) -- this
+# workflow reads files and publishes nothing, so a superseded run leaves nothing
+# half-done to clean up.
+concurrency:
+  group: link-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # FAILS CLOSED, stated precisely because a sibling copy of this shape says the
+      # opposite of its own code: an empty tracked-.md list is asserted and EXITS 1
+      # here, before the engine ever runs -- it is never read as "nothing to check,
+      # report green." scripts/lib/link-check.mjs's own CLI repeats this same
+      # fail-closed check when invoked with no args (its own walker mode), so the
+      # property holds whether this workflow or a human runs it directly.
+      #
+      # NOT continue-on-error -- a real gate on a tree that already passes (0 findings,
+      # verified before this workflow was written), not a report-only pass. A
+      # report-only link gate is the cry-wolf shape this campaign exists to ban.
+      #
+      # ENGINE: scripts/lib/link-check.mjs (r34, CW-017), built against CWK-098's
+      # measured slug oracle. Unlike a wrapped engine whose own exit code is always 0,
+      # this engine's CLI sets process.exitCode itself on any finding or an empty file
+      # list -- so the bare invocation below IS the gate; no output-grep wrapper needed.
+      #
+      # r34 FIXBACK 2 LOW-1: `|| true` on the grep pipeline is LOAD-BEARING, not
+      # decoration. GitHub's default shell for a `run:` step is `bash -eo pipefail`, and
+      # `grep -v` exits 1 when every line is filtered out -- without `|| true`, `set -e`
+      # aborts the step AT THE PIPELINE, before the `if [ -z "$files" ]` guard below ever
+      # runs, so the ::error:: line this comment describes never prints (the step still
+      # exits 1, but silently). Two separate greps merged into one with two `-e`
+      # patterns for the same reason: a mid-pipeline grep can independently exit 1 the
+      # same way.
+      - run: |
+          files=$(git ls-files '*.md' | grep -v -e '^plugin/' -e '/fixtures/link-check/' || true)
+          if [ -z "$files" ]; then
+            echo "::error::link-check found NO markdown files to scan -- the scope filter is broken, not the tree"
+            exit 1
+          fi
+          node scripts/lib/link-check.mjs $files

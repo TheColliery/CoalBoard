@@ -1,0 +1,242 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# The ONE room-specific value in the CWK-058 change: paths whose change genuinely needs no
+# verify/test run. Space-separated shell globs; an adopting room edits this line only.
+# NOTE the asymmetry with codeql.yml on purpose -- a SHIPPED markdown artifact
+# (skills/**/SKILL.md, commands/*.md) MUST run CI, because verify.mjs checks dist-sync.
+# Only these NON-shipped root docs are exempt. (NOTICE is deliberately NOT in this list --
+# that widening is CWK-065 DRIFT row 5.6, a separate ticket; this unit changes no room-specific
+# data beyond porting the existing paths-ignore list.)
+env:
+  DOCS_GLOBS: "README.md CHANGELOG.md CONTRIBUTING.md PRIVACY.md SECURITY.md LICENSE"
+
+# cancel-in-progress: TRUE -- ci.yml only reads, tests and compares; it publishes nothing and
+# touches no external state, so a superseded run has nothing to leave half-done.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # DOC-ONLY DETECTION (CWK-058). Moved here from the workflow-level `paths-ignore` that
+  # used to sit on `on:`. VERIFIED AT SOURCE why it had to move (GitHub's own docs,
+  # content/actions/how-tos/manage-workflow-runs/skip-workflow-runs.md): "If a workflow is
+  # skipped due to path filtering ... then checks associated with that workflow will remain
+  # in a 'Pending' state. A pull request that requires those checks to be successful will be
+  # blocked from merging." A required check that never fires is not a saved minute, it is a
+  # branch that can never merge without an owner bypass -- which is exactly the bypass line
+  # every push to this repo has been echoing.
+  #
+  # DOCS_GLOBS is the only room-specific value here: an adopting room edits this DATA and
+  # nothing else. It must mirror what this workflow's own analysis genuinely does not need.
+  changes:
+    # Named ci-changed-paths, not the generic changed-paths (CWK-058 findings-back LOW-2):
+    # codeql.yml's own classifier job emits the identical generic name today, which is
+    # harmless while neither is a required check but becomes a real collision the day either
+    # is added to a ruleset -- two check-runs on one commit sharing one name. Cheap to avoid
+    # now rather than disambiguate later.
+    name: ci-changed-paths
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+      files: ${{ steps.detect.outputs.files }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: detect
+        # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
+        # every step's shell -- no per-step re-declaration, which would be one more place to
+        # drift.
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `set -f` (noglob) is LOAD-BEARING, not hygiene. Without it, `for g in $DOCS_GLOBS`
+          # PATHNAME-EXPANDS the patterns against the checked-out tree before the loop runs, so
+          # `*.md` silently becomes "the .md files that happen to exist here" and the comparison
+          # is against filenames rather than patterns. `set -f` stops the EXPANSION while
+          # leaving `case` pattern matching intact, which is exactly the split we need. (An
+          # expansion bug here could only ever cause OVER-running, never a silent skip, because
+          # of the fail-safe polarity below -- which is the reason that polarity is chosen
+          # rather than merely preferred.)
+          set -f
+          # FAIL-SAFE POLARITY, and it is the whole safety argument: anything this step
+          # cannot determine counts as CODE, never as docs-only. A wrong "docs-only" skips a
+          # real analysis silently; a wrong "code" costs one cheap job. Never invert this.
+          #
+          # RUN-TIME RANDOM HEREDOC DELIMITER (CWK-074). A FIXED delimiter ("EOF") is forgeable:
+          # a diff containing a file literally named `EOF` terminates the `files<<EOF` block
+          # early, and the NEXT line of $changed then parses as a fresh top-level `key=value`
+          # pair -- a file named `code=false` overwrites the real classifier verdict with no
+          # code execution at all (a forged green with nothing run), and a file named
+          # `code=x$(...)` / `` code=x`...` `` makes outputs.code ATTACKER-CHOSEN TEXT. Proven
+          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real ci.yml:172
+          # consumer line, run in bash) -- see the CWK-074 commit message (82a9235) for the
+          # payload families and results; the harness itself is a gitignored scratch file, not
+          # a citable path.
+          #
+          # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
+          # someone will later "strengthen" a property that never came from here: $RANDOM is
+          # generated AFTER the attacker's filenames are already frozen in $changed, so $RANDOM
+          # not being a CSPRNG is irrelevant. An attacker cannot forge a value they cannot see
+          # in advance, however guessable that value's distribution is.
+          emit() {
+            local delim="cwk074_${GITHUB_RUN_ID:-0}_${RANDOM}${RANDOM}${RANDOM}_$$"
+            echo "code=$1" >> "$GITHUB_OUTPUT"
+            echo "files<<$delim" >> "$GITHUB_OUTPUT"
+            echo "${2:-}" >> "$GITHUB_OUTPUT"
+            echo "$delim" >> "$GITHUB_OUTPUT"
+          }
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "not a push event -- treating as code (fail-safe)"; emit true ""; exit 0
+          fi
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
+             || ! git rev-parse -q --verify "${before}^{commit}" >/dev/null 2>&1; then
+            echo "no usable base commit -- treating as code (fail-safe)"; emit true ""; exit 0
+          fi
+          changed="$(git diff --name-only "$before" "${{ github.sha }}" || true)"
+          if [ -z "$changed" ]; then
+            echo "empty diff -- treating as code (fail-safe)"; emit true ""; exit 0
+          fi
+          code=false
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            matched=false
+            for g in $DOCS_GLOBS; do
+              # shellcheck disable=SC2254
+              case "$f" in $g) matched=true; break ;; esac
+            done
+            if [ "$matched" = false ]; then code=true; fi
+          done <<< "$changed"
+          echo "changed files:"; echo "$changed"
+          echo "code=$code"
+          emit "$code" "$changed"
+  gate:
+    name: gate (${{ matrix.os }} · node ${{ matrix.node }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]  # supported LTS only (24 Active, 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+      # Zero-dependency: no install step. Run the same fail-loud gate as a local pre-push,
+      # cross-platform — verify (dist-sync + repo consistency checks) then the test suite.
+      # No build step here: rebuilding the dist in CI would mask a stale COMMITTED
+      # plugin/ — the exact drift verify exists to catch.
+      - run: node scripts/verify.mjs
+      - run: node scripts/test.mjs
+
+
+  # A single STABLE required-check context (the matrix names drift; this does not).
+  # Succeeds iff every matrix gate passed or was legitimately skipped; fails if any
+  # gate failed. Rulesets require `all-green`, never the per-matrix names.
+  all-green:
+    name: all-green
+    needs: [changes, gate]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # HONESTY STEP (CWK-058) -- this check now fires on EVERY push, including doc-only ones,
+      # so it must say which of THREE things happened. A reader landing on `all-green` in the
+      # UI must be able to tell "the suite ran and passed" from "there was nothing to run" from
+      # "the classifier itself failed", WITHOUT reading a commit message. Written to the job
+      # summary, not just the log.
+      #
+      # THREE branches, not two -- a two-branch summary (ran / nothing-to-run) LIES when the
+      # classifier itself fails: it would report "nothing to run" when the truth is that
+      # nothing could be determined. This branch refuses instead.
+      - name: what this check actually did
+        # MEDIUM-1 (CWK-058 findings-back): `files` is git-diff-derived, repository-controlled
+        # data -- a filename like `` `id` `` or `$(curl ...)` would be expanded INTO the script
+        # text before bash ever parses it if interpolated directly (the same
+        # `${{ github.event.* }}` script-injection class lens-prompts.md already names, applied
+        # to a needs.*.outputs.* value instead of an event field). Routed through env: so
+        # Actions hands it to the shell as DATA, in an environment variable, never as script
+        # text -- the same pattern codeql.yml's own `detect` step already uses for DOCS_GLOBS.
+        #
+        # CODE (CWK-074): the same routing, for the same reason, for `outputs.code`. The
+        # run-time random delimiter in `emit()` already closes today's forgery path (a diff
+        # filename can no longer overwrite this output), but an interpolated `${{ }}` consumer
+        # is a live sink the day anything else influences the value -- defence in depth, not
+        # a claim that this alone was the vulnerability. Proven end-to-end (3 of 4 payload
+        # families execute against this exact line's un-fixed form) -- see the CWK-074 commit
+        # message (82a9235) for the payload families and results.
+        env:
+          FILES: ${{ needs.changes.outputs.files }}
+          CODE: ${{ needs.changes.outputs.code }}
+        run: |
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            {
+              echo "### all-green: FAILED -- the path classifier did not run"
+              echo ""
+              echo "\`changed-paths\` finished as \`${{ needs.changes.result }}\`, so this job cannot"
+              echo "tell whether the suite was needed. It refuses rather than reporting either way."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "changes=${{ needs.changes.result }} -- refusing"
+            exit 1
+          fi
+          # LOW-1 (CWK-058 findings-back): `changes` can SUCCEED while emitting no verdict at
+          # all (code neither true nor false) -- reachability is low (emit() is unconditional
+          # on every path, and set -euo pipefail would fail the step first if the
+          # $GITHUB_OUTPUT write itself failed), but an unguarded fall-through would take the
+          # false branch below and report "NO SUITE RAN" as if a real classification had
+          # happened. Refuse instead of guessing.
+          case "$CODE" in
+            true|false) ;;
+            *) echo "classifier emitted no verdict -- refusing"; exit 1 ;;
+          esac
+          if [ "$CODE" = "true" ]; then
+            {
+              echo "### all-green: the suite RAN"
+              echo ""
+              echo "Code paths changed, so the full \`gate\` matrix executed (3 OS x 2 Node)."
+              echo "Result: \`${{ needs.gate.result }}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### all-green: NO SUITE RAN -- and this is not a passing analysis"
+              echo ""
+              echo "Every changed path is in this workflow's \`DOCS_GLOBS\` (non-shipped root docs),"
+              echo "so the \`gate\` matrix was deliberately skipped. **Nothing was verified or tested.**"
+              echo ""
+              echo "This check reports success so the branch ruleset that requires \`all-green\` is"
+              echo "satisfiable on a doc-only change. It is NOT a claim that any code was checked."
+              echo ""
+              echo "Changed paths:"
+              echo '```'
+              echo "$FILES"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: gate result
+        run: |
+          # `gate: skipped` is only a LEGITIMATE pass if the classifier that skipped it actually
+          # succeeded. With `if: always()`, a FAILED or cancelled `changes` job also leaves
+          # `gate` skipped -- which a naive case statement reads as "nothing to do" and reports
+          # GREEN, with neither a detection nor a test having run. That is the silent-pass class
+          # this whole change exists to remove, so `changes` is checked FIRST and explicitly.
+          echo "changes=${{ needs.changes.result }} gate=${{ needs.gate.result }}"
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            echo "changed-paths did not succeed -- refusing to vouch for a run it never classified"
+            exit 1
+          fi
+          case "${{ needs.gate.result }}" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
