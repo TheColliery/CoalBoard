@@ -16,3 +16,6 @@ skills-lock.json
 
 # Dispatch-artifact scratch dir (machine-local working notes, never shipped)
 scratchpad/
+
+# Generated local coverage output (lcov.info / cobertura.xml from the report-only coverage run)
+coverage/
