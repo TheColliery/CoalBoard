@@ -548,6 +548,50 @@ test('UMB-133 r2 MEDIUM-2: the migration notice names a path that, FOLLOWED, sti
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+// UMB-133 r3: the test above fixtured .claude ONLY and asserted only "never .claude inside .claude",
+// which is why an .agents/.gemini legacy hit surviving with a DIFFERENT wrong target (a .claude nested
+// inside the agent dir, rather than inside .claude) passed round 2 unnoticed. Two more cases, red-first
+// against cf8fcf9: an agent-dir holder must get README:118's exact form, and reach from <proj> -- not
+// just from <proj>/<holder> -- must improve (the old target was unreachable from <proj>; the new one
+// is <proj>/<holder>/coal/coalboard.json, a real candidate of level <proj> per AGENT_DIR_ORDER).
+test('UMB-133 r3 MEDIUM-2 coverage gap: an .agents/.gemini legacy hit names README:118\'s form, not .claude nested inside the agent dir', () => {
+  for (const holder of ['.agents', '.gemini']) {
+    const { home, proj } = mkProj();
+    try {
+      const holderDir = path.join(proj, holder);
+      fs.mkdirSync(holderDir, { recursive: true });
+      writeCfgRootLegacy(holderDir, SILENCE); // <proj>/<holder>/.coalboard.json -- root-legacy AT that level
+      const before = run({ hook_event_name: 'SessionStart' }, holderDir, home).stdout;
+      const m = /migrate to (\S.*?coalboard\.json)\./.exec(before);
+      assert.ok(m, `${holder}: a legacy hit must name its migration target; got: ${before}`);
+      const target = m[1];
+      const expected = path.join(holderDir, 'coal', 'coalboard.json');
+      assert.equal(target, expected, `${holder}: target must be README:118's form ${expected}, got ${target}`);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.renameSync(path.join(holderDir, '.coalboard.json'), target);
+      for (const cwd of [proj, holderDir]) {
+        const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, cwd, home);
+        assert.equal(r.stdout, '', `${holder}: after migrating to ${target}, the config must still be found from ${cwd}`);
+      }
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  }
+});
+
+test('UMB-133 r3: a plain non-agent dir keeps ITS current legacyTarget behaviour unchanged (a .claude nested inside it)', () => {
+  const { home, proj } = mkProj();
+  try {
+    const src = path.join(proj, 'src');
+    fs.mkdirSync(src, { recursive: true });
+    writeCfgRootLegacy(src, SILENCE); // <proj>/src/.coalboard.json -- root-legacy at that level, src is NOT an agent dir
+    const before = run({ hook_event_name: 'SessionStart' }, src, home).stdout;
+    const m = /migrate to (\S.*?coalboard\.json)\./.exec(before);
+    assert.ok(m, `plain dir: a legacy hit must name its migration target; got: ${before}`);
+    const target = m[1];
+    const expected = path.join(src, '.claude', 'coal', 'coalboard.json');
+    assert.equal(target, expected, `plain-dir behaviour must not regress: expected ${expected}, got ${target}`);
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 test('UMB-133 r2 cost: the near-miss sweep is paid on SessionStart ONLY -- no event that cannot emit stat-s a stray path', () => {
   const { home, proj } = mkProj();
   try {

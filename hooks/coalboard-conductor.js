@@ -183,9 +183,14 @@ const IGNORED_CAP = 3;
 // <r>/.claude -- building the target from that level named <r>/.claude/.claude/coal/coalboard.json, a path
 // no session outside .claude ever reads (measured: followed, the config was LOST). Both shapes resolve to
 // <r>/.claude/coal/coalboard.json, which is read from <r> AND from inside <r>/.claude.
+// UMB-133 r3: this is TRUE FOR ANY of the three names in AGENT_DIR_ORDER, not just .claude -- a legacy
+// file's dirname holding ".agents" or ".gemini" also has its OWN coal/coalboard.json candidate one
+// level in, and README:118 documents that as the replacement form. A .claude-only branch reads that
+// case as a PLAIN dir and nests .claude/coal/coalboard.json inside .agents/.gemini instead -- reachable
+// (measured, no loss), but a form README never names and only one directory level reads.
 function legacyTarget(file) {
   const d = path.dirname(file);
-  return path.basename(d) === '.claude' ? path.join(d, 'coal', 'coalboard.json') : path.join(d, '.claude', 'coal', 'coalboard.json');
+  return AGENT_DIR_ORDER.includes(path.basename(d)) ? path.join(d, 'coal', 'coalboard.json') : path.join(d, '.claude', 'coal', 'coalboard.json');
 }
 function cfgNotices(proj) {
   try {
