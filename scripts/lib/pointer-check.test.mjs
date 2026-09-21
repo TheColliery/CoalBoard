@@ -481,24 +481,83 @@ function preFixLogic(ci) {
   return ignored;
 }
 
-test('classifyCheckIgnoreResult: a REAL git check-ignore --stdin exit other than 0/1 (an unknown-option 129) is a FAIL, naming the status', () => {
+// UMB-133 r5 (CI run 35656824596, ubuntu/node 24 only, then re-owed since UMB-124): `git check-ignore
+// --stdin --bogus-flag` REJECTS the flag and can exit BEFORE draining stdin. Whether spawnSync's write of
+// the input reaches a live reader is a RACE, and it has TWO real terminal shapes, both reachable on a
+// supported platform:
+//   (status-only) git drained stdin or spawnSync finished writing first -> { status: 129, error: undefined }
+//   (error-set)   git exited first -> spawnSync's write fails (EPIPE on POSIX, EOF on Windows) ->
+//                 { error: <set>, status: 129 } -- MEASURED here: status is STILL 129 alongside the error,
+//                 not null, and classifyCheckIgnoreResult takes its spawn-error branch FIRST by design.
+// Both are non-0/1 runs the gate must fail closed on. The old test pinned only the first spelling
+// (/exited 129/), so it was a coin flip that only landed on the second shape under load. The invariant is
+// asserted below over BOTH shapes, keyed on WHICH one occurred (never an ||-regex that would also pass if the
+// classifier returned the WRONG branch), and each shape is FORCED by construction in its own test rather
+// than waited for. Nothing here skips, retries or tolerates a shape as "inconclusive".
+function assertFailClosedVerdict(ci) {
+  const verdict = classifyCheckIgnoreResult(ci);
+  assert.equal(verdict.ok, false, 'a non-0/1 real git run is a FAIL in BOTH terminal shapes -- this leg never branches');
+  if (ci.error) {
+    assert.ok(verdict.message.includes('failed to spawn: ' + ci.error.message),
+      'error-set shape: the message names the spawn error itself, got: ' + verdict.message);
+    assert.doesNotMatch(verdict.message, /exited/, 'error-set shape must take the spawn-error branch, not the exit-status one');
+  } else {
+    assert.match(verdict.message, new RegExp('exited ' + ci.status),
+      'status-only shape: the message names the exit status, got: ' + verdict.message);
+    assert.doesNotMatch(verdict.message, /failed to spawn/, 'status-only shape must take the exit-status branch, not the spawn-error one');
+  }
+  return verdict;
+}
+
+// RED, against the pre-fix logic, replayed on a REAL failing run. Only meaningful in the status-only shape:
+// preFixLogic gated on `!ci.error`, so in the error-set shape it returns [] for a reason that has nothing
+// to do with the bug. The status-only test below asserts that precondition explicitly.
+function assertPreFixFailedOpen(ci) {
+  assert.deepEqual([...preFixLogic(ci)], [],
+    'the pre-fix logic (only checking ci.error) silently produces an empty ignoredRoots on a real non-0/1 exit -- this IS the bug');
+}
+
+test('classifyCheckIgnoreResult: a REAL git check-ignore --stdin exit other than 0/1 (an unknown-option 129) is a FAIL -- whichever terminal shape the stdin race lands on', () => {
   const tmp = mkGitRepoForIgnoreProbe();
   try {
     const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
       { cwd: tmp, encoding: 'utf8', input: 'ignored-dir/probe\n' });
     assert.notEqual(ci.status, 0, 'this probe only proves anything if git actually took a non-0/1 exit');
     assert.notEqual(ci.status, 1, 'this probe only proves anything if git actually took a non-0/1 exit');
+    assertPreFixFailedOpen(ci);
+    assertFailClosedVerdict(ci); // the naturally racy run: either shape is legitimate, both are asserted
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
 
-    // RED, against the pre-fix logic, replayed on this real failing run: it answers
-    // "nothing is ignored" -- exactly the fail-open bug this fix closes, reproduced with
-    // a genuine git process rather than asserted from a synthetic object.
-    assert.deepEqual([...preFixLogic(ci)], [],
-      'the pre-fix logic (only checking ci.error) silently produces an empty ignoredRoots on a real non-0/1 exit -- this IS the bug');
+test('classifyCheckIgnoreResult: FORCED status-only shape (stdin not connected) -- exit 129 is a FAIL naming the status, and the pre-fix logic failed open on it', () => {
+  const tmp = mkGitRepoForIgnoreProbe();
+  try {
+    // stdio[0] = 'ignore': spawnSync never writes to git's stdin at all, so no EPIPE is possible.
+    const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
+      { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    assert.equal(ci.error, undefined, 'fixture precondition: this shape carries NO spawn error');
+    assert.equal(ci.status, 129, 'fixture precondition: git rejected the unknown option with 129');
+    assertPreFixFailedOpen(ci); // here the replay proves the ORIGINAL bug: no error to short-circuit it, yet nothing ignored
+    const verdict = assertFailClosedVerdict(ci);
+    assert.match(verdict.message, /exited 129/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
 
-    // GREEN, against the fix: the same real result is classified as a failure by name.
-    const verdict = classifyCheckIgnoreResult(ci);
-    assert.equal(verdict.ok, false);
-    assert.match(verdict.message, new RegExp(`exited ${ci.status}`));
+test('classifyCheckIgnoreResult: FORCED error-set shape (input far past the pipe buffer, git exits first) -- a spawn error is a FAIL naming that error', () => {
+  const tmp = mkGitRepoForIgnoreProbe();
+  try {
+    // ~4 MB of input against a git that rejects its flag and exits without reading: the write cannot complete
+    // into a pipe buffer orders of magnitude smaller, so the child closing its end surfaces as the spawn error
+    // (EPIPE on POSIX, EOF on Windows). A fixture failure to reach this shape is a LOUD failure, never a skip.
+    const big = ('x/' + 'a'.repeat(200) + '\n').repeat(20000);
+    const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
+      { cwd: tmp, encoding: 'utf8', input: big, maxBuffer: 1 << 26 });
+    assert.ok(ci.error, 'fixture precondition: a 4 MB write to a git that exited without reading must surface as a spawn error');
+    assertFailClosedVerdict(ci);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
