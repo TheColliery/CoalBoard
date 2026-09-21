@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.5.0] - 2026-09-22
 
 ### Added
 - **The repo-root project config `<project>/.coalboard.json` is now read (UMB-133).** Before this it was silently dead: the conductor's per-level walk stepped past it while nothing said so. The candidate list per level is now the canonical three (`.claude/coal/coalboard.json`, `.agents/coal/coalboard.json`, `.gemini/coal/coalboard.json`) then both legacy shapes, `.claude/.coalboard.json` first and `.coalboard.json` last; first existing file wins, nearest level wins, 40-level cap, stops at home — all unchanged, and there is still no repository-root resolve. The SessionStart line now also reports a legacy file it read (naming the canonical path to migrate to) and a near-miss config path it ignored (a fixed list of seven shapes of this skill's own config name, at the levels the walk already visits, at most three named plus a count). `scripts/configure.mjs` carries the same candidate list and now migrates the repo-root legacy file on write too.
