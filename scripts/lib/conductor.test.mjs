@@ -548,6 +548,21 @@ test('UMB-133 r2 MEDIUM-2: the migration notice names a path that, FOLLOWED, sti
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
 
+// UMB-133 r4: assert a hook-EMITTED path against a fixture-built one by IDENTITY, never by string.
+// The hook resolves cwd through physical() before building the target, so the emitted path can spell the
+// same directory differently from the raw mkdtemp path -- macOS /var vs /private/var (CI run 35654385662,
+// both r3 path tests RED there and nowhere else), a Windows 8.3 alias (RUNNER~1) the other way round.
+// So: strip the KNOWN relative tail off the emitted target, then compare the remaining ROOT through
+// realpathSync.native on BOTH sides (.native, not plain: plain leaves an 8.3 alias unexpanded, and the
+// hook's own physical() is the plain one, so resolving only the expected side with .native would move the
+// break to Windows). The tail is compared exactly, so this pins the whole path, not a substring.
+function assertTargetIs(target, root, rel, msg) {
+  let actualRoot = target;
+  for (let i = 0; i < rel.length; i++) actualRoot = path.dirname(actualRoot);
+  assert.equal(path.relative(actualRoot, target), path.join(...rel), `${msg}: exact tail; got ${target}`);
+  assert.equal(fs.realpathSync.native(actualRoot), fs.realpathSync.native(root), `${msg}: same root; got ${target}`);
+}
+
 // UMB-133 r3: the test above fixtured .claude ONLY and asserted only "never .claude inside .claude",
 // which is why an .agents/.gemini legacy hit surviving with a DIFFERENT wrong target (a .claude nested
 // inside the agent dir, rather than inside .claude) passed round 2 unnoticed. Two more cases, red-first
@@ -565,8 +580,7 @@ test('UMB-133 r3 MEDIUM-2 coverage gap: an .agents/.gemini legacy hit names READ
       const m = /migrate to (\S.*?coalboard\.json)\./.exec(before);
       assert.ok(m, `${holder}: a legacy hit must name its migration target; got: ${before}`);
       const target = m[1];
-      const expected = path.join(holderDir, 'coal', 'coalboard.json');
-      assert.equal(target, expected, `${holder}: target must be README:118's form ${expected}, got ${target}`);
+      assertTargetIs(target, holderDir, ['coal', 'coalboard.json'], `${holder}: target must be README:118's form <holder>/coal/coalboard.json`);
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.renameSync(path.join(holderDir, '.coalboard.json'), target);
       for (const cwd of [proj, holderDir]) {
@@ -587,8 +601,7 @@ test('UMB-133 r3: a plain non-agent dir keeps ITS current legacyTarget behaviour
     const m = /migrate to (\S.*?coalboard\.json)\./.exec(before);
     assert.ok(m, `plain dir: a legacy hit must name its migration target; got: ${before}`);
     const target = m[1];
-    const expected = path.join(src, '.claude', 'coal', 'coalboard.json');
-    assert.equal(target, expected, `plain-dir behaviour must not regress: expected ${expected}, got ${target}`);
+    assertTargetIs(target, src, ['.claude', 'coal', 'coalboard.json'], 'plain-dir behaviour must not regress: <src>/.claude/coal/coalboard.json');
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
 
