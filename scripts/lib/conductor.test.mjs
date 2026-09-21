@@ -363,7 +363,6 @@ const writeStray = (dir, rel, cfg) => {
   fs.writeFileSync(p, JSON.stringify(cfg));
 };
 const SILENCE = { coalboardMode: 'off', updateMode: 'off' };
-const CANONICAL_SHAPE = '.claude/coal/coalboard.json';
 
 test('UMB-133 proof 1/4 (GUARD, passes before and after): a config at <dir>/.claude/.coalboard.json is FOUND', () => {
   const { home, proj } = mkProj();
