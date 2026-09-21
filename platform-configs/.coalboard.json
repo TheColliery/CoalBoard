@@ -7,7 +7,7 @@
   // (no whack-a-mole token-bleed) + ZERO-BREAKAGE (work is staged, never touches live files until verified +
   // approved). It IMPROVES correctness; it does NOT claim a reliability number.
   //
-  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.claude/.coalboard.json (per-project,
+  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.claude/coal/coalboard.json (per-project,
   // overrides global). Absent = these defaults apply. The conductor + skill read the merged config.
 
   // ─── activation / trigger ───

@@ -4,6 +4,12 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+- **The repo-root project config `<project>/.coalboard.json` is now read (UMB-133).** Before this it was silently dead: the conductor's per-level walk stepped past it while nothing said so. The candidate list per level is now the canonical three (`.claude/coal/coalboard.json`, `.agents/coal/coalboard.json`, `.gemini/coal/coalboard.json`) then both legacy shapes, `.claude/.coalboard.json` first and `.coalboard.json` last; first existing file wins, nearest level wins, 40-level cap, stops at home — all unchanged, and there is still no repository-root resolve. The SessionStart line now also reports a legacy file it read (naming the canonical path to migrate to) and a near-miss config path it ignored (a fixed list of seven shapes of this skill's own config name, at the levels the walk already visits, at most three named plus a count). `scripts/configure.mjs` carries the same candidate list and now migrates the repo-root legacy file on write too.
+
+### Deprecated
+- **Both legacy project-config paths — `<project>/.claude/.coalboard.json` and `<project>/.coalboard.json` — are deprecated in favour of `.claude/coal/coalboard.json` (UMB-133).** Both are still read; nothing breaks. **Window:** deprecated in the release that carries this entry, removable no earlier than the next MAJOR release. **Owner:** this room. **Channel:** this section and the README Configure note only — not a runtime warning (Phoenix #13 bars a hook from emitting a deprecation notice); the SessionStart report of a legacy hit is a report of what was read, not the deprecation itself. To migrate, rename the file, or run `node scripts/configure.mjs` from a repo checkout with any key. The repo-root shape is deprecated in the same release that starts honouring it, so it was never a supported path before this. **Not deprecated:** the global `~/.claude/.coalboard.json`, a separate tier.
+
 ## [2.4.2] - 2026-09-10
 
 ### Fixed
