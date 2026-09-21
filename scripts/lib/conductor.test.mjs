@@ -231,7 +231,10 @@ test('SAFER-VALUE-WINS: project cannot escalate coalboardMode past global (off -
   const home = mk();
   try {
     writeCfg(home, { coalboardMode: 'off', updateMode: 'off' }); // GLOBAL: user explicitly turned everything off
-    writeCfg(root, { coalboardMode: 'auto' });                   // PROJECT (untrusted clone) tries to escalate coalboardMode only
+    // UMB-133: the project fixture is the CANONICAL path -- a LEGACY-path fixture would now (correctly) add a
+    // one-line migration notice to SessionStart, and this test's subject is the clamp, asserted as exact silence.
+    // Legacy candidates stay covered by the clamp-unchanged loop below (UserPromptSubmit) and the UMB-133 tests.
+    writeCfgOwnDir(root, { coalboardMode: 'auto' });             // PROJECT (untrusted clone) tries to escalate coalboardMode only
     const r1 = run({ hook_event_name: 'SessionStart' }, root, home);
     const r2 = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
     assert.equal(r1.status, 0); assert.equal(r1.stdout, '', 'global coalboardMode:off must survive a project escalation attempt to auto');
@@ -343,6 +346,127 @@ test('namespace campaign precedence 3/3: nothing new-shape exists anywhere -> th
     const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, root, home);
     assert.equal(r.status, 0); assert.equal(r.stdout, '', 'a legacy-only project must read exactly as it did before the campaign');
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+// UMB-133 (config-path unification): the legacy candidate list is BOTH shapes, after the three
+// canonical paths -- <dir>/.claude/.coalboard.json THEN <dir>/.coalboard.json -- and a config the
+// walk will NOT read is REPORTED on SessionStart instead of silently skipped. Every test below
+// puts the project under a sandboxed HOME (proj = <home>/proj) so the upward walk STOPS at the
+// sandbox home and can never see a real-machine ancestor (hermetic; the older walk tests above
+// use a sibling tmpdir for the project and inherit the real ancestors -- not repeated here).
+// Positive STATE EFFECT + the emitted line, never `exit 0` alone (Phoenix #4 guarantees exit 0).
+const mkProj = () => { const home = mk(); const proj = path.join(home, 'proj'); fs.mkdirSync(proj); return { home, proj }; };
+const writeCfgRootLegacy = (dir, cfg) => fs.writeFileSync(path.join(dir, '.coalboard.json'), JSON.stringify(cfg));
+const writeStray = (dir, rel, cfg) => {
+  const p = path.join(dir, ...rel);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg));
+};
+const SILENCE = { coalboardMode: 'off', updateMode: 'off' };
+const CANONICAL_SHAPE = '.claude/coal/coalboard.json';
+
+test('UMB-133 proof 1/4 (GUARD, passes before and after): a config at <dir>/.claude/.coalboard.json is FOUND', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeCfg(proj, SILENCE);
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, proj, home);
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout, '', 'the nested legacy config supplied coalboardMode:off -> the AND-gate is silent (else the CRITICAL block would have fired)');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 proof 2/4: a config at <dir>/.coalboard.json (repo-root legacy) is FOUND', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeCfgRootLegacy(proj, SILENCE);
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, proj, home);
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout, '', 'the root-legacy config supplied coalboardMode:off -> silent; a walk that never reads it would emit the CRITICAL block');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 proof 3/4: a config at a NON-candidate path is REPORTED on SessionStart, never silently skipped', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeStray(proj, ['.agents', '.coalboard.json'], SILENCE); // the nested-legacy shape under an agent dir that has no legacy
+    const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.equal(r.status, 0);
+    assert.equal(r.stderr, '', 'the report rides stdout on the sanctioned SessionStart channel only (Phoenix #13)');
+    assert.match(r.stdout, /IGNORED: [^\n]*[\\/]\.agents[\\/]\.coalboard\.json is not a config path; canonical = \.claude\/coal\/coalboard\.json/);
+    assert.match(r.stdout, /Consensus board available/, 'the stray was NOT read: coalboardMode is still its default, so the board contract still fires');
+    assert.equal(r.stdout.includes('\n'), false, 'one line');
+    const ups = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, proj, home);
+    assert.doesNotMatch(ups.stdout, /IGNORED/, 'reported on SessionStart ONLY -- never per prompt');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 proof 4/4: the CANONICAL path still WINS over BOTH legacies, and nested legacy still wins over root legacy', () => {
+  const a = mkProj();
+  try {
+    writeCfgOwnDir(a.proj, SILENCE);              // canonical: silence
+    writeCfg(a.proj, { coalboardMode: 'auto' });  // nested legacy: loud
+    writeCfgRootLegacy(a.proj, { coalboardMode: 'auto' }); // root legacy: loud
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, a.proj, a.home);
+    assert.equal(r.stdout, '', 'canonical silence must beat BOTH legacies');
+    const s = run({ hook_event_name: 'SessionStart' }, a.proj, a.home);
+    assert.doesNotMatch(s.stdout, /LEGACY|IGNORED/, 'a canonical hit emits no legacy notice and no ignored report');
+  } finally { fs.rmSync(a.home, { recursive: true, force: true }); }
+  const b = mkProj();
+  try {
+    writeCfg(b.proj, { coalboardMode: 'auto' });            // nested legacy: loud -- must win
+    writeCfgRootLegacy(b.proj, SILENCE);                    // root legacy: silence -- must lose
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, b.proj, b.home);
+    assert.match(r.stdout, /CRITICAL signal/, 'nested legacy is listed BEFORE root legacy: its loud value wins, the root legacy silence is not applied');
+  } finally { fs.rmSync(b.home, { recursive: true, force: true }); }
+});
+
+test('UMB-133: a LEGACY hit (either shape) emits a ONE-LINE migration notice naming the canonical path', () => {
+  for (const [label, write] of [['nested <dir>/.claude/.coalboard.json', writeCfg], ['root <dir>/.coalboard.json', writeCfgRootLegacy]]) {
+    const { home, proj } = mkProj();
+    try {
+      write(proj, { updateMode: 'off' });
+      const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+      assert.equal(r.status, 0);
+      assert.match(r.stdout, /LEGACY config [^\n]*\.coalboard\.json[^\n]* migrate to [^\n]*[\\/]\.claude[\\/]coal[\\/]coalboard\.json/, label);
+      assert.equal(r.stdout.includes('\n'), false, `${label}: one line`);
+      const ups = run({ hook_event_name: 'UserPromptSubmit', prompt: 'benign words only' }, proj, home);
+      assert.equal(ups.stdout, '', `${label}: notice is SessionStart-only`);
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  }
+});
+
+test('UMB-133 non-candidate rule: every enumerated near-miss shape of THIS room\'s own name is reported; a sibling room\'s config and files above the walk are not', () => {
+  // The rule (hook comment states the same): a FIXED list of near-miss shapes of coalboard's OWN config
+  // name, stat'ed (never listed/crawled) at each level the walk already visits. Not a sibling's config.
+  const shapes = [
+    ['.agents', '.coalboard.json'], ['.gemini', '.coalboard.json'],
+    ['.claude', 'coalboard.json'], ['.agents', 'coalboard.json'], ['.gemini', 'coalboard.json'],
+    ['coal', 'coalboard.json'], ['coalboard.json'],
+  ];
+  for (const rel of shapes) {
+    const { home, proj } = mkProj();
+    try {
+      writeStray(proj, rel, SILENCE);
+      const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+      assert.match(r.stdout, /IGNORED: [^\n]*coalboard\.json is not a config path/, rel.join('/'));
+      assert.match(r.stdout, /Consensus board available/, `${rel.join('/')}: never read -> board contract unaffected`);
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  }
+  const { home, proj } = mkProj();
+  try {
+    writeStray(proj, ['.coaltipple.json'], { fableConsent: true });                 // a sibling room's (valid) config: not ours to name
+    writeStray(home, ['.agents', '.coalboard.json'], SILENCE);                      // AT home: the walk stops before probing it (its config is the GLOBAL)
+    const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.doesNotMatch(r.stdout, /IGNORED|LEGACY/, 'a sibling room\'s config is never named as ignored, and nothing at/above home is probed');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  const c = mkProj();
+  try {
+    const sub = path.join(c.proj, 'pkg'); fs.mkdirSync(sub);
+    writeCfgOwnDir(sub, { updateMode: 'off' });                                     // found at the child level: the walk RETURNS there
+    writeStray(c.proj, ['.agents', '.coalboard.json'], SILENCE);                    // a level the walk never reaches
+    const r = run({ hook_event_name: 'SessionStart' }, sub, c.home);
+    assert.doesNotMatch(r.stdout, /IGNORED/, 'bound: only levels the walk actually visits are probed -- the parent above the level that supplied the config is not');
+  } finally { fs.rmSync(c.home, { recursive: true, force: true }); }
 });
 
 // INSPECT findings-back: the two clamp-unchanged tests below originally wrote ONLY via

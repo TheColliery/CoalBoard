@@ -78,7 +78,8 @@ function physical(p) {
 const AGENT_DIR_ORDER = ['.claude', '.agents', '.gemini'];
 function projectCandidates(dir) {
   const c = AGENT_DIR_ORDER.map((d) => path.join(dir, d, 'coal', 'coalboard.json'));
-  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY, always last
+  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY 1 (nested), after the canonical three
+  c.push(path.join(dir, '.coalboard.json'));            // LEGACY 2 (repo root, UMB-133), always last
   return c;
 }
 function findProjectCfg(startDir) {
@@ -196,13 +197,14 @@ function main() {
   const isGlobal = globalIdx !== -1;
   if (isGlobal) args.splice(globalIdx, 1);
   const cwd = process.cwd();
-  const legacyPath = path.join(cwd, '.claude', '.coalboard.json');
+  // UMB-133: BOTH legacy shapes at CWD migrate on write (the same two the hook's projectCandidates lists).
+  const legacyPaths = [path.join(cwd, '.claude', '.coalboard.json'), path.join(cwd, '.coalboard.json')];
   const readPath = isGlobal
     ? path.join(os.homedir(), '.claude', '.coalboard.json')
     : (findProjectCfg(cwd) ?? ownDirDefault(cwd));
   const writePath = isGlobal
     ? readPath
-    : (readPath === legacyPath ? ownDirDefault(cwd) : readPath);
+    : (legacyPaths.includes(readPath) ? ownDirDefault(cwd) : readPath);
 
   let cfg = {};
   let hadComments = false;
@@ -262,9 +264,9 @@ function main() {
     // moved away from it). Best-effort -- a failed delete here still leaves a
     // correctly-written new config; the stray legacy file is simply not cleaned
     // up this run.
-    if (readPath === legacyPath && writePath !== legacyPath) {
-      try { fs.rmSync(legacyPath, { force: true }); } catch {}
-      console.log(`Migrated the project config from ${legacyPath} to ${writePath}.`);
+    if (legacyPaths.includes(readPath) && writePath !== readPath) {
+      try { fs.rmSync(readPath, { force: true }); } catch {}
+      console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
     }
     if (hadComments) {
       console.warn('Note: inline comments were stripped (this tool writes plain JSON). Every key stays documented in platform-configs/.coalboard.json.');

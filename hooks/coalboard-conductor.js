@@ -65,8 +65,13 @@ function physical(p) {
 //      the first entry of step 2 below rather than needing a separate check.
 //   2. Other known agent dirs, fixed order: `.claude` -> `.agents` -> `.gemini`
 //      (first FOUND wins).
-//   3. LEGACY: <project>/.claude/.coalboard.json -- CoalBoard's actual pre-migration
-//      shape -- read normally, no breakage for an existing user.
+//   3. LEGACY, both shapes, in this order (UMB-133 unified the flock's legacy list; every
+//      room honours BOTH): <project>/.claude/.coalboard.json -- CoalBoard's actual
+//      pre-migration shape -- THEN <project>/.coalboard.json (the repo-root dotfile other
+//      rooms used as their legacy; a user reasonably writes it here). Read normally, no
+//      breakage for an existing user, and a hit is REPORTED on SessionStart with a one-line
+//      migration notice naming the canonical path (the deprecation channel: Phoenix #13 allows
+//      no other runtime surface).
 // WRITE target = where the config was found; absent everywhere, the running agent's
 // own dir. Hooks never perform this move on a READ (Phoenix #5, no side effects) --
 // and THIS HOOK never writes the config (it only reads). CWK-023 added the room's
@@ -83,34 +88,86 @@ function physical(p) {
 const AGENT_DIR_ORDER = ['.claude', '.agents', '.gemini'];
 function projectCandidates(dir) {
   const c = AGENT_DIR_ORDER.map((d) => path.join(dir, d, 'coal', 'coalboard.json'));
-  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY, always last
+  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY 1 (nested), listed after the canonical three
+  c.push(path.join(dir, '.coalboard.json'));            // LEGACY 2 (repo root, UMB-133), always last
   return c;
+}
+
+// UMB-133 hole (1): a config the walk will NOT read is REPORTED, never silently skipped.
+// THE RULE, and its BOUND: a FIXED list of near-miss shapes of THIS room's OWN config name
+// (the legacy nested shape under an agent dir that has no legacy, the canonical name without
+// its `coal/` segment, without its agent dir), each stat'ed with existsSync at every level the
+// walk below ALREADY visits -- no readdir, no recursion, no crawl: at most 7 stats x the walk's
+// own 40-level cap, and never at or above home (the walk stops there). A SIBLING room's config
+// (e.g. `.coaltipple.json`) is deliberately NOT named: it is a valid file for that room's own
+// conductor, and calling it "not a config path, canonical = coalboard" would be false. None of
+// these shapes overlaps a candidate above, so nothing read is ever also reported.
+function strayCandidates(dir) {
+  return [
+    path.join(dir, '.agents', '.coalboard.json'),
+    path.join(dir, '.gemini', '.coalboard.json'),
+    path.join(dir, '.claude', 'coalboard.json'),
+    path.join(dir, '.agents', 'coalboard.json'),
+    path.join(dir, '.gemini', 'coalboard.json'),
+    path.join(dir, 'coal', 'coalboard.json'),
+    path.join(dir, 'coalboard.json'),
+  ];
 }
 
 // Find the nearest project config by walking UP from cwd (a CC hook cwd may be a SUBDIR,
 // not the project root -- Phoenix #10: resolve the project root, do not trust raw cwd).
-// At EACH level, check all 4 read-order candidates above before moving to the parent --
+// At EACH level, check all 5 read-order candidates above before moving to the parent --
 // this room's existing upward walk has NO root-marker concept (unlike CoalWash's
 // findProjectRoot), so the read order is applied per-level rather than by first resolving
 // a single root, which would change existing nearest-wins-per-level behavior. STOP at the
 // home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing above
 // your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
 // another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
+// Returns { file, legacyDir, ignored }: `file` = the config found (null if none); `legacyDir` = the
+// level whose LEGACY shape supplied it (null when a canonical path did, or nothing was found);
+// `ignored` = near-miss paths (strayCandidates) present at the levels visited, INCLUDING the level
+// that supplied the config, never above it (the walk returns there).
 function findProjectCfg() {
+  const out = { file: null, legacyDir: null, ignored: [] };
   try {
     const home = physical(os.homedir());
     let dir = physical(process.cwd());
     for (let i = 0; i < 40; i++) {
       if (dir === home) break; // reached home: its config is the GLOBAL (already read), and nothing above home is "this project"
-      for (const f of projectCandidates(dir)) {
-        if (fs.existsSync(f)) return f;
+      for (const f of strayCandidates(dir)) {
+        if (fs.existsSync(f)) out.ignored.push(f);
+      }
+      const cands = projectCandidates(dir);
+      const at = cands.findIndex((f) => fs.existsSync(f));
+      if (at !== -1) {
+        out.file = cands[at];
+        if (at >= AGENT_DIR_ORDER.length) out.legacyDir = dir; // past the canonical three = a deprecated legacy shape
+        return out;
       }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
     }
   } catch {}
-  return null;
+  return out;
+}
+
+// SessionStart-only text for the two reports above. Paths are DATA printed back, never
+// instructions: control characters are stripped so one path cannot break the one-line shape.
+const IGNORED_CAP = 3;
+function cfgNotices(proj) {
+  try {
+    const clean = (s) => String(s).replace(/\p{Cc}/gu, '?');
+    const out = [];
+    if (proj.legacyDir) {
+      out.push(`LEGACY config read: ${clean(proj.file)} is a deprecated path; migrate to ${clean(path.join(proj.legacyDir, '.claude', 'coal', 'coalboard.json'))}.`);
+    }
+    for (const f of proj.ignored.slice(0, IGNORED_CAP)) {
+      out.push(`IGNORED: ${clean(f)} is not a config path; canonical = .claude/coal/coalboard.json`);
+    }
+    if (proj.ignored.length > IGNORED_CAP) out.push(`(+${proj.ignored.length - IGNORED_CAP} more ignored near-miss config paths)`);
+    return out.join(' ');
+  } catch { return ''; }
 }
 
 // SAFER-VALUE-WINS (hooks-safety.md §9): the project layer overlaying global ARRIVES WITH
@@ -153,8 +210,10 @@ function readCfg() {
   try { globalPath = path.join(os.homedir(), '.claude', '.coalboard.json'); } catch {}
   const global = globalPath ? readCfgFile(globalPath) : {};
   const proj = findProjectCfg(); // found by walking UP (cwd may be a subdir)
-  const project = proj ? readCfgFile(proj) : {};
-  return mergeSafety(global, project); // project overlays global per key, EXCEPT SAFER_ENUM keys (never louder than global)
+  const project = proj.file ? readCfgFile(proj.file) : {};
+  // project overlays global per key, EXCEPT SAFER_ENUM keys (never louder than global). WHERE the project
+  // file was found never reaches the merge: UMB-133 changes the walk, not the clamp.
+  return { cfg: mergeSafety(global, project), proj };
 }
 
 function boardOff(cfg) {
@@ -238,7 +297,7 @@ function updateDue(cfg) {
 }
 
 function main() {
-  const cfg = readCfg();
+  const { cfg, proj } = readCfg();
   const off = boardOff(cfg);
   let input = {};
   try { const p = JSON.parse(readStdin() || '{}'); if (p && typeof p === 'object' && !Array.isArray(p)) input = p; } catch {}
@@ -286,6 +345,10 @@ function main() {
   if (updateDue(cfg)) {
     msg += (msg ? ' ' : '[CoalBoard] ') + '[self-update due] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER `claude plugin update coalboard@coalboard`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.';
   }
+  // UMB-133: the config-path report rides the SAME sanctioned SessionStart line (Phoenix #13), and
+  // fires even when the board is off / no update is due -- it is orthogonal to both, like self-update.
+  const notes = cfgNotices(proj);
+  if (notes) msg += (msg ? ' ' : '[CoalBoard] ') + notes;
   if (msg) process.stdout.write(msg);
 }
 
