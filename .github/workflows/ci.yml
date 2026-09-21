@@ -54,9 +54,17 @@ jobs:
           fetch-depth: 0
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
-        # every step's shell -- no per-step re-declaration, which would be one more place to
-        # drift.
+        # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
+        # below (that block carries only the three event values), because a per-step
+        # re-declaration would be one more place to drift.
         shell: bash
+        # IN THIS STEP, EVERY ${{ }} REACHES THE SHELL THROUGH env:, NEVER INSIDE run:. Actions
+        # expands ${{ }} by TEXT SUBSTITUTION before bash parses the script, so an expression
+        # written inside run: is interpolated as CODE; through env: it arrives as an
+        # environment variable, which is data, always. These three happen to be
+        # GitHub-controlled today (an event name and two commit SHAs), so this is not a live
+        # hole -- the rule is held anyway because an inline exception is exactly where a later
+        # edit (a branch name, a PR title) would slip an attacker-reachable value in unreviewed.
         env:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_BEFORE: ${{ github.event.before }}
@@ -82,10 +90,10 @@ jobs:
           # pair -- a file named `code=false` overwrites the real classifier verdict with no
           # code execution at all (a forged green with nothing run), and a file named
           # `code=x$(...)` / `` code=x`...` `` makes outputs.code ATTACKER-CHOSEN TEXT. Proven
-          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real ci.yml:172
-          # consumer line, run in bash) -- see the CWK-074 commit message (82a9235) for the
-          # payload families and results; the harness itself is a gitignored scratch file, not
-          # a citable path.
+          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real consumer
+          # (`needs.changes.outputs.code` as the all-green step reads it), run in bash) -- see
+          # the CWK-074 commit message (82a9235) for the payload families and results; the
+          # harness itself is a gitignored scratch file, not a citable path.
           #
           # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
           # someone will later "strengthen" a property that never came from here: $RANDOM is

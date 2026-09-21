@@ -56,11 +56,20 @@ jobs:
           fetch-depth: 0
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
-        # every step's shell -- no per-step re-declaration, which would be one more place to
-        # drift (CWK-058 findings-back LOW-3: this file used to re-declare it here while
-        # ci.yml's own comment argues explicitly against exactly that; ci.yml already followed
-        # its own rule, so this file was the one that had to change).
+        # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
+        # below (that block carries only the three event values), because a per-step
+        # re-declaration would be one more place to drift (CWK-058 findings-back LOW-3: this
+        # file used to re-declare it here while ci.yml's own comment argues explicitly against
+        # exactly that; ci.yml already followed its own rule, so this file was the one that
+        # had to change).
         shell: bash
+        # IN THIS STEP, EVERY ${{ }} REACHES THE SHELL THROUGH env:, NEVER INSIDE run:. Actions
+        # expands ${{ }} by TEXT SUBSTITUTION before bash parses the script, so an expression
+        # written inside run: is interpolated as CODE; through env: it arrives as an
+        # environment variable, which is data, always. These three happen to be
+        # GitHub-controlled today (an event name and two commit SHAs), so this is not a live
+        # hole -- the rule is held anyway because an inline exception is exactly where a later
+        # edit (a branch name, a PR title) would slip an attacker-reachable value in unreviewed.
         env:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_BEFORE: ${{ github.event.before }}
