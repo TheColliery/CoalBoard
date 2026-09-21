@@ -469,15 +469,145 @@ test('UMB-133 non-candidate rule: every enumerated near-miss shape of THIS room\
   } finally { fs.rmSync(c.home, { recursive: true, force: true }); }
 });
 
+// UMB-133 BOUNCE r2 (INSPECT FIX-NEEDED, reviewer 938ee6bc): the fixtures below are the reviewer's own
+// (rev-probe.mjs 1-3 in scratchpad/umb133/), each written to FAIL before its fix.
+const writeCfgGeminiDir = (dir, cfg) => {
+  const p = path.join(dir, '.gemini', 'coal', 'coalboard.json');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg));
+};
+// Run the REAL hook with a preload that logs every fs.existsSync argument, so a test can assert
+// WHICH paths a given event stat-ed -- the only way to observe a cost that changes no stdout.
+// The preload joins lines with String.fromCharCode(10) so no escape sequence rides through this file.
+function runLogged(input, cwd, home) {
+  const work = mk();
+  const log = path.join(work, 'stat.log');
+  const preload = path.join(work, 'preload.cjs');
+  fs.writeFileSync(preload, "const fs = require('fs'); const orig = fs.existsSync; fs.existsSync = function (p) { try { fs.appendFileSync(process.env.CB_STAT_LOG, String(p) + String.fromCharCode(10)); } catch {} return orig.apply(this, arguments); };");
+  const env = { ...process.env, CB_STAT_LOG: log, USERPROFILE: home, HOME: home };
+  const r = spawnSync(process.execPath, ['--require', preload, HOOK], { input: JSON.stringify(input), cwd, env, encoding: 'utf8', timeout: 20000 });
+  let stats = [];
+  try { stats = fs.readFileSync(log, 'utf8').split(String.fromCharCode(10)).filter(Boolean); } catch {}
+  fs.rmSync(work, { recursive: true, force: true });
+  return { r, stats };
+}
+
+test('UMB-133 r2 MEDIUM-1: a CANONICAL config is never reported as IGNORED, from a cwd inside its own agent dir or its coal/ dir', () => {
+  const writers = [['.claude', writeCfgOwnDir], ['.agents', writeCfgAgentsDir], ['.gemini', writeCfgGeminiDir]];
+  for (const [agentDir, write] of writers) {
+    for (const rel of [[agentDir], [agentDir, 'coal']]) {
+      const { home, proj } = mkProj();
+      try {
+        write(proj, SILENCE); // the canonical file: board off + update off -> SessionStart is exactly silent unless a report fires
+        const cwd = path.join(proj, ...rel);
+        const r = run({ hook_event_name: 'SessionStart' }, cwd, home);
+        assert.equal(r.status, 0);
+        assert.equal(r.stdout, '', `cwd=<proj>/${rel.join('/')}: the config is READ (board is off), so nothing may be reported; got: ${r.stdout}`);
+      } finally { fs.rmSync(home, { recursive: true, force: true }); }
+    }
+  }
+});
+
+test('UMB-133 r2 MEDIUM-1: a real candidate SHADOWED by a nearer level is not "IGNORED" either (it is a candidate, just not the winner)', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeCfgOwnDir(proj, { coalboardMode: 'auto' });                                          // canonical at <proj>: a real candidate, shadowed below
+    fs.writeFileSync(path.join(proj, '.claude', '.coalboard.json'), JSON.stringify(SILENCE)); // at level <proj>/.claude this is LEGACY 2 and WINS
+    const r = run({ hook_event_name: 'SessionStart' }, path.join(proj, '.claude'), home);
+    assert.doesNotMatch(r.stdout, /IGNORED: [^ ]*coal[\\/]coalboard\.json/, 'coal/coalboard.json under .claude is <proj> canonical candidate; shadowed is not "not a config path"');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 r2 MEDIUM-1: one near-miss path is named ONCE even when two visited levels both enumerate it', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeStray(proj, ['.claude', 'coalboard.json'], SILENCE); // stray(<proj>) and stray(<proj>/.claude) both list this path
+    const r = run({ hook_event_name: 'SessionStart' }, path.join(proj, '.claude'), home);
+    const named = r.stdout.split('IGNORED:').length - 1;
+    assert.equal(named, 1, `named once, got ${named}: ${r.stdout}`);
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 r2 MEDIUM-2: the migration notice names a path that, FOLLOWED, still finds the config from every cwd (never a .claude inside .claude)', () => {
+  const { home, proj } = mkProj();
+  try {
+    writeCfg(proj, SILENCE); // <proj>/.claude/.coalboard.json = this room's documented LEGACY 1 for <proj>
+    const inside = path.join(proj, '.claude');
+    const before = run({ hook_event_name: 'SessionStart' }, inside, home).stdout;
+    const m = /migrate to (\S.*?coalboard\.json)\./.exec(before);
+    assert.ok(m, `a legacy hit must name its migration target; got: ${before}`);
+    const target = m[1];
+    assert.equal(/[\\/]\.claude[\\/]\.claude[\\/]/.test(target), false, `never a .claude inside .claude: ${target}`);
+    // FOLLOW the advice exactly: move the file to the named path, then open sessions at BOTH cwds.
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.renameSync(path.join(proj, '.claude', '.coalboard.json'), target);
+    for (const cwd of [proj, inside]) {
+      const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, cwd, home);
+      assert.equal(r.stdout, '', `after migrating to ${target}, the config (coalboardMode:off) must still be found from ${cwd}`);
+    }
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 r2 cost: the near-miss sweep is paid on SessionStart ONLY -- no event that cannot emit stat-s a stray path', () => {
+  const { home, proj } = mkProj();
+  try {
+    const norm = (p) => p.split(path.sep).join('/');
+    const wants = norm(path.join(proj, '.agents', '.coalboard.json')); // a stray shape only the sweep ever stat-s
+    const under = (list) => list.map(norm).some((p) => p.endsWith('/proj/.agents/.coalboard.json'));
+    const ss = runLogged({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.ok(under(ss.stats), 'positive control: SessionStart DOES sweep the near-miss shapes (' + wants + ')');
+    for (const ev of ['UserPromptSubmit', 'PreToolUse', 'Stop']) {
+      const l = runLogged({ hook_event_name: ev, prompt: 'benign words only' }, proj, home);
+      assert.equal(l.r.status, 0);
+      assert.equal(under(l.stats), false, `${ev} cannot emit the report, so it must not pay for it`);
+      assert.ok(l.stats.length > 0, `${ev}: the candidate walk itself still runs (control that the log works)`);
+    }
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 r2 IGNORED_CAP: seven near-misses in one level -> exactly 3 named + a count, still ONE line', () => {
+  const { home, proj } = mkProj();
+  try {
+    for (const rel of [['.agents', '.coalboard.json'], ['.gemini', '.coalboard.json'], ['.claude', 'coalboard.json'], ['.agents', 'coalboard.json'], ['.gemini', 'coalboard.json'], ['coal', 'coalboard.json'], ['coalboard.json']]) {
+      writeStray(proj, rel, SILENCE);
+    }
+    const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.equal((r.stdout.match(/IGNORED:/g) || []).length, 3, `cap is 3 named: ${r.stdout}`);
+    assert.match(r.stdout, /\(\+4 more ignored near-miss config paths\)/);
+    assert.equal(r.stdout.includes('\n'), false, 'one line');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('UMB-133 r2 control-character strip: a path carrying a control character is printed with it replaced, never raw (one-line channel)', (t) => {
+  // C1 control U+0085 is a legal filename character on NTFS AND POSIX (C0 controls are not creatable on Windows), so the
+  // strip is exercised on every platform. Capability is PROBED, never assumed by platform.
+  const home = mk();
+  const ctl = String.fromCodePoint(0x85);
+  const proj = path.join(home, 'p' + ctl + 'q');
+  try {
+    try { fs.mkdirSync(proj); } catch { t.skip('this volume cannot create a directory named with a C1 control character'); return; }
+    writeStray(proj, ['.agents', '.coalboard.json'], SILENCE);
+    const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+    assert.match(r.stdout, /IGNORED: /);
+    assert.equal(/\p{Cc}/u.test(r.stdout), false, 'no control character may reach the SessionStart line');
+    assert.ok(r.stdout.includes('p?q'), 'the control character is REPLACED (visible as ?), not silently dropped');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 // INSPECT findings-back: the two clamp-unchanged tests below originally wrote ONLY via
 // writeCfgOwnDir -- the "regardless of which candidate" claim was true by construction
 // (candidate identity is erased before the merge), never actually demonstrated across
 // more than one candidate. Both now loop over three genuinely different candidates
 // (own-dir, another known agent dir, and the legacy shape) in independent sandboxes.
+// UMB-133 r2 LOW-2: the list now names ALL FIVE read-order candidates -- it stopped at three, so
+// .gemini/coal and the root legacy .coalboard.json rode on the strength of the merge being
+// address-blind, never on a run through each address.
 const CANDIDATE_WRITERS = [
   ['own-dir (.claude/coal/coalboard.json)', writeCfgOwnDir],
   ['another known agent dir (.agents/coal/coalboard.json)', writeCfgAgentsDir],
+  ['the third known agent dir (.gemini/coal/coalboard.json)', writeCfgGeminiDir],
   ['the legacy shape (.claude/.coalboard.json)', writeCfg],
+  ['the root legacy shape (.coalboard.json)', writeCfgRootLegacy],
 ];
 
 test('clamp-unchanged regression: safer-value-wins rejects escalation regardless of which read-order candidate supplied the project value', () => {

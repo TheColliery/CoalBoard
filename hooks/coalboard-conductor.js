@@ -98,10 +98,18 @@ function projectCandidates(dir) {
 // (the legacy nested shape under an agent dir that has no legacy, the canonical name without
 // its `coal/` segment, without its agent dir), each stat'ed with existsSync at every level the
 // walk below ALREADY visits -- no readdir, no recursion, no crawl: at most 7 stats x the walk's
-// own 40-level cap, and never at or above home (the walk stops there). A SIBLING room's config
-// (e.g. `.coaltipple.json`) is deliberately NOT named: it is a valid file for that room's own
-// conductor, and calling it "not a config path, canonical = coalboard" would be false. None of
-// these shapes overlaps a candidate above, so nothing read is ever also reported.
+// own 40-level cap (worst case +280 on top of the candidate walk's own 5 per level), and never at
+// or above home (the walk stops there). It runs on SessionStart ONLY -- the one event that can emit
+// the report -- so a UserPromptSubmit / PreToolUse / Stop never pays for it (findProjectCfg's
+// withStrays flag). A SIBLING room's config (e.g. `.coaltipple.json`) is deliberately NOT named: it
+// is a valid file for that room's own conductor, and calling it "not a config path, canonical =
+// coalboard" would be false.
+// NO-OVERLAP HOLDS ONLY WITHIN ONE LEVEL, so it is enforced across levels by isCandidateElsewhere():
+// strayCandidates(dir) is relative to `dir`, projectCandidates(anc) to an ANCESTOR, and they collide
+// when `dir` is that ancestor's own agent dir (dir = anc/.claude lists anc/.claude/coal/coalboard.json,
+// which IS anc's CANONICAL candidate) -- measured 2026-09-21: the canonical file was printed as "not a
+// config path", twice in one line, while the walk read it. A path that is a candidate of the parent or
+// grandparent level is therefore never reported, whether or not the walk got as far as reading it.
 function strayCandidates(dir) {
   return [
     path.join(dir, '.agents', '.coalboard.json'),
@@ -112,6 +120,14 @@ function strayCandidates(dir) {
     path.join(dir, 'coal', 'coalboard.json'),
     path.join(dir, 'coalboard.json'),
   ];
+}
+
+// True when `p` is a real candidate at the parent or grandparent of `dir` -- the only two levels whose
+// candidates a stray of `dir` can equal (see the block above). String work only: no stat.
+function isCandidateElsewhere(p, dir) {
+  const up = path.dirname(dir);
+  const up2 = path.dirname(up);
+  return projectCandidates(up).includes(p) || projectCandidates(up2).includes(p);
 }
 
 // Find the nearest project config by walking UP from cwd (a CC hook cwd may be a SUBDIR,
@@ -126,16 +142,23 @@ function strayCandidates(dir) {
 // Returns { file, legacyDir, ignored }: `file` = the config found (null if none); `legacyDir` = the
 // level whose LEGACY shape supplied it (null when a canonical path did, or nothing was found);
 // `ignored` = near-miss paths (strayCandidates) present at the levels visited, INCLUDING the level
-// that supplied the config, never above it (the walk returns there).
-function findProjectCfg() {
+// that supplied the config, never above it (the walk returns there). `ignored` stays empty unless
+// `withStrays` (SessionStart only: the sweep's stats are pure cost on every other event).
+function findProjectCfg(withStrays) {
   const out = { file: null, legacyDir: null, ignored: [] };
   try {
     const home = physical(os.homedir());
     let dir = physical(process.cwd());
     for (let i = 0; i < 40; i++) {
       if (dir === home) break; // reached home: its config is the GLOBAL (already read), and nothing above home is "this project"
-      for (const f of strayCandidates(dir)) {
-        if (fs.existsSync(f)) out.ignored.push(f);
+      if (withStrays) {
+        for (const f of strayCandidates(dir)) {
+          // isCandidateElsewhere: a candidate of a nearer/farther level is never "not a config path";
+          // includes(): two visited levels can enumerate the SAME path (stray(d) .claude/coalboard.json ==
+          // stray(d/.claude) coalboard.json), and a path is named once.
+          if (out.ignored.includes(f) || isCandidateElsewhere(f, dir)) continue;
+          if (fs.existsSync(f)) out.ignored.push(f);
+        }
       }
       const cands = projectCandidates(dir);
       const at = cands.findIndex((f) => fs.existsSync(f));
@@ -155,12 +178,21 @@ function findProjectCfg() {
 // SessionStart-only text for the two reports above. Paths are DATA printed back, never
 // instructions: control characters are stripped so one path cannot break the one-line shape.
 const IGNORED_CAP = 3;
+// The canonical target a LEGACY file migrates to, derived from the FILE and never from the level that
+// matched it: <r>/.claude/.coalboard.json is legacy 1 of <r> AND, with cwd inside .claude, legacy 2 of
+// <r>/.claude -- building the target from that level named <r>/.claude/.claude/coal/coalboard.json, a path
+// no session outside .claude ever reads (measured: followed, the config was LOST). Both shapes resolve to
+// <r>/.claude/coal/coalboard.json, which is read from <r> AND from inside <r>/.claude.
+function legacyTarget(file) {
+  const d = path.dirname(file);
+  return path.basename(d) === '.claude' ? path.join(d, 'coal', 'coalboard.json') : path.join(d, '.claude', 'coal', 'coalboard.json');
+}
 function cfgNotices(proj) {
   try {
     const clean = (s) => String(s).replace(/\p{Cc}/gu, '?');
     const out = [];
     if (proj.legacyDir) {
-      out.push(`LEGACY config read: ${clean(proj.file)} is a deprecated path; migrate to ${clean(path.join(proj.legacyDir, '.claude', 'coal', 'coalboard.json'))}.`);
+      out.push(`LEGACY config read: ${clean(proj.file)} is a deprecated path; migrate to ${clean(legacyTarget(proj.file))}.`);
     }
     for (const f of proj.ignored.slice(0, IGNORED_CAP)) {
       out.push(`IGNORED: ${clean(f)} is not a config path; canonical = .claude/coal/coalboard.json`);
@@ -205,11 +237,11 @@ function readCfgFile(f) {
   try { return fs.existsSync(f) ? parseJsonc(fs.readFileSync(f, 'utf8')) : {}; } catch { return {}; }
 }
 
-function readCfg() {
+function readCfg(withStrays) {
   let globalPath = null;
   try { globalPath = path.join(os.homedir(), '.claude', '.coalboard.json'); } catch {}
   const global = globalPath ? readCfgFile(globalPath) : {};
-  const proj = findProjectCfg(); // found by walking UP (cwd may be a subdir)
+  const proj = findProjectCfg(withStrays); // found by walking UP (cwd may be a subdir)
   const project = proj.file ? readCfgFile(proj.file) : {};
   // project overlays global per key, EXCEPT SAFER_ENUM keys (never louder than global). WHERE the project
   // file was found never reaches the merge: UMB-133 changes the walk, not the clamp.
@@ -297,11 +329,12 @@ function updateDue(cfg) {
 }
 
 function main() {
-  const { cfg, proj } = readCfg();
-  const off = boardOff(cfg);
+  // The event is read BEFORE the config walk: the near-miss sweep inside it is SessionStart-only work.
   let input = {};
   try { const p = JSON.parse(readStdin() || '{}'); if (p && typeof p === 'object' && !Array.isArray(p)) input = p; } catch {}
   const event = input.hook_event_name || input.hookEventName || '';
+  const { cfg, proj } = readCfg(event === 'SessionStart');
+  const off = boardOff(cfg);
 
   if (event === 'UserPromptSubmit') {
     if (off) return; // the board AND-gate is gated by coalboardMode; self-update is orthogonal (SessionStart only).

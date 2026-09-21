@@ -12,7 +12,7 @@
 //     findProjectCfg / parseJsonc), not CM's findGitRoot. CM resolves a
 //     single git-marker ROOT then checks candidates once at that level;
 //     CoalBoard's own conductor has NO root-marker concept — it checks all
-//     4 read-order candidates at EVERY directory level from cwd up to home
+//     5 read-order candidates at EVERY directory level from cwd up to home
 //     (the conductor's own comment: "this room's existing upward walk has
 //     no root-marker concept, unlike CoalWash's findProjectRoot"). Porting
 //     CM's git-root shape here would give the CLI a DIFFERENT read order
