@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.5.1] - 2026-09-22
 
 ### Fixed
 - **`commands/update.md`'s `git ls-remote` call had no `--refs` filter, so a peeled annotated-tag ref (`vX.Y.Z^{}`) could be read alongside the real tag (CWK-120 row 3, CodeRabbit PR 19).** Added `--refs 'v*'`, verified live against the real remote.
