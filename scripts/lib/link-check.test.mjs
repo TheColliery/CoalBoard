@@ -137,16 +137,23 @@ test('checkFile: the broken fixture reports both planted defects', () => {
   assert.ok(findings.some((f) => f.reason === 'anchor not found'));
 });
 
-// CLI-spawn tests -- CoalTipple's HIGH-1 lesson: the exit code is the gate's ONLY
-// mechanism, so it is the exit code that gets tested, not the exported functions.
+// CLI-spawn tests -- CoalTipple's HIGH-1 lesson: the exit code is the gate's real
+// mechanism, so exit code is asserted, not the exported functions. The exit-1 case below
+// needs no companion state assertion: a no-op main() (prints nothing, exits 0) cannot
+// produce exit 1, so that assertion alone is already unsatisfiable by a silent gate.
 test('CLI: exits 1 on a broken fixture (real spawned process)', () => {
   const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8' });
   assert.equal(res.status, 1);
 });
 
+// CWK-120 MEDIUM-4 (INSPECT rev-p4-prove.mjs, ride-along d): exit-code-only WAS the P4 shape
+// here -- a no-op main() (if (true) return; prints nothing, scans nothing) still exits 0, so
+// `assert.equal(res.status, 0)` alone passed against a gate that did nothing at all. Assert
+// the positive state effect the gate actually produces, matching every other spawning test.
 test('CLI: exits 0 on a clean fixture (real spawned process)', () => {
   const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/clean.md'], { cwd: REPO_ROOT, encoding: 'utf8' });
   assert.equal(res.status, 0);
+  assert.ok(res.stdout.includes('0 finding(s) across 1 file(s)'), `must report it actually scanned the file -- got: ${res.stdout}`);
 });
 
 test('CLI: exits 1 on a genuinely empty tracked-.md list -- CoalTipple HIGH-1 lesson (git init, no commits, no walk-exclusion involved)', (t) => {
