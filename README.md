@@ -20,7 +20,9 @@
 
 [Benchmark](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Releases](https://github.com/TheColliery/CoalBoard/releases)
 
-**Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/TheColliery/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing) · **[CoalHearth](https://github.com/TheColliery/CoalHearth)** (session warm-resume) · **[CoalFace](https://github.com/TheColliery/CoalFace)** (fan-out discipline) · **[CoalWash](https://github.com/TheColliery/CoalWash)** (memory defrag) · **[CoalLedger](https://github.com/TheColliery/CoalLedger)** (docs health).
+**Docs:** [thecolliery.gitbook.io/thecolliery-docs/tools/coalboard](https://thecolliery.gitbook.io/thecolliery-docs/tools/coalboard) *(publishing soon)*
+
+**Part of [TheColliery](https://github.com/TheColliery)** — siblings: **[CoalMine](https://github.com/TheColliery/CoalMine)** (quality canaries) · **[CoalTipple](https://github.com/TheColliery/CoalTipple)** (model/effort routing) · **[CoalHearth](https://github.com/TheColliery/CoalHearth)** (session warm-resume) · **[CoalFace](https://github.com/TheColliery/CoalFace)** (fan-out discipline) · **[CoalWash](https://github.com/TheColliery/CoalWash)** (memory defrag) · **[CoalLedger](https://github.com/TheColliery/CoalLedger)** (docs health) · **[CoalGob](https://github.com/TheColliery/CoalGob)** (OS-trash delete guard, PUBLIC BETA v0.1.0-beta.1).
 
 </div>
 
@@ -137,7 +139,7 @@ Full series matrix + the must-fail set: [Permission Matrix](https://github.com/T
 
 ## 🧭 Part of TheColliery
 
-CoalBoard is the **consensus & debate board** of the mining series, alongside its six siblings:
+CoalBoard is the **consensus & debate board** of the mining series, alongside its seven siblings:
 
 - [CoalMine](https://github.com/TheColliery/CoalMine) — quality canaries
 - [CoalTipple](https://github.com/TheColliery/CoalTipple) — model/effort routing
@@ -145,6 +147,7 @@ CoalBoard is the **consensus & debate board** of the mining series, alongside it
 - [CoalFace](https://github.com/TheColliery/CoalFace) — fan-out discipline
 - [CoalWash](https://github.com/TheColliery/CoalWash) — memory defrag
 - [CoalLedger](https://github.com/TheColliery/CoalLedger) — docs health
+- [CoalGob](https://github.com/TheColliery/CoalGob) — OS-trash delete guard, PUBLIC BETA v0.1.0-beta.1
 
 Install one, it stands alone; install all, they compose without conflict.
 
