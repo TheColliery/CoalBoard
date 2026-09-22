@@ -5,7 +5,7 @@ description: CoalBoard self-update — check for a newer version and offer to ap
 Kind-1 self-update — the **agent** verifies (online), the **hook** only schedules (it never networks). On an offline box or with no git, say so and skip gracefully.
 
 1. **Check.** Compare the latest published tag to the installed version:
-   - latest tag: `git ls-remote --tags --sort=-v:refname https://github.com/TheColliery/CoalBoard` → the top `vX.Y.Z` (filter at the source — do not fetch the whole list).
+   - latest tag: `git ls-remote --refs --tags --sort=-v:refname https://github.com/TheColliery/CoalBoard 'v*'` → the top `vX.Y.Z` (`--refs` drops peeled `^{}` annotated-tag entries; the `v*` pattern filters at the source — do not fetch the whole list).
    - installed: the `version` in `.claude-plugin/plugin.json`.
 2. **Offer (consent-gated — the only token spend).** Newer available → OFFER `claude plugin update coalboard@coalboard` (then restart). Already current → say so in one line.
 3. **Cadence.** To change how updates are handled, set `updateMode` (`ask` | `auto` | `remind` | `off`) and `updateCheckDays` in `.coalboard.json`. `auto` lets this check run when due without re-asking; `off` silences it entirely.
