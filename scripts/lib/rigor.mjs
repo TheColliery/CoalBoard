@@ -22,7 +22,13 @@ export const RIGOR_PRESETS = {
 
 export function rigorPreset(name) {
   const key = String(name == null ? 'standard' : name).toLowerCase();
-  return RIGOR_PRESETS[key] || RIGOR_PRESETS.standard;
+  // Object.hasOwn, not a plain RIGOR_PRESETS[key] lookup: a plain lookup walks the prototype
+  // chain, so rigor:"constructor" (a hand-edited .coalboard.json) resolves to the inherited
+  // Object constructor -- truthy, so the || fallback below never runs. applyRigor then spreads
+  // that function, which yields {}, silently dropping every rigor-controlled key including
+  // applyConsent -- the CB-4 fail-safe two lines below checks applyConsent === false and never
+  // sees it, because it is undefined, not false. CodeRabbit PR 19 comment 4045387931.
+  return Object.hasOwn(RIGOR_PRESETS, key) ? RIGOR_PRESETS[key] : RIGOR_PRESETS.standard;
 }
 
 // Resolve the rigor-controlled knobs: start from the preset, then let an explicit

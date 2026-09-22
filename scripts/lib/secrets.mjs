@@ -57,7 +57,10 @@ const PATTERNS = [
   // is fully redacted, not leaked after word 1. The {0,8} reps + the [^\n] class stay linear
   // (no catastrophic backtracking). The value branch carries an OPTIONAL auth-scheme prefix
   // (Bearer/Basic/…) so the WHOLE credential is redacted, not just the scheme word.
-  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})([^\S\n]*["']?[^\S\n]*[:=][^\S\n]*)(?:(?:bearer|basic|digest|token)[^\S\n]+)?(?:"[^"]*"|'[^']*'|[^\n"']+)/gi, '$1$2[REDACTED]'],
+  // The UNQUOTED branch is `[^\n]+`, not `[^\n"']+`: the old exclusion stopped at the first
+  // quote, so scrub("PASSWORD=abc'def") left the suffix ('def) unredacted -- an embedded quote
+  // is common in a real password, not an edge case. CodeRabbit PR 19 comment 4045387938.
+  [/(?<![A-Za-z0-9])((?:[A-Za-z][A-Za-z0-9]*[_-]){0,8}(?:authorization|bearer|client[_-]?secret|api[_-]?secret|api[_-]?key|access[_-]?key|access[_-]?token|refresh[_-]?token|oauth[_-]?token|id[_-]?token|token|secret|password|passwd|pwd|credentials?)(?:[_-][A-Za-z0-9]+){0,8})([^\S\n]*["']?[^\S\n]*[:=][^\S\n]*)(?:(?:bearer|basic|digest|token)[^\S\n]+)?(?:"[^"]*"|'[^']*'|[^\n]+)/gi, '$1$2[REDACTED]'],
 ];
 
 // Redact credential-shaped substrings in `text`. Returns a scrubbed copy.

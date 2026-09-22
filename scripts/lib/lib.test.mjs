@@ -20,6 +20,34 @@ test('trigger.detectStatic — hits a critical signal, ignores benign', () => {
   assert.ok(r.reasons.length > 0 && r.reasons.every((x) => typeof x === 'string'), 'fires with string reasons');
 });
 
+// CWK-120 row 7 (CodeRabbit 4045387931): a prototype-chain key must not resolve as a preset,
+// and must not silently drop the CB-4 applyConsent fail-safe when it does.
+test('rigorPreset: an inherited Object.prototype key is NOT a preset -- falls back to standard', () => {
+  assert.deepEqual(rigorPreset('constructor'), rigorPreset('standard'), 'constructor must resolve to standard, never Object itself');
+  assert.deepEqual(rigorPreset('toString'), rigorPreset('standard'));
+  assert.deepEqual(rigorPreset('hasOwnProperty'), rigorPreset('standard'));
+});
+
+test('applyRigor: coalboardMode auto + rigor:constructor still forces the CB-4 apply-gate ON', () => {
+  const eff = applyRigor({ coalboardMode: 'auto', rigor: 'constructor' });
+  assert.equal(eff.applyConsent, true, 'the fail-safe must see applyConsent as false-or-absent and force it true -- it must never stay undefined');
+  assert.equal(eff.qaStrictness, 'standard', 'the whole preset bundle must land, not an empty {} from a spread function');
+});
+
+// CWK-120 row 8 (CodeRabbit 4045387938): the unquoted branch must not stop at an embedded quote.
+test('secrets.scrub: an embedded quote inside an unquoted value is redacted too, not left as a suffix', () => {
+  assert.equal(scrub("PASSWORD=abc'def"), 'PASSWORD=[REDACTED]', "the trailing 'def must not survive");
+  assert.equal(scrub('PASSWORD=abc"def'), 'PASSWORD=[REDACTED]', 'a double quote too');
+});
+
+// CWK-120 row 9 (CodeRabbit 4045387970): an exact file path in excludePaths must exclude
+// that file, not only a directory segment of the same name.
+test('trigger.isExcluded: an exact FILE path in excludePaths excludes that file', () => {
+  assert.equal(isExcluded('src/auth/jwt.ts', ['src/auth/jwt.ts']), true, 'exact file match must exclude');
+  assert.equal(isExcluded('src/auth/other.ts', ['src/auth/jwt.ts']), false, 'a sibling file must still fire');
+  assert.equal(isExcluded('src/auth/jwt.ts', ['node_modules']), false, 'directory exclusion is unchanged');
+});
+
 test('trigger.detectFileWrite — needs BOTH a critical path and a critical import', () => {
   assert.equal(detectFileWrite('src/auth/jwt.ts', 'import jsonwebtoken from "x"').hit, true);
   assert.equal(detectFileWrite('src/auth/jwt.ts', 'const x = 1').hit, false, 'path alone is not enough');

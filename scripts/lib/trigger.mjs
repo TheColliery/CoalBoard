@@ -65,11 +65,23 @@ function seedList(v, dflt) {
 }
 const keywordList = (v) => seedList(v, DEFAULT_CRITICAL_KEYWORDS);
 
-// Is this file path inside an excluded dir? (so the gate never fires on vendored code)
+// Is this file path inside an excluded dir, OR an excluded file exactly? (so the gate never
+// fires on vendored code, and a config can name one exact file, not only a directory --
+// isExcluded('src/auth/jwt.ts', ['src/auth/jwt.ts']) used to return false because the old
+// check was directory-containment only: it looked for "/src/auth/jwt.ts/" as a segment, which
+// a plain file path never contains. CodeRabbit PR 19 comment 4045387970. UNREACHABLE today
+// (verified 2026-09-22): this function's only caller is lib.test.mjs -- scripts/lib/ is not
+// in build-plugin.mjs's copy list, and hooks/coalboard-conductor.js mirrors detectStatic
+// inline for PROMPTS only (comment there: "no excludePaths path here"). Fixed anyway: it is
+// the canonical tested spec CB-4/trigger.mjs's own header claims to be, and the fix is free.
 export function isExcluded(filePath, excludePaths = DEFAULT_EXCLUDE) {
   const list = cfgList(excludePaths, DEFAULT_EXCLUDE);
   const p = String(filePath || '').replace(/\\/g, '/').toLowerCase();
-  return list.some((d) => d && (p.includes(`/${String(d).toLowerCase()}/`) || p.startsWith(`${String(d).toLowerCase()}/`)));
+  return list.some((d) => {
+    if (!d) return false;
+    const dn = String(d).toLowerCase();
+    return p === dn || p.includes(`/${dn}/`) || p.startsWith(`${dn}/`);
+  });
 }
 
 // Detect the Layer-1 static signal in a piece of text (a prompt, or a file's content).
