@@ -381,18 +381,23 @@ function main() {
   // is updateMode), so it still fires when the board is off — the two keys are independent.
   let msg = off ? '' : "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
-    // CWK-120 row 4 (CodeRabbit 4045387911): the directive used to say nothing about
-    // WHICH mode fired it. CodeRabbit's own proposed fix additionally asked for distinct
-    // ask/remind/auto BEHAVIOR branches in this hook -- declined: nothing anywhere in
-    // ship-text (commands/update.md, SKILL.md) ever defines what "remind" does
-    // differently from "ask"; the schema (config-schema.mjs) only orders the four
-    // values, it does not behaviorally distinguish two of them. Inventing that behavior
-    // here would be a product decision this BUILD dispatch has no authority to make.
-    // The narrow, uncontroversial half is applied instead: the hook already computed
-    // cfg.updateMode, so naming it costs nothing and lets the reading agent see which
-    // mode fired, rather than emitting an identical sentence for ask/remind/auto alike.
+    // CWK-120 row 4 (CodeRabbit 4045387911) + findings-back MEDIUM-1/MEDIUM-2 (INSPECT).
+    // The BEHAVIOR is documented, in platform-configs/.coalboard.json's own updateMode
+    // comment: ask = ask ONCE then save the answer (auto/remind/off); auto = the agent
+    // web-checks and offers `claude plugin update` -- "standing consent, the only spend";
+    // remind = "a free periodic reminder, you run it" -- no network, no spend. Before this
+    // fix, updateDue() short-circuited ONLY on "off", so remind received the identical
+    // web-check directive as auto -- a user who picked remind specifically to avoid the
+    // spend was charged anyway (MEDIUM-2). Implemented per the head's ruling: remind now
+    // emits a spend-free reminder; auto is unchanged. The "ask ONCE then persist the
+    // answer" half of `ask` is NOT implemented here -- persisting a chosen mode means
+    // writing the user's config, and this hook is not a config writer (Phoenix #10); that
+    // half is returned upward as a separate product question, not worked around here.
     const mode = lc(cfg.updateMode || 'ask');
-    msg += (msg ? ' ' : '[CoalBoard] ') + `[self-update due, mode: ${mode}] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER \`claude plugin update coalboard@coalboard\`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.`;
+    const directive = mode === 'remind'
+      ? `[self-update due, mode: remind] This is a FREE reminder only -- do NOT web-check or spend on this yourself. Tell the user a CoalBoard update check is due and that they can run it whenever they choose (/coalboard:update, or by hand: compare the latest tag to the installed plugin.json version). No network call, no OFFER, no spend.`
+      : `[self-update due, mode: ${mode}] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER \`claude plugin update coalboard@coalboard\`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.`;
+    msg += (msg ? ' ' : '[CoalBoard] ') + directive;
   }
   // UMB-133: the config-path report rides the SAME sanctioned SessionStart line (Phoenix #13), and
   // fires even when the board is off / no update is due -- it is orthogonal to both, like self-update.

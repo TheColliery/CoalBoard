@@ -215,6 +215,34 @@ test('updateCheckDays:14 (in range) stays silent within the window on the 2nd Se
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+// CWK-120 MEDIUM-2 (INSPECT, head's ruling): the config template documents "remind" as
+// "a free periodic reminder, you run it" -- no web-check, no spend. Before this fix,
+// updateDue() short-circuited only on "off", so "remind" received the identical web-check
+// directive as "auto". A user who picked "remind" specifically to avoid the spend was
+// charged anyway.
+test('updateMode:remind emits a free reminder, never the web-check directive (MEDIUM-2)', () => {
+  const tmp = mk();
+  try {
+    writeCfg(tmp, { updateMode: 'remind' });
+    const r = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /self-update due/, 'a reminder is still due -- remind is not off');
+    assert.doesNotMatch(r.stdout, /OFFER `claude plugin update/, 'remind must never OFFER the update command itself -- no spend, no action taken for the user');
+    assert.doesNotMatch(r.stdout, /web-check the latest/, 'remind must never instruct the agent to perform the check itself -- that is the auto-only spend');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('updateMode:auto still emits the web-check directive, unchanged (MEDIUM-2 control)', () => {
+  const tmp = mk();
+  try {
+    writeCfg(tmp, { updateMode: 'auto' });
+    const r = run({ hook_event_name: 'SessionStart' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /self-update due/);
+    assert.match(r.stdout, /web-check/, 'auto is the one mode with standing consent to spend on a web-check');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('garbage + valid-but-non-object stdin -> exit 0, no crash (Phoenix fail-silent)', () => {
   const tmp = mk();
   try {
