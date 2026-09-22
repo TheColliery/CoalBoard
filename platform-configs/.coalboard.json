@@ -7,8 +7,11 @@
   // (no whack-a-mole token-bleed) + ZERO-BREAKAGE (work is staged, never touches live files until verified +
   // approved). It IMPROVES correctness; it does NOT claim a reliability number.
   //
-  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.claude/coal/coalboard.json (per-project,
-  // overrides global). Absent = these defaults apply. The conductor + skill read the merged config.
+  // To customize: copy this file to ~/.claude/.coalboard.json (global) or <project>/.claude/coal/coalboard.json
+  // (per-project, overrides global per key -- EXCEPT the consent keys "coalboardMode" and "updateMode": a project
+  // may only make those QUIETER than the global value, never louder (safer-value-wins, hooks-safety.md §9;
+  // enforced by mergeSafety in hooks/coalboard-conductor.js, e.g. a project "coalboardMode":"auto" over a global
+  // "off" is silently ignored). Absent = these defaults apply. The conductor + skill read the merged config.
 
   // ─── activation / trigger ───
 
