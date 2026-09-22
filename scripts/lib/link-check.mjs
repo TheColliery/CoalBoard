@@ -29,7 +29,11 @@ function decodeEntities(s) {
     if (e[0] === '#') {
       const isHex = e[1] === 'x' || e[1] === 'X';
       const code = isHex ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      // Number.isFinite alone accepts a value above 0x10FFFF; String.fromCodePoint throws
+      // RangeError for such a value, and that exception escapes checkFile/main, so a heading
+      // like "# &#1114112; note" crashed the whole CLI with a stack trace instead of reporting
+      // a finding. CodeRabbit PR 19 comment 4045387921.
+      return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
     const key = e.toLowerCase();
     return Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key] : m;
@@ -225,8 +229,19 @@ function isExcluded(relPath) {
   return norm.startsWith('plugin/') || norm.includes('/fixtures/link-check/');
 }
 
+// A git pre-commit/pre-push hook sets GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE for its own
+// child processes -- .githooks/pre-commit runs "node scripts/test.mjs" as a hook, so this
+// is a real caller shape, not a hypothetical one. Any of the three OVERRIDES cwd for repo
+// discovery, so "git ls-files" would enumerate the HOOK's repository instead of repoRoot.
+// Scrubbed here so the scan always targets the directory it was actually asked to scan.
+// CodeRabbit PR 19 comment 4045387940.
+const GIT_ENV_SCRUBBED = { ...process.env };
+delete GIT_ENV_SCRUBBED.GIT_DIR;
+delete GIT_ENV_SCRUBBED.GIT_WORK_TREE;
+delete GIT_ENV_SCRUBBED.GIT_INDEX_FILE;
+
 function listTrackedMarkdown(repoRoot) {
-  const out = execFileSync('git', ['ls-files', '*.md'], { cwd: repoRoot, encoding: 'utf8' });
+  const out = execFileSync('git', ['ls-files', '*.md'], { cwd: repoRoot, encoding: 'utf8', env: GIT_ENV_SCRUBBED });
   return out.split(/\r?\n/).filter(Boolean);
 }
 

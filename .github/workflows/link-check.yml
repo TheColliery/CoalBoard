@@ -44,18 +44,10 @@ jobs:
       # this engine's CLI sets process.exitCode itself on any finding or an empty file
       # list -- so the bare invocation below IS the gate; no output-grep wrapper needed.
       #
-      # r34 FIXBACK 2 LOW-1: `|| true` on the grep pipeline is LOAD-BEARING, not
-      # decoration. GitHub's default shell for a `run:` step is `bash -eo pipefail`, and
-      # `grep -v` exits 1 when every line is filtered out -- without `|| true`, `set -e`
-      # aborts the step AT THE PIPELINE, before the `if [ -z "$files" ]` guard below ever
-      # runs, so the ::error:: line this comment describes never prints (the step still
-      # exits 1, but silently). Two separate greps merged into one with two `-e`
-      # patterns for the same reason: a mid-pipeline grep can independently exit 1 the
-      # same way.
-      - run: |
-          files=$(git ls-files '*.md' | grep -v -e '^plugin/' -e '/fixtures/link-check/' || true)
-          if [ -z "$files" ]; then
-            echo "::error::link-check found NO markdown files to scan -- the scope filter is broken, not the tree"
-            exit 1
-          fi
-          node scripts/lib/link-check.mjs $files
+      # CWK-120 row 2 (CodeRabbit PR 19 comment 4045387864): a former `files=$(git
+      # ls-files ... | grep -v ...)` + unquoted `node ... $files` construction here
+      # word-split a tracked path containing a space into multiple bogus argv entries.
+      # Removed entirely -- the no-arg call below already enumerates tracked markdown,
+      # applies the identical exclusions (isExcluded: 'plugin/' + '/fixtures/link-
+      # check/'), and refuses an empty result with exit 1, all inside the engine itself.
+      - run: node scripts/lib/link-check.mjs

@@ -11,8 +11,24 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { slug, renderInline, anchorsFor, checkFile, Anchorer } from './link-check.mjs';
 
+// CWK-120 row 5 (CodeRabbit 4045387921): a numeric entity above 0x10FFFF must not crash the
+// gate with a RangeError -- it must fall through unchanged (the same "m" fallback the
+// unrecognized-named-entity branch already uses).
+test('renderInline: a numeric entity above the Unicode maximum does not throw', () => {
+  assert.doesNotThrow(() => renderInline('note &#1114112; note'), 'RangeError from String.fromCodePoint must not escape');
+  assert.equal(renderInline('note &#1114112; note').includes('&#1114112;'), true, 'an out-of-range entity is left as-is, not silently dropped');
+});
+
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ENGINE = path.resolve(REPO_ROOT, 'scripts/lib/link-check.mjs');
+// CWK-120 row 6 hermetic follow-through: a temp-repo git spawn in these tests must not
+// inherit GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE from whatever invoked "node --test" --
+// e.g. these tests running inside the repo's own pre-commit hook, which sets all three.
+const GIT_ENV_CLEAN = { ...process.env };
+delete GIT_ENV_CLEAN.GIT_DIR;
+delete GIT_ENV_CLEAN.GIT_WORK_TREE;
+delete GIT_ENV_CLEAN.GIT_INDEX_FILE;
 
 // The 39 canonical vectors (10 census, 29 probe), from slug-oracle-2026-09.test-vectors.json.
 const VECTORS = [
@@ -136,7 +152,7 @@ test('CLI: exits 0 on a clean fixture (real spawned process)', () => {
 test('CLI: exits 1 on a genuinely empty tracked-.md list -- CoalTipple HIGH-1 lesson (git init, no commits, no walk-exclusion involved)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-empty-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8' });
+  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
   assert.equal(init.status, 0);
   // Dispatch-transport.md's fixture-safety rule: assert the fixture's OWN .git exists
   // before trusting anything about it (here: before running git ls-files against it).
@@ -161,60 +177,38 @@ for (const f of ['scripts/lib/link-check.mjs', 'scripts/lib/link-check.test.mjs'
 
 // Reading a shipped workflow file in a test is legitimate -- main's ruling for
 // CoalHearth (cited per the r34 order's own instruction to name the precedent).
-test('.github/workflows/link-check.yml: the engine step is real, no continue-on-error, and a non-empty-list guard exists', () => {
+//
+// CWK-120 row 2 (CodeRabbit 4045387864): the step used to build `files=$(git ls-files
+// ...)` and call `node scripts/lib/link-check.mjs $files` UNQUOTED -- a tracked path
+// containing a space (e.g. "docs/release notes.md") word-splits into two argv entries,
+// so the CLI reads wrong paths and can fail the workflow on a legitimate filename. Fixed
+// by calling the CLI with NO arguments at all: main()'s own no-arg path already
+// enumerates tracked markdown (listTrackedMarkdown), applies the identical exclusions
+// (isExcluded: 'plugin/' + '/fixtures/link-check/', the same two patterns the removed
+// bash `grep -v` used), and refuses an empty result with exit 1 on its own -- the "CLI:
+// exits 1 on a genuinely empty tracked-.md list" test above already pins that internal
+// guard directly against the real engine, so nothing here needs to re-prove it via bash.
+test('.github/workflows/link-check.yml: the engine step is real, unquoted-arg-free, no continue-on-error', () => {
   const yml = readFileSync(path.resolve(REPO_ROOT, '.github/workflows/link-check.yml'), 'utf8');
   assert.ok(yml.includes('node scripts/lib/link-check.mjs'), 'the step must run the real CLI, not a stub');
   assert.ok(!/continue-on-error\s*:/.test(yml), 'this is a real gate, never continue-on-error');
-  assert.ok(/if \[ -z "\$files" \]/.test(yml), 'a non-empty tracked-.md list guard must exist before the engine runs');
+  assert.ok(
+    !/node scripts\/lib\/link-check\.mjs[ \t]*\S/m.test(yml),
+    'the CLI must be invoked with NO trailing argument -- an unquoted $files expansion ' +
+      'word-splits a tracked path containing a space into multiple argv entries'
+  );
 });
 
-// r34 FIXBACK 2, LOW-1: the text-only check above cannot see that `set -e` (GitHub's
-// own default shell for `run:` is `bash --noprofile --norc -eo pipefail {0}`) aborts
-// the step at the grep pipeline BEFORE the empty-list `if` ever runs, when every file
-// is filtered out (grep -v exits 1 on zero matching lines). Pin the BEHAVIOUR: extract
-// the real run: block and execute it under the identical shell GitHub uses, against a
-// fixture repo with zero tracked .md files.
-function extractRunBlock(yml) {
-  const lines = yml.split('\n');
-  const idx = lines.findIndex((l) => /^\s*- run: \|\s*$/.test(l));
-  assert.ok(idx !== -1, 'could not find "- run: |" in the workflow');
-  const body = [];
-  let baseIndent = null;
-  for (let i = idx + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === '') {
-      body.push('');
-      continue;
-    }
-    const indent = line.match(/^ */)[0].length;
-    if (baseIndent === null) baseIndent = indent;
-    if (indent < baseIndent) break;
-    body.push(line.slice(baseIndent));
-  }
-  return body.join('\n') + '\n';
-}
-
-test('.github/workflows/link-check.yml: the empty-list guard is REACHED, not aborted by set -e (LOW-1)', (t) => {
-  const bashCheck = spawnSync('bash', ['--version'], { encoding: 'utf8' });
-  if (bashCheck.error) {
-    t.skip('bash is not available on this host');
-    return;
-  }
-  const yml = readFileSync(path.resolve(REPO_ROOT, '.github/workflows/link-check.yml'), 'utf8');
-  const script = extractRunBlock(yml);
-  const dir = mkdtempSync(path.join(tmpdir(), 'link-check-emptyguard-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8' });
-  assert.equal(init.status, 0);
-  assert.ok(existsSync(path.join(dir, '.git')), 'git init must have created .git first');
-  const scriptPath = path.join(dir, 'step.sh');
-  writeFileSync(scriptPath, script);
-  // The fixture repo is git-init'd with ZERO tracked .md files -- `git ls-files '*.md'`
-  // already returns nothing, so the guard must fire without any file needing exclusion.
-  const res = spawnSync('bash', ['-eo', 'pipefail', scriptPath], { cwd: dir, encoding: 'utf8' });
-  assert.equal(res.status, 1, `expected exit 1, got ${res.status} stdout=${JSON.stringify(res.stdout)} stderr=${JSON.stringify(res.stderr)}`);
-  assert.ok((res.stdout + res.stderr).includes('::error::'), 'the ::error:: guard line must actually print, not be skipped by set -e');
-});
+// r34 FIXBACK 2, LOW-1's bash-guard hermetic pin is RETIRED, not merely moved: CWK-120
+// row 2 deleted the bash `if [ -z "$files" ]` / `set -e` / `grep -v` machinery it existed
+// to protect -- there is no bash-side guard left to prove reachable. The property that
+// mattered (an empty tracked-.md list makes the step fail) is unchanged and is already
+// pinned at the correct layer by the pre-existing "CLI: exits 1 on a genuinely empty
+// tracked-.md list" test above, which spawns the real engine directly. Removed rather
+// than repurposed: reusing extractRunBlock() against a fixture repo cannot work here --
+// the new one-line body is a bare relative path to scripts/lib/link-check.mjs, which
+// only resolves when cwd is this repo's own root, so it cannot be replayed unmodified
+// against an empty external fixture the way the old multi-line bash body could.
 
 // r34 FIXBACK 2, MEDIUM-1: the CLI's main-module guard compares process.argv[1] against
 // import.meta.url. Node resolves import.meta.url to the file's REALPATH, but a bare
@@ -238,6 +232,30 @@ test('CLI: the main-module guard survives being invoked through a symlink/juncti
 
 // r34 FIXBACK 2, LOW-3: the malformed-percent-encoding branch (decodeURIComponent
 // throwing on a %zz-shaped escape) had no test -- pin it directly.
+// CWK-120 row 6 (CodeRabbit 4045387940): git ls-files must scan repoRoot, never a repo
+// leaked through GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE inherited from the caller's env --
+// exactly the environment a git pre-commit/pre-push hook sets (.githooks/pre-commit runs
+// "node scripts/test.mjs" as a git hook, so this is a real, not hypothetical, caller shape).
+test('CLI: a polluted GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE env does not redirect the scan to another repo', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'link-check-envpollute-'));
+  spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  writeFileSync(path.join(dir, 'unique-row6-marker.md'), '# marker\n\nno links here.\n');
+  spawnSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  const pollutedEnv = {
+    ...process.env,
+    GIT_DIR: path.join(REPO_ROOT, '.git'),
+    GIT_WORK_TREE: REPO_ROOT,
+    GIT_INDEX_FILE: path.join(REPO_ROOT, '.git', 'index'),
+  };
+  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', env: pollutedEnv });
+  assert.ok(
+    res.stdout.includes('0 finding(s) across 1 file(s)'),
+    `must scan exactly the temp repo's own 1 tracked file, not the real repo's -- got: ${res.stdout || res.stderr}`
+  );
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('checkFile: a malformed percent-encoded anchor is a finding, never a crash (LOW-3)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-malformed-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
