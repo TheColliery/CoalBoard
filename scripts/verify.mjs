@@ -509,6 +509,14 @@ check('factory config valid against schema', () => {
   let cfg;
   try { cfg = JSON.parse(stripJsonc(raw)); }
   catch (e) { return `platform-configs/.coalboard.json is not valid JSONC: ${e && e.message ? e.message : e}`; }
+  // CWK-120 MEDIUM-3 (INSPECT rev-parse4.mjs): Object.entries([]) is [] and Object.entries(42)
+  // is [], so an array or a primitive body ran zero per-key validations and this check printed
+  // "ok" -- the same object-and-not-array guard the other 3 JSON.parse sites in this room
+  // already carry (hooks/coalboard-conductor.js:39/:339, scripts/configure.mjs:65).
+  if (!(cfg && typeof cfg === 'object' && !Array.isArray(cfg))) {
+    const shape = cfg === null ? 'null' : Array.isArray(cfg) ? 'an array' : typeof cfg;
+    return `platform-configs/.coalboard.json body must be a JSON object, not ${shape}`;
+  }
   const byKey = new Map(CONFIG_SCHEMA.map((s) => [s.key, s]));
   for (const [k, v] of Object.entries(cfg)) {
     const spec = byKey.get(k);
