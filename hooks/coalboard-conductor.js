@@ -381,7 +381,18 @@ function main() {
   // is updateMode), so it still fires when the board is off — the two keys are independent.
   let msg = off ? '' : "[CoalBoard] Consensus board available. On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user's consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.";
   if (updateDue(cfg)) {
-    msg += (msg ? ' ' : '[CoalBoard] ') + '[self-update due] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER `claude plugin update coalboard@coalboard`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.';
+    // CWK-120 row 4 (CodeRabbit 4045387911): the directive used to say nothing about
+    // WHICH mode fired it. CodeRabbit's own proposed fix additionally asked for distinct
+    // ask/remind/auto BEHAVIOR branches in this hook -- declined: nothing anywhere in
+    // ship-text (commands/update.md, SKILL.md) ever defines what "remind" does
+    // differently from "ask"; the schema (config-schema.mjs) only orders the four
+    // values, it does not behaviorally distinguish two of them. Inventing that behavior
+    // here would be a product decision this BUILD dispatch has no authority to make.
+    // The narrow, uncontroversial half is applied instead: the hook already computed
+    // cfg.updateMode, so naming it costs nothing and lets the reading agent see which
+    // mode fired, rather than emitting an identical sentence for ask/remind/auto alike.
+    const mode = lc(cfg.updateMode || 'ask');
+    msg += (msg ? ' ' : '[CoalBoard] ') + `[self-update due, mode: ${mode}] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER \`claude plugin update coalboard@coalboard\`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.`;
   }
   // UMB-133: the config-path report rides the SAME sanctioned SessionStart line (Phoenix #13), and
   // fires even when the board is off / no update is due -- it is orthogonal to both, like self-update.
