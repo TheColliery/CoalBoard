@@ -903,7 +903,6 @@ function shortAlias(dir) {
 }
 // base/.claude/.coalboard.json = the FOREIGN config (legacy shape, so a read names it on stdout);
 // base/<long home>/<proj> = the project; the walk must stop at the long-named home.
-const LIVE125 = /self-update due, mode: remind/;
 function cwk125Layout() {
   const base = fs.realpathSync.native(mk());
   const home = path.join(base, 'a-long-home-directory-name-cwk125');
@@ -911,10 +910,11 @@ function cwk125Layout() {
   fs.mkdirSync(proj, { recursive: true });
   fs.mkdirSync(path.join(base, '.claude'), { recursive: true });
   const foreign = path.join(base, '.claude', '.coalboard.json');
-  fs.writeFileSync(foreign, JSON.stringify({ updateMode: 'off' }));
-  // r12 M-2 liveness anchor: the HOME-level (global) config sets updateMode remind, so a hook that ran prints
-  // `mode: remind`, and a walk that escaped above home would read the foreign `off` and silence it.
-  writeCfg(home, { updateMode: 'remind' });
+  // r12 M-2 + R2-M1 liveness anchor: NOTHING is written at or below home. A config at <home>/.claude would be
+  // a walk candidate that ends the walk BEFORE the stop-at-home compare, so the 8.3 escape could never happen
+  // and the alias tests went blind. With nothing there, a live contained hook prints the board line (coalboardMode
+  // default ask); a walk that escaped above home reads this foreign `off`, drops the line and names the file.
+  fs.writeFileSync(foreign, JSON.stringify({ coalboardMode: 'off' }));
   return { base, home, proj, foreign };
 }
 test('CWK-125 control: cwd and HOME spelled the SAME way -- the walk stops at home, the foreign config above it is not read', (t) => {
@@ -922,7 +922,7 @@ test('CWK-125 control: cwd and HOME spelled the SAME way -- the walk stops at ho
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const r = run({ hook_event_name: 'SessionStart' }, proj, home);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config');
+  assert.match(r.stdout, BOARD_LINE, 'liveness: the hook ran (board line, nothing at home)');
   assert.ok(!r.stdout.includes(foreign), 'a config above home is never read');
 });
 test('CWK-125: HOME spelled as its 8.3 ALIAS, cwd long -- the walk must STILL stop at home (no escape above it)', (t) => {
@@ -932,7 +932,7 @@ test('CWK-125: HOME spelled as its 8.3 ALIAS, cwd long -- the walk must STILL st
   if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
   const r = run({ hook_event_name: 'SessionStart' }, proj, alias);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config: ' + r.stdout);
+  assert.match(r.stdout, BOARD_LINE, 'liveness: a contained walk keeps the board line; an escaped one reads the foreign off: ' + r.stdout);
   assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
 });
 test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL stop at home (the mirror mismatch)', (t) => {
@@ -942,7 +942,7 @@ test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL st
   if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
   const r = run({ hook_event_name: 'SessionStart' }, alias, home);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config: ' + r.stdout);
+  assert.match(r.stdout, BOARD_LINE, 'liveness: a contained walk keeps the board line; an escaped one reads the foreign off: ' + r.stdout);
   assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
 });
 
