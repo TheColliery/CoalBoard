@@ -984,7 +984,7 @@ function umb174(setup, input) {
   const root = mk();
   const home = mk();
   try {
-    const real = fs.realpathSync(root);
+    const real = fs.realpathSync.native(root);
     setup({ root, home, real });
     return { r: run(input || { hook_event_name: 'SessionStart' }, root, home), real, home };
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
@@ -1084,7 +1084,7 @@ test('UMB-174 (b) C-6: an UNREADABLE config (EACCES or EPERM) is reported as "un
   const root = mk();
   const home = mk();
   t.after(() => { undoDeny(projTarget(root)); fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); });
-  const real = fs.realpathSync(root);
+  const real = fs.realpathSync.native(root);
   writeAt(projTarget(root), JSON.stringify({ updateMode: 'off' }));
   applyDeny(projTarget(root), how);
   const r = run({ hook_event_name: 'SessionStart' }, root, home);
