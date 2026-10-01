@@ -199,7 +199,11 @@ function main() {
   const globalIdx = args.indexOf('--global');
   const isGlobal = globalIdx !== -1;
   if (isGlobal) args.splice(globalIdx, 1);
-  const cwd = process.cwd();
+  // The ONE spelling of cwd for this whole run: findProjectCfg returns paths built from physical(startDir)
+  // (CWK-125), and legacyPaths.includes(readPath) below is a STRING compare, so a raw process.cwd() spelled as a
+  // Windows 8.3 alias (C:\Users\RUNNER~1\...) never matched the expanded readPath -- a legacy config was then
+  // written back IN PLACE and never migrated (CI red on 396cabb: the two configure legacy-migration tests).
+  const cwd = physical(process.cwd());
   // UMB-133: BOTH legacy shapes at CWD migrate on write (the same two the hook's projectCandidates lists).
   const legacyPaths = [path.join(cwd, '.claude', '.coalboard.json'), path.join(cwd, '.coalboard.json')];
   const readPath = isGlobal

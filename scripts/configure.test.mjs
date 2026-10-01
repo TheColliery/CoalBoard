@@ -327,3 +327,27 @@ test('configure CWK-125: HOME spelled as its 8.3 ALIAS -- the walk stops at home
   assert.strictEqual(fs.readFileSync(foreign, 'utf8'), before, 'the foreign config above home must be left untouched');
   assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the write must land at the project own-dir default');
 });
+
+// ---- CI red on 396cabb: a legacy config must still MIGRATE when cwd is spelled as its 8.3 alias. findProjectCfg
+// returns paths built from the EXPANDED cwd (CWK-125) while legacyPaths was built from the raw process.cwd(), so
+// the string compare missed and the CLI rewrote the legacy file in place. A dev box with a short username makes
+// no alias for its own TEMP, so the runner's condition is built here through the capability probe instead.
+for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude', '.coalboard.json']], ['root .coalboard.json', ['.coalboard.json']]]) {
+  test(`configure: a LEGACY config (${label}) migrates on write when cwd is spelled as its 8.3 ALIAS`, (t) => {
+    const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-alias-')));
+    t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+    const home = path.join(base, 'a-long-home-directory-name-migr');
+    const proj = path.join(home, 'a-long-project-directory-name');
+    fs.mkdirSync(path.dirname(path.join(proj, ...legacyRel)), { recursive: true });
+    const legacy = path.join(proj, ...legacyRel);
+    fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+    const alias = shortAlias(proj);
+    if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+    const r = run(['--language', 'en'], { home, proj: alias });
+    assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
+    assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the config must land at the own-dir location, not be rewritten in place');
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(proj), 'utf8')).updateCheckDays, 30, 'the legacy value survives the migration');
+    assert.strictEqual(fs.existsSync(legacy), false, 'the legacy file is removed after the migration');
+    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration is announced');
+  });
+}
