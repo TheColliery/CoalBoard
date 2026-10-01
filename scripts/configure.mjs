@@ -9,7 +9,7 @@
 // not a re-derivation from description. Adaptations from CM's file, named:
 //   - root-finding + read-order candidates are ported from THIS ROOM'S OWN
 //     hooks/coalboard-conductor.js (AGENT_DIR_ORDER / projectCandidates /
-//     findProjectCfg / parseJsonc), not CM's findGitRoot. CM resolves a
+//     findProjectCfg / parseConfig), not CM's findGitRoot. CM resolves a
 //     single git-marker ROOT then checks candidates once at that level;
 //     CoalBoard's own conductor has NO root-marker concept — it checks all
 //     5 read-order candidates at EVERY directory level from cwd up to home
@@ -38,7 +38,7 @@
 //     renamed. A migration block exists to move an old VALUE onto a new
 //     KEY; there is no new key here to migrate it onto).
 //   - parseJsonc (below) THROWS on a malformed/non-object root where the
-//     hook's own parseJsonc swallows to {} -- deliberate (a CLI fails loud,
+//     hook's own parseConfig classifies (a reason) and contributes {} -- deliberate (a CLI fails loud,
 //     scripts-quality.md §1, where a hook fails silent, Phoenix #4); the
 //     mechanism and reasoning live on the function itself, this line only
 //     NAMES the divergence so this list stays the complete "what differs
@@ -54,7 +54,7 @@ import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
 
 // String-aware JSONC strip + prototype-pollution guard — the SAME stripping
 // regex and __proto__/constructor/prototype reviver as hooks/coalboard-
-// conductor.js's own parseJsonc (verified at source before porting, not
+// conductor.js's own parseConfig (verified at source before porting, not
 // assumed present), but this one THROWS on malformed input instead of
 // swallowing to {} — the hook is a fail-silent Phoenix-13 surface, this is
 // a fail-loud CLI script (scripts-quality.md §1); the caller below tells

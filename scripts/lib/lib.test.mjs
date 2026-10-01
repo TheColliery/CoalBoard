@@ -160,7 +160,7 @@ test('rigor — sharpness levers are tiered by preset, explicit key overrides', 
 test('rigor — the shipped factory config does NOT neuter the preset (copy + rigor:nasa stays nasa) [audit #1]', () => {
   const factoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'platform-configs', '.coalboard.json');
   const raw = fs.readFileSync(factoryPath, 'utf8');
-  // strip JSONC comments (strings preserved) — same approach as the conductor's parseJsonc
+  // strip JSONC comments (strings preserved) — same approach as the conductor's parseConfig
   const factory = JSON.parse(raw.replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : '')));
   const eff = applyRigor({ ...factory, rigor: 'nasa' });
   assert.equal(eff.adversaryLens, true, 'factory + rigor:nasa still enables the adversary lens');

@@ -30,15 +30,37 @@ function seedList(v, d) { const e = Array.isArray(v) ? v.filter(Boolean) : []; r
 function kwList(v) { return seedList(v, D_KEYWORDS); }
 
 // String-aware JSONC strip (the CoalMine #12 fix: a value ending in a backslash before a
-// later // must not desync the comment stripper). Guards the result to a plain object.
-function parseJsonc(text) {
+// later // must not desync the comment stripper). Guards the result to a plain object, and CLASSIFIES a
+// failure instead of swallowing it (UMB-174 (b)): { cfg, reason } with reason null | 'malformed JSON' |
+// 'not a JSON object'. A leading U+FEFF is STRIPPED first (RFC 8259 s8.1 lets a parser ignore a BOM;
+// Windows PowerShell 5.1 writes one whenever asked for UTF-8), so a BOM-prefixed valid object is read.
+function parseConfig(text) {
+  let body = String(text);
+  if (body.charCodeAt(0) === 0xfeff) body = body.slice(1);
+  let p;
   try {
-    const clean = String(text).replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : ''));
+    const clean = body.replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : ''));
     // Drop __proto__/constructor/prototype so an untrusted PROJECT config can't pollute the merged
     // config's prototype via the Object.assign in readCfg (OWASP prototype-pollution; ecc ts/security).
-    const p = JSON.parse(clean, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
-    return p && typeof p === 'object' && !Array.isArray(p) ? p : {};
-  } catch { return {}; }
+    p = JSON.parse(clean, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
+  } catch { return { cfg: {}, reason: 'malformed JSON' }; }
+  return p && typeof p === 'object' && !Array.isArray(p) ? { cfg: p, reason: null } : { cfg: {}, reason: 'not a JSON object' };
+}
+
+// Read + classify ONE config file -> { cfg, reason }. Absent = silent (reason null). Branches on the fs error's
+// CODE, never its message (node/runtime.md section 7): 'a directory' (EISDIR) | 'unreadable' (BOTH EACCES and
+// EPERM -- a Windows ACL denial surfaces as EPERM, and a room that maps EACCES alone stays silent there). Any
+// OTHER fs error stays silent: never a fifth reason invented for it. cfg is {} in every failure case, so the
+// walk's SELECTION is unchanged (an unreadable candidate still wins and contributes nothing).
+function readConfigFile(f) {
+  let content;
+  try { content = fs.readFileSync(f, 'utf8'); } catch (e) {
+    const code = e && e.code;
+    if (code === 'EISDIR') return { cfg: {}, reason: 'a directory' };
+    if (code === 'EACCES' || code === 'EPERM') return { cfg: {}, reason: 'unreadable' };
+    return { cfg: {}, reason: null };
+  }
+  return parseConfig(content);
 }
 
 // realpath a dir to its PHYSICAL path, falling back to a lexical resolve if realpath
@@ -199,7 +221,14 @@ function cfgNotices(proj) {
   try {
     const clean = (s) => String(s).replace(/\p{Cc}/gu, '?');
     const out = [];
-    if (proj.legacyDir) {
+    // UMB-174 (b): ONE flock string (every room verbatim). CWK-135 (a): the line names the path of the TIER that
+    // failed -- the PROJECT tier keeps the flock literal (canonical = .claude/coal/coalboard.json), the GLOBAL tier
+    // names the global file's OWN path, because a global config has no project location to move to.
+    const unreadable = (p, reason, canon) => `UNREADABLE: ${clean(p)} exists but is not a readable config (${reason}); it was skipped \u2014 canonical = ${canon}`;
+    if (proj.globalReason && proj.globalPath) out.push(unreadable(proj.globalPath, proj.globalReason, clean(proj.globalPath)));
+    if (proj.projectReason && proj.file) out.push(unreadable(proj.file, proj.projectReason, '.claude/coal/coalboard.json'));
+    // a file that failed to read was not "still read": an unreadable legacy winner is UNREADABLE only.
+    if (proj.legacyDir && !proj.projectReason) {
       out.push(`LEGACY config read: ${clean(proj.file)} is a deprecated path; migrate to ${clean(legacyTarget(proj.file))}.`);
     }
     for (const f of proj.ignored.slice(0, IGNORED_CAP)) {
@@ -251,16 +280,16 @@ function mergeSafety(global, project) {
   return out;
 }
 
-function readCfgFile(f) {
-  try { return fs.existsSync(f) ? parseJsonc(fs.readFileSync(f, 'utf8')) : {}; } catch { return {}; }
-}
-
 function readCfg(withStrays) {
   let globalPath = null;
   try { globalPath = path.join(os.homedir(), '.claude', '.coalboard.json'); } catch {}
-  const global = globalPath ? readCfgFile(globalPath) : {};
+  const g = globalPath ? readConfigFile(globalPath) : { cfg: {}, reason: null };
+  const global = g.cfg;
   const proj = findProjectCfg(withStrays); // found by walking UP (cwd may be a subdir)
-  const project = proj.file ? readCfgFile(proj.file) : {};
+  const p = proj.file ? readConfigFile(proj.file) : { cfg: {}, reason: null };
+  const project = p.cfg;
+  // UMB-174 (b): the reasons ride the walk's result to cfgNotices (SessionStart only prints them).
+  proj.globalPath = globalPath; proj.globalReason = g.reason; proj.projectReason = p.reason;
   // project overlays global per key, EXCEPT SAFER_ENUM keys (never louder than global). WHERE the project
   // file was found never reaches the merge: UMB-133 changes the walk, not the clamp.
   return { cfg: mergeSafety(global, project), proj };

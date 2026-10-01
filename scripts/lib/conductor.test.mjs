@@ -947,3 +947,117 @@ test('CWK-135 (b): the CWK-022 authority sentence (the class label) is unchanged
     assert.ok(r.stdout.includes(CWK022));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+
+// ---- r12 item 6 / UMB-174 (b) + CWK-135 (a): ONE flock string for a config that EXISTS where the walk reads
+// but cannot be used -- reported on the SessionStart line, never silent. Reasons: malformed JSON, a directory,
+// unreadable (EACCES AND EPERM -- a Windows ACL denial surfaces as EPERM), not a JSON object (C-5), and a
+// leading U+FEFF is STRIPPED before the parse (a BOM-prefixed VALID object is read, never "malformed").
+// The SELECTION is unchanged: an unreadable candidate still wins the walk and contributes nothing. CWK-135 (a):
+// the GLOBAL tier names the global file's OWN path as canonical; the project tier keeps the flock literal.
+const CANON_REL = '.claude/coal/coalboard.json';
+const unreadableLine = (p, reason, canon) => 'UNREADABLE: ' + p + ' exists but is not a readable config (' + reason + '); it was skipped — canonical = ' + (canon || CANON_REL);
+const unreadableLines = (out) => out.match(/UNREADABLE: [^;]+; it was skipped — canonical = \S+/g) || [];
+function umb174(setup, input) {
+  const root = mk();
+  const home = mk();
+  try {
+    const real = fs.realpathSync(root);
+    setup({ root, home, real });
+    return { r: run(input || { hook_event_name: 'SessionStart' }, root, home), real, home };
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
+}
+const projTarget = (root) => path.join(root, '.claude', 'coal', 'coalboard.json');
+const writeAt = (p, body) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body); };
+
+test('UMB-174 (b): a MALFORMED project config is reported (exact string), and contributes nothing', () => {
+  const { r, real } = umb174(({ root }) => writeAt(projTarget(root), '{ "updateMode": '));
+  assert.equal(r.status, 0);
+  assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', 'coal', 'coalboard.json'), 'malformed JSON')]);
+  assert.match(r.stdout, /self-update due/, 'selection unchanged: the unreadable candidate contributes {}, the default (ask) stands');
+});
+
+test('UMB-174 (b): a DIRECTORY at the candidate path is reported as "a directory"', () => {
+  const { r, real } = umb174(({ root }) => fs.mkdirSync(projTarget(root), { recursive: true }));
+  assert.equal(r.status, 0);
+  assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', 'coal', 'coalboard.json'), 'a directory')]);
+});
+
+test('UMB-174 (b) C-5: valid JSON that is NOT an object gets its own reason, never silence', () => {
+  for (const body of ['[1,2]', '42', '"text"', 'null', 'true']) {
+    const { r, real } = umb174(({ root }) => writeAt(projTarget(root), body));
+    assert.equal(r.status, 0);
+    assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', 'coal', 'coalboard.json'), 'not a JSON object')], 'body ' + body);
+  }
+});
+
+test('UMB-174 (b) C-5: a leading U+FEFF is STRIPPED -- a BOM-prefixed VALID config is read, not reported', () => {
+  const { r } = umb174(({ root }) => writeAt(projTarget(root), '\uFEFF' + JSON.stringify({ updateMode: 'off' })));
+  assert.equal(r.status, 0);
+  assert.deepStrictEqual(unreadableLines(r.stdout), []);
+  assert.doesNotMatch(r.stdout, /self-update due/, 'the BOM-prefixed updateMode:off was actually READ and honoured');
+});
+
+test('UMB-174 (b): an absent config and a valid one print no UNREADABLE line (controls)', () => {
+  assert.deepStrictEqual(unreadableLines(umb174(() => {}).r.stdout), []);
+  assert.deepStrictEqual(unreadableLines(umb174(({ root }) => writeAt(projTarget(root), JSON.stringify({ language: 'th' }))).r.stdout), []);
+});
+
+test('UMB-174 (b) + CWK-135 (a): a malformed GLOBAL config names the GLOBAL file as its own canonical path', () => {
+  const { r, home } = umb174(({ home }) => writeAt(path.join(home, '.claude', '.coalboard.json'), 'not json'));
+  assert.equal(r.status, 0);
+  const g = path.join(home, '.claude', '.coalboard.json');
+  assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(g, 'malformed JSON', g)]);
+});
+
+test('UMB-174 (b): an unreadable LEGACY winner is UNREADABLE only, never also LEGACY', () => {
+  const { r, real } = umb174(({ root }) => writeAt(path.join(root, '.claude', '.coalboard.json'), '{ broken'));
+  assert.equal(r.status, 0);
+  assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', '.coalboard.json'), 'malformed JSON')]);
+  assert.doesNotMatch(r.stdout, /LEGACY config read/, 'a file that failed to parse was not "still read"');
+});
+
+test('UMB-174 (b): the report rides SessionStart ONLY (Phoenix #13) -- UserPromptSubmit emits none', () => {
+  const { r } = umb174(({ root }) => writeAt(projTarget(root), '{ broken'), { hook_event_name: 'UserPromptSubmit', prompt: 'a benign prompt' });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, '');
+});
+
+// EACCES/EPERM: Windows denies a read through an ACL and libuv reports EPERM; chmod cannot deny a read on NTFS.
+// Capability-probed (chmod first, then icacls where it exists), never process.platform; one skippable leg.
+function denyRead(file) {
+  try { fs.chmodSync(file, 0); try { fs.readFileSync(file); } catch (e) { if (e && (e.code === 'EACCES' || e.code === 'EPERM')) return 'chmod'; } finally { try { fs.chmodSync(file, 0o600); } catch {} } } catch {}
+  try {
+    const me = os.userInfo().username;
+    const d = spawnSync('icacls', [file, '/deny', me + ':(R)'], { encoding: 'utf8' });
+    if (d.error || d.status !== 0) return null;
+    try { fs.readFileSync(file); } catch (e) { if (e && (e.code === 'EACCES' || e.code === 'EPERM')) return 'icacls'; }
+    spawnSync('icacls', [file, '/reset'], { encoding: 'utf8' });
+  } catch {}
+  return null;
+}
+function applyDeny(file, how) {
+  if (how === 'chmod') fs.chmodSync(file, 0);
+  else spawnSync('icacls', [file, '/deny', os.userInfo().username + ':(R)'], { encoding: 'utf8' });
+}
+function undoDeny(file) {
+  try { fs.chmodSync(file, 0o600); } catch {}
+  try { spawnSync('icacls', [file, '/reset'], { encoding: 'utf8' }); } catch {}
+}
+test('UMB-174 (b) C-6: an UNREADABLE config (EACCES or EPERM) is reported as "unreadable"', (t) => {
+  const probeDir = mk();
+  t.after(() => fs.rmSync(probeDir, { recursive: true, force: true }));
+  const probe = path.join(probeDir, 'probe');
+  fs.writeFileSync(probe, 'x');
+  const how = denyRead(probe);
+  undoDeny(probe);
+  if (!how) { t.skip('this volume/OS enforces no read denial for the owning process via chmod or icacls (capability probe)'); return; }
+  const root = mk();
+  const home = mk();
+  t.after(() => { undoDeny(projTarget(root)); fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); });
+  const real = fs.realpathSync(root);
+  writeAt(projTarget(root), JSON.stringify({ updateMode: 'off' }));
+  applyDeny(projTarget(root), how);
+  const r = run({ hook_event_name: 'SessionStart' }, root, home);
+  assert.equal(r.status, 0);
+  assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', 'coal', 'coalboard.json'), 'unreadable')]);
+});
