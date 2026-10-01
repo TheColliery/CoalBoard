@@ -45,6 +45,22 @@ test('an expression that merely CONTAINS gitEnv( is refused: presence of the hel
   assert.equal(refused(call("{ env: { ...gitEnv(), X: '1' } }")).length, 1);
 });
 
+// r12 findings-back L-5: CALL_RE took only ' and " as the quote around git, so a quote-less template literal
+// spawn was unseen AND not named open. The backtick is built (String.fromCharCode) so this file stays clean
+// of a literal call the census would read.
+const BT = String.fromCharCode(96);
+const btCall = (opts, fn = 'spawnSync') => fn + '(' + BT + 'git' + BT + ", ['status'], " + opts + ');';
+test('L-5: a backtick-quoted git command is SEEN and refused without gitEnv, and passes with it', () => {
+  const bad = censusGitSpawns(files(btCall('{ cwd: d, env: process.env }')));
+  assert.equal(bad.spawns, 1, 'the census must count the backtick-quoted spawn');
+  assert.equal(bad.findings.length, 1);
+  assert.match(bad.findings[0], /process\.env/);
+  assert.equal(refused(btCall('{ cwd: d }', 'execFileSync')).length, 1, 'a missing env: is refused too');
+  const ok = censusGitSpawns(files(btCall('{ cwd: d, env: gitEnv() }')));
+  assert.equal(ok.spawns, 1);
+  assert.deepEqual(ok.findings, []);
+});
+
 test('a comment mention, a node child and a non-git command are not git spawns', () => {
   const text = [
     '// ' + call('{ env: process.env }'),

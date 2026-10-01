@@ -14,7 +14,8 @@
 // A node child (process.execPath) and any other non-git command is not a git spawn and is left alone.
 //
 // It is TEXTUAL, not a parser. What it sees: a direct spawnSync / execFileSync / spawn / execFile call whose
-// first argument is the literal 'git' (or 'git.exe'), outside a `//` comment line. NAMED OPEN, on purpose:
+// first argument is the literal 'git' (or 'git.exe') in single, double or backtick quotes (a template
+// literal with no ${} is still a literal), outside a `//` comment line. NAMED OPEN, on purpose:
 //   - a callee reached any other way (an alias `const run = spawnSync`, a property of another object, a
 //     wrapper around git defined elsewhere and called by its own name);
 //   - git through a shell (`sh -c '... git ...'`, execSync/exec strings, any call with `shell:`), or a
@@ -26,7 +27,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const CALL_RE = /(?<![.\w$])(spawnSync|execFileSync|spawn|execFile)\(\s*(['"])git(?:\.exe)?\2/g;
+const CALL_RE = /(?<![.\w$])(spawnSync|execFileSync|spawn|execFile)\(\s*(['"`])git(?:\.exe)?\2/g;
 
 function lineOf(text, idx) { return text.slice(0, idx).split('\n').length; }
 
