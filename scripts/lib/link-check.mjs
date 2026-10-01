@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gitEnv } from './git-env.mjs';
 
 // step 2 keep-set, exactly as THE RULE states it: \p{Alphabetic} | \p{M} | \p{Nd} |
 // \p{Pc} | \p{Join_Control} | U+0020 SPACE | U+002D HYPHEN-MINUS. Everything else is
@@ -235,10 +236,8 @@ function isExcluded(relPath) {
 // discovery, so "git ls-files" would enumerate the HOOK's repository instead of repoRoot.
 // Scrubbed here so the scan always targets the directory it was actually asked to scan.
 // CodeRabbit PR 19 comment 4045387940.
-const GIT_ENV_SCRUBBED = { ...process.env };
-delete GIT_ENV_SCRUBBED.GIT_DIR;
-delete GIT_ENV_SCRUBBED.GIT_WORK_TREE;
-delete GIT_ENV_SCRUBBED.GIT_INDEX_FILE;
+// The whole GIT_* family is stripped (CWK-133: gitEnv()), not the three keys first named here.
+const GIT_ENV_SCRUBBED = gitEnv();
 
 function listTrackedMarkdown(repoRoot) {
   const out = execFileSync('git', ['ls-files', '*.md'], { cwd: repoRoot, encoding: 'utf8', env: GIT_ENV_SCRUBBED });

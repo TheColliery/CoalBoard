@@ -11,6 +11,7 @@ import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
 import { checkPointers, pointerCandidates, looksPathShaped, DEFAULT_SURFACE_PLAN, collectSurfaces, applyCheckIgnoreProbe } from './lib/pointer-check.mjs';
 import { deriveRootSets } from './lib/derive-roots.mjs';
+import { gitEnv } from './lib/git-env.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -325,7 +326,7 @@ const pcSurfaces = collectSurfaces(root, DEFAULT_SURFACE_PLAN, {
 // top-level-executing shape (no main-guard) cannot offer a test that imports it.
 function pcResolve(rel) {
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe' });
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe', env: gitEnv(path.dirname(root)) });
     return 'tracked';
   } catch {
     return fs.existsSync(path.join(root, rel)) ? 'untracked' : 'missing';
@@ -466,7 +467,7 @@ if (!pcRoots.ok) {
       PROBE_SUFFIX,
       ignoredRoots,
       fail: (m) => { msg = m; },
-      runCheckIgnore: (input) => spawnSync('git', ['check-ignore', '--stdin'], { cwd: root, encoding: 'utf8', input }),
+      runCheckIgnore: (input) => spawnSync('git', ['check-ignore', '--stdin'], { cwd: root, encoding: 'utf8', input, env: gitEnv(path.dirname(root)) }),
     });
     return msg;
   });

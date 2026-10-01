@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { gitEnv } from './git-env.mjs';
 import {
   checkPointers, pointerCandidates, looksPathShaped,
   classifyCheckIgnoreResult, applyCheckIgnoreProbe,
@@ -453,7 +454,7 @@ test('looksPathShaped residue: an extensionless real path with no trailing slash
 // pre-gate already SKIPs before this spawn fires).
 function mkGitRepoForIgnoreProbe() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-ci-classify-'));
-  const g = (args) => spawnSync('git', args, { cwd: tmp, encoding: 'utf8' });
+  const g = (args) => spawnSync('git', args, { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8' });
   g(['init', '-q', '-b', 'main']);
   g(['config', 'user.email', 'test@test.invalid']);
   g(['config', 'user.name', 'Test']);
@@ -521,7 +522,7 @@ test('classifyCheckIgnoreResult: a REAL git check-ignore --stdin exit other than
   const tmp = mkGitRepoForIgnoreProbe();
   try {
     const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
-      { cwd: tmp, encoding: 'utf8', input: 'ignored-dir/probe\n' });
+      { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'ignored-dir/probe\n' });
     assert.notEqual(ci.status, 0, 'this probe only proves anything if git actually took a non-0/1 exit');
     assert.notEqual(ci.status, 1, 'this probe only proves anything if git actually took a non-0/1 exit');
     assertPreFixFailedOpen(ci);
@@ -536,7 +537,7 @@ test('classifyCheckIgnoreResult: FORCED status-only shape (stdin not connected) 
   try {
     // stdio[0] = 'ignore': spawnSync never writes to git's stdin at all, so no EPIPE is possible.
     const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
-      { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     assert.equal(ci.error, undefined, 'fixture precondition: this shape carries NO spawn error');
     assert.equal(ci.status, 129, 'fixture precondition: git rejected the unknown option with 129');
     assertPreFixFailedOpen(ci); // here the replay proves the ORIGINAL bug: no error to short-circuit it, yet nothing ignored
@@ -555,7 +556,7 @@ test('classifyCheckIgnoreResult: FORCED error-set shape (input far past the pipe
     // (EPIPE on POSIX, EOF on Windows). A fixture failure to reach this shape is a LOUD failure, never a skip.
     const big = ('x/' + 'a'.repeat(200) + '\n').repeat(20000);
     const ci = spawnSync('git', ['check-ignore', '--stdin', '--bogus-flag-xyz'],
-      { cwd: tmp, encoding: 'utf8', input: big, maxBuffer: 1 << 26 });
+      { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: big, maxBuffer: 1 << 26 });
     assert.ok(ci.error, 'fixture precondition: a 4 MB write to a git that exited without reading must surface as a spawn error');
     assertFailClosedVerdict(ci);
   } finally {
@@ -567,7 +568,7 @@ test('classifyCheckIgnoreResult: a REAL exit 0 (a fed path IS ignored) succeeds,
   const tmp = mkGitRepoForIgnoreProbe();
   try {
     const ci = spawnSync('git', ['check-ignore', '--stdin'],
-      { cwd: tmp, encoding: 'utf8', input: 'ignored-dir/probe\n' });
+      { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'ignored-dir/probe\n' });
     assert.equal(ci.status, 0);
     const verdict = classifyCheckIgnoreResult(ci);
     assert.equal(verdict.ok, true);
@@ -581,7 +582,7 @@ test('classifyCheckIgnoreResult: a REAL exit 1 (nothing fed is ignored) succeeds
   const tmp = mkGitRepoForIgnoreProbe();
   try {
     const ci = spawnSync('git', ['check-ignore', '--stdin'],
-      { cwd: tmp, encoding: 'utf8', input: 'not-ignored-at-all/probe\n' });
+      { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'not-ignored-at-all/probe\n' });
     assert.equal(ci.status, 1);
     const verdict = classifyCheckIgnoreResult(ci);
     assert.equal(verdict.ok, true);

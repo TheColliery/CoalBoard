@@ -10,6 +10,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { slug, renderInline, anchorsFor, checkFile, Anchorer } from './link-check.mjs';
+import { gitEnv } from './git-env.mjs';
 
 // CWK-120 row 5 (CodeRabbit 4045387921): a numeric entity above 0x10FFFF must not crash the
 // gate with a RangeError -- it must fall through unchanged (the same "m" fallback the
@@ -25,10 +26,7 @@ const ENGINE = path.resolve(REPO_ROOT, 'scripts/lib/link-check.mjs');
 // CWK-120 row 6 hermetic follow-through: a temp-repo git spawn in these tests must not
 // inherit GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE from whatever invoked "node --test" --
 // e.g. these tests running inside the repo's own pre-commit hook, which sets all three.
-const GIT_ENV_CLEAN = { ...process.env };
-delete GIT_ENV_CLEAN.GIT_DIR;
-delete GIT_ENV_CLEAN.GIT_WORK_TREE;
-delete GIT_ENV_CLEAN.GIT_INDEX_FILE;
+const GIT_ENV_CLEAN = gitEnv();
 
 // The 39 canonical vectors (10 census, 29 probe), from slug-oracle-2026-09.test-vectors.json.
 const VECTORS = [
