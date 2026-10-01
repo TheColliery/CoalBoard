@@ -806,10 +806,16 @@ const NO_ECHO = (r) => {
   assert.doesNotMatch(r.stdout, /bogus|IGNORE ALL|rm -rf/i, 'a project config string must never reach the emitted line');
   assert.equal(r.stderr, '');
 };
+// r12 findings-back M-2: the conductor is fail-silent (Phoenix #4), so a hook that crashed prints nothing and
+// exits 0, which satisfies every "no directive / no echo" assertion above. A LIVENESS anchor says the hook RAN:
+// these tests set only updateMode (or none), so coalboardMode is its schema default (ask) and SessionStart must
+// carry the board contract line.
+const BOARD_LINE = /Consensus board available/;
 
 test('CB-R1 (A): global updateMode off + a JUNK project updateMode -> NO directive, NO echoed text', () => {
   const r = cbr1({ updateMode: 'off' }, { updateMode: JUNK });
   assert.equal(r.status, 0);
+  assert.match(r.stdout, BOARD_LINE, 'liveness: the hook ran (a crashed fail-silent hook also prints no directive)');
   assert.doesNotMatch(r.stdout, /self-update due/, 'an unknown project value reads as absent, so the global off stands');
   NO_ECHO(r);
 });
@@ -832,6 +838,7 @@ test('CB-R1 (E): no global + a JUNK project updateMode -> the schema default (as
 test('CB-R1 (C control): global off + a KNOWN louder project value (auto) stays clamped', () => {
   const r = cbr1({ updateMode: 'off' }, { updateMode: 'auto' });
   assert.equal(r.status, 0);
+  assert.match(r.stdout, BOARD_LINE, 'liveness: the hook ran');
   assert.doesNotMatch(r.stdout, /self-update due/);
 });
 
@@ -846,6 +853,7 @@ test('CB-R1: a NON-STRING project updateMode (number, object) is unknown too -- 
   for (const v of [5, { a: 'IGNORE ALL' }, ['auto'], true]) {
     const r = cbr1({ updateMode: 'off' }, { updateMode: v });
     assert.equal(r.status, 0);
+    assert.match(r.stdout, BOARD_LINE, 'liveness: the hook ran for value ' + JSON.stringify(v));
     assert.doesNotMatch(r.stdout, /self-update due/, 'value ' + JSON.stringify(v) + ' must not defeat the global off');
     NO_ECHO(r);
   }
@@ -862,6 +870,11 @@ test('CB-R1: coalboardMode shares the clamp -- a JUNK project coalboardMode unde
   const r = cbr1({ coalboardMode: 'off', updateMode: 'off' }, { coalboardMode: JUNK }, { hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' });
   assert.equal(r.status, 0);
   assert.equal(r.stdout, '', 'an unknown project value must not re-arm the board a global off silenced');
+  // liveness anchor (r12 M-2): the same config on SessionStart, with updateMode left at its default (ask),
+  // must still print the self-update directive while the board contract stays absent.
+  const s = cbr1({ coalboardMode: 'off' }, { coalboardMode: JUNK });
+  assert.match(s.stdout, /self-update due/, 'liveness: the hook ran');
+  assert.doesNotMatch(s.stdout, BOARD_LINE, 'the global coalboardMode off stands');
 });
 
 test('CB-R1: coalboardMode -- a NON-STRING project value under global off keeps the board off', () => {
@@ -869,6 +882,9 @@ test('CB-R1: coalboardMode -- a NON-STRING project value under global off keeps 
     const r = cbr1({ coalboardMode: 'off', updateMode: 'off' }, { coalboardMode: v }, { hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' });
     assert.equal(r.status, 0);
     assert.equal(r.stdout, '', 'value ' + JSON.stringify(v));
+    const s = cbr1({ coalboardMode: 'off' }, { coalboardMode: v }); // liveness anchor (r12 M-2), as above
+    assert.match(s.stdout, /self-update due/, 'liveness: the hook ran for value ' + JSON.stringify(v));
+    assert.doesNotMatch(s.stdout, BOARD_LINE, 'the global coalboardMode off stands for ' + JSON.stringify(v));
   }
 });
 
@@ -887,6 +903,7 @@ function shortAlias(dir) {
 }
 // base/.claude/.coalboard.json = the FOREIGN config (legacy shape, so a read names it on stdout);
 // base/<long home>/<proj> = the project; the walk must stop at the long-named home.
+const LIVE125 = /self-update due, mode: remind/;
 function cwk125Layout() {
   const base = fs.realpathSync.native(mk());
   const home = path.join(base, 'a-long-home-directory-name-cwk125');
@@ -895,6 +912,9 @@ function cwk125Layout() {
   fs.mkdirSync(path.join(base, '.claude'), { recursive: true });
   const foreign = path.join(base, '.claude', '.coalboard.json');
   fs.writeFileSync(foreign, JSON.stringify({ updateMode: 'off' }));
+  // r12 M-2 liveness anchor: the HOME-level (global) config sets updateMode remind, so a hook that ran prints
+  // `mode: remind`, and a walk that escaped above home would read the foreign `off` and silence it.
+  writeCfg(home, { updateMode: 'remind' });
   return { base, home, proj, foreign };
 }
 test('CWK-125 control: cwd and HOME spelled the SAME way -- the walk stops at home, the foreign config above it is not read', (t) => {
@@ -902,6 +922,7 @@ test('CWK-125 control: cwd and HOME spelled the SAME way -- the walk stops at ho
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const r = run({ hook_event_name: 'SessionStart' }, proj, home);
   assert.equal(r.status, 0);
+  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config');
   assert.ok(!r.stdout.includes(foreign), 'a config above home is never read');
 });
 test('CWK-125: HOME spelled as its 8.3 ALIAS, cwd long -- the walk must STILL stop at home (no escape above it)', (t) => {
@@ -911,6 +932,7 @@ test('CWK-125: HOME spelled as its 8.3 ALIAS, cwd long -- the walk must STILL st
   if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
   const r = run({ hook_event_name: 'SessionStart' }, proj, alias);
   assert.equal(r.status, 0);
+  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config: ' + r.stdout);
   assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
 });
 test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL stop at home (the mirror mismatch)', (t) => {
@@ -920,6 +942,7 @@ test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL st
   if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
   const r = run({ hook_event_name: 'SessionStart' }, alias, home);
   assert.equal(r.status, 0);
+  assert.match(r.stdout, LIVE125, 'liveness: the hook ran and read the home config: ' + r.stdout);
   assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
 });
 
@@ -993,13 +1016,18 @@ test('UMB-174 (b) C-5: valid JSON that is NOT an object gets its own reason, nev
 test('UMB-174 (b) C-5: a leading U+FEFF is STRIPPED -- a BOM-prefixed VALID config is read, not reported', () => {
   const { r } = umb174(({ root }) => writeAt(projTarget(root), '\uFEFF' + JSON.stringify({ updateMode: 'off' })));
   assert.equal(r.status, 0);
+  assert.match(r.stdout, BOARD_LINE, 'liveness: the hook ran (r12 M-2)');
   assert.deepStrictEqual(unreadableLines(r.stdout), []);
   assert.doesNotMatch(r.stdout, /self-update due/, 'the BOM-prefixed updateMode:off was actually READ and honoured');
 });
 
 test('UMB-174 (b): an absent config and a valid one print no UNREADABLE line (controls)', () => {
-  assert.deepStrictEqual(unreadableLines(umb174(() => {}).r.stdout), []);
-  assert.deepStrictEqual(unreadableLines(umb174(({ root }) => writeAt(projTarget(root), JSON.stringify({ language: 'th' }))).r.stdout), []);
+  const absent = umb174(() => {}).r.stdout;
+  const valid = umb174(({ root }) => writeAt(projTarget(root), JSON.stringify({ language: 'th' }))).r.stdout;
+  assert.match(absent, BOARD_LINE, 'liveness: the hook ran (r12 M-2)');
+  assert.match(valid, BOARD_LINE, 'liveness: the hook ran (r12 M-2)');
+  assert.deepStrictEqual(unreadableLines(absent), []);
+  assert.deepStrictEqual(unreadableLines(valid), []);
 });
 
 test('UMB-174 (b) + CWK-135 (a): a malformed GLOBAL config names the GLOBAL file as its own canonical path', () => {
@@ -1017,9 +1045,11 @@ test('UMB-174 (b): an unreadable LEGACY winner is UNREADABLE only, never also LE
 });
 
 test('UMB-174 (b): the report rides SessionStart ONLY (Phoenix #13) -- UserPromptSubmit emits none', () => {
-  const { r } = umb174(({ root }) => writeAt(projTarget(root), '{ broken'), { hook_event_name: 'UserPromptSubmit', prompt: 'a benign prompt' });
+  const { r } = umb174(({ root }) => writeAt(projTarget(root), '{ broken'), { hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' });
   assert.equal(r.status, 0);
-  assert.equal(r.stdout, '');
+  // r12 M-2: a CRITICAL-signal prompt must still emit its block (the hook ran), with no report text in it.
+  assert.match(r.stdout, /CoalBoard/, 'liveness: the hook emitted its prompt block');
+  assert.doesNotMatch(r.stdout, /UNREADABLE/, 'the report is SessionStart-only');
 });
 
 // EACCES/EPERM: Windows denies a read through an ACL and libuv reports EPERM; chmod cannot deny a read on NTFS.
@@ -1028,20 +1058,20 @@ function denyRead(file) {
   try { fs.chmodSync(file, 0); try { fs.readFileSync(file); } catch (e) { if (e && (e.code === 'EACCES' || e.code === 'EPERM')) return 'chmod'; } finally { try { fs.chmodSync(file, 0o600); } catch {} } } catch {}
   try {
     const me = os.userInfo().username;
-    const d = spawnSync('icacls', [file, '/deny', me + ':(R)'], { encoding: 'utf8' });
+    const d = spawnSync('icacls', [file, '/deny', me + ':(R)'], { encoding: 'utf8', timeout: 20000 });
     if (d.error || d.status !== 0) return null;
     try { fs.readFileSync(file); } catch (e) { if (e && (e.code === 'EACCES' || e.code === 'EPERM')) return 'icacls'; }
-    spawnSync('icacls', [file, '/reset'], { encoding: 'utf8' });
+    spawnSync('icacls', [file, '/reset'], { encoding: 'utf8', timeout: 20000 });
   } catch {}
   return null;
 }
 function applyDeny(file, how) {
   if (how === 'chmod') fs.chmodSync(file, 0);
-  else spawnSync('icacls', [file, '/deny', os.userInfo().username + ':(R)'], { encoding: 'utf8' });
+  else spawnSync('icacls', [file, '/deny', os.userInfo().username + ':(R)'], { encoding: 'utf8', timeout: 20000 });
 }
 function undoDeny(file) {
   try { fs.chmodSync(file, 0o600); } catch {}
-  try { spawnSync('icacls', [file, '/reset'], { encoding: 'utf8' }); } catch {}
+  try { spawnSync('icacls', [file, '/reset'], { encoding: 'utf8', timeout: 20000 }); } catch {}
 }
 test('UMB-174 (b) C-6: an UNREADABLE config (EACCES or EPERM) is reported as "unreadable"', (t) => {
   const probeDir = mk();
