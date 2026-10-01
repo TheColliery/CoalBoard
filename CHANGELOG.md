@@ -2,6 +2,23 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+### Security
+- **An unrecognised project `updateMode` or `coalboardMode` value bypassed the config-cascade clamp, and v2.5.1 also echoed it into the session (CB-R1, severity MEDIUM, provisional until the room's review rules).** Found by reading the v2.5.1 diff, not by the SkillSpector scanner. Two defects, one root: a value outside the known list was neither clamped nor validated. **(A) The clamp failed open** (present at v2.5.0): the safer-value-wins merge skipped any pair with an unknown value, so a cloned repository's `.coalboard.json` carrying an unrecognised `updateMode` overrode the user's global `off` or `remind`, and the SessionStart conductor emitted the update web-check directive anyway; `coalboardMode` shared the same path. **(B) The raw string was echoed** (new in v2.5.1, when the `remind` fix put the mode in the directive header): attacker-chosen text, newlines included, reached the line the agent reads as context. The conductor now reads an unknown value, or a non-string, as absent (a project's falls back to the global value, a global's to the schema default) and prints only the canonical literal. A known louder project value under a global `off` stays clamped, as before.
+- **A home directory spelled as its Windows 8.3 short name let the project-config walk escape above home (CWK-125).** The stop-at-home compare resolved paths with plain `realpathSync`, which does not expand an 8.3 alias, so a working directory and a `HOME` that spell one directory two ways never compared equal and the walk read a foreign `.coalboard.json` above home. In the conductor that was a read; in `scripts/configure.mjs` (same compare, same resolver) it could write through that foreign config. Both sides now resolve through `realpathSync.native`.
+
+### Added
+- **A config file that exists but cannot be read is now reported instead of silently skipped (UMB-174 (b)).** The SessionStart line carries `UNREADABLE: <path> exists but is not a readable config (<reason>); it was skipped — canonical = <canonical>`, with four reasons: `malformed JSON`, `a directory`, `unreadable` (a permission denial, `EACCES` or `EPERM`) and `not a JSON object`. The file is still skipped, as before; only the silence is gone. A failed legacy-path file is reported as unreadable only, never also as a legacy read. The global tier names the global file's own path as its canonical (CWK-135 (a)); the project tier keeps `.claude/coal/coalboard.json`.
+- **A config file with a leading UTF-8 byte-order mark is now read.** Windows PowerShell 5.1 writes one whenever asked for UTF-8, and a valid config carrying it used to read as malformed JSON.
+
+### Changed
+- **The auto-trigger cue's arbitration sentence now names CoalTipple only conditionally (CWK-135 (b)).** It read as if CoalTipple were always present ("CoalTipple = tier-lever"); it now says that if CoalBoard is present this session it leads, and CoalTipple, if present, is its tier-lever. An undecidable Layer-2 verdict is treated as stakes, so the board still halts and asks. The class-label sentence before it is unchanged.
+
+### Fixed
+- **`scripts/` git spawns inherited the ambient `GIT_*` environment (CWK-133).** Inside a linked worktree a git hook exports an absolute `GIT_DIR`, and a test fixture or gate that spread `process.env` into `git` could re-initialise or read the wrong repository. Every git spawn in `scripts/` now takes its environment from one `gitEnv()` helper that deletes the whole `GIT_*` family. Maintainer-side; reaches no install.
+- **A new gate refuses a git spawn that does not use `gitEnv()` alone (CWK-136).** `verify.mjs` now runs a git-spawn census over `scripts/` and fails on a spawn with no `env:`, one that mentions `process.env`, or one whose env is anything but `gitEnv(...)`. Maintainer-side; reaches no install.
+
 ## [2.5.1] - 2026-09-22
 
 ### Fixed
