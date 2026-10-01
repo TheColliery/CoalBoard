@@ -1,0 +1,69 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { censusGitSpawns, collectSources } from './git-env-census.mjs';
+
+// Fixture source text is BUILT, never written as a literal call: this file is itself scanned by the census
+// (scripts/**/*.mjs), and a literal git spawn inside a string would be read as a real one.
+const GIT = "'git'";
+const call = (opts, fn = 'spawnSync') => fn + '(' + GIT + ", ['status'], " + opts + ');';
+const files = (text, rel = 'scripts/x.mjs') => [{ rel, text }];
+const refused = (text) => censusGitSpawns(files(text)).findings;
+
+test('RED-FIRST CWK-136: env: process.env on a git spawn is REFUSED (the hole the presence census passes)', () => {
+  const r = refused(call('{ cwd: d, env: process.env }'));
+  assert.equal(r.length, 1);
+  assert.match(r[0], /process\.env/);
+  assert.match(r[0], /scripts\/x\.mjs:1/);
+});
+
+test('a spread of process.env beside other keys is refused, and a missing env: is refused', () => {
+  assert.equal(refused(call("{ env: { ...process.env, X: '1' } }", 'execFileSync')).length, 1);
+  const none = refused(call('{ cwd: d }'));
+  assert.equal(none.length, 1);
+  assert.match(none[0], /no 'env:'/);
+});
+
+test('gitEnv(...) alone passes, with and without a ceiling, and across a multi-line call', () => {
+  assert.deepEqual(refused(call('{ cwd: d, env: gitEnv(path.dirname(d)) }')), []);
+  assert.deepEqual(refused(call('{\n  cwd: d,\n  env: gitEnv(),\n}', 'execFileSync')), []);
+});
+
+test('an identifier passes only when declared const X = gitEnv(...) and never mutated', () => {
+  const use = call('{ env: E }');
+  assert.deepEqual(refused('const E = gitEnv();\n' + use), []);
+  assert.equal(refused('const E = { ...process.env };\n' + use).length, 1, 'declared from process.env');
+  assert.equal(refused("const E = gitEnv();\nE.GIT_DIR = 'x';\n" + use).length, 1, 'mutated after');
+  assert.equal(refused('const E = gitEnv();\ndelete E.GIT_CEILING_DIRECTORIES;\n' + use).length, 1, 'deleted from');
+  assert.equal(refused(call('{ env: someUndeclared }')).length, 1, 'no declaration at all');
+});
+
+test('an expression that merely CONTAINS gitEnv( is refused: presence of the helper is not the property', () => {
+  assert.equal(refused(call('{ env: base || gitEnv() }')).length, 1);
+  assert.equal(refused(call('{ env: Object.assign(gitEnv(), extra) }')).length, 1);
+  assert.equal(refused(call("{ env: { ...gitEnv(), X: '1' } }")).length, 1);
+});
+
+test('a comment mention, a node child and a non-git command are not git spawns', () => {
+  const text = [
+    '// ' + call('{ env: process.env }'),
+    '  * ' + call('{}'),
+    'spawnSync(process.execPath, ["a"], { env: process.env });',
+    "spawnSync('cmd.exe', ['/c'], {});",
+  ].join('\n');
+  const r = censusGitSpawns(files(text));
+  assert.deepEqual(r.findings, []);
+  assert.equal(r.spawns, 0);
+});
+
+test('unbalanced parens report as a finding, never a silent pass', () => {
+  assert.match(refused('spawnSync(' + GIT + ", ['init'], { env: gitEnv()")[0], /unbalanced/);
+});
+
+test("THIS room's own sources pass: every git spawn takes env from gitEnv() alone", () => {
+  const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const r = censusGitSpawns(collectSources(repo));
+  assert.deepEqual(r.findings, []);
+  assert.ok(r.spawns >= 10, "the census must actually SEE this room's spawns, saw " + r.spawns);
+});

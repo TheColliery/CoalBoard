@@ -23,6 +23,7 @@ const TESTS = [
   'scripts/lib/pointer-check.test.mjs',
   'scripts/lib/derive-roots.test.mjs',
   'scripts/lib/git-env.test.mjs',
+  'scripts/lib/git-env-census.test.mjs',
   'scripts/lib/link-check.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/verify.test.mjs',

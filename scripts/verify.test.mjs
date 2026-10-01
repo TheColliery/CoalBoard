@@ -241,3 +241,33 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// CWK-136: the gate's git-spawn census must refuse a git spawn whose env is process.env. The planted
+// source is BUILT (this file is scanned by the census itself); the control proves the same tree, unplanted,
+// passes, so the FAIL below is the plant and nothing else.
+function censusTree(plant) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-census-'));
+  for (const d of ['scripts', 'skills', 'hooks', 'plugin', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
+    const src = path.join(root, d);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(tmp, d), { recursive: true });
+  }
+  for (const f of ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md', 'CHANGELOG.md', 'NOTICE']) {
+    fs.copyFileSync(path.join(root, f), path.join(tmp, f));
+  }
+  if (plant) fs.writeFileSync(path.join(tmp, 'scripts', 'lib', 'zz-planted.mjs'), 'spawnSync(' + "'git'" + ", ['status'], { cwd: '.', env: process.env });" + NL);
+  return tmp;
+}
+test('CWK-136 RED-FIRST: planting env: process.env on a git spawn makes the verify gate FAIL, naming the file', (t) => {
+  const tmp = censusTree(true);
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
+  assert.match(r.stdout, /FAIL git spawn census: finding 1\/1: scripts\/lib\/zz-planted\.mjs:1 .*process\.env/);
+  assert.notEqual(r.status, 0, 'a refused spawn fails the gate');
+});
+test('CWK-136 control: the same tree with nothing planted passes the census line', (t) => {
+  const tmp = censusTree(false);
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
+  assert.match(r.stdout, /ok {3}git spawn census: every one of \d+ git spawn\(s\)/);
+  assert.doesNotMatch(r.stdout, /FAIL git spawn census/);
+});

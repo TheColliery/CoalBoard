@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
@@ -530,6 +530,27 @@ check('factory config valid against schema', () => {
   if (cross) return `.coalboard.json ${cross}`;
   return null;
 });
+
+// CWK-133 / CWK-136: the git-spawn census. Every git child under scripts/ and hooks/ takes its env from
+// gitEnv() ALONE (scripts/lib/git-env-census.mjs states the three refusals and what it cannot see). The
+// module is imported dynamically, inside this block (node/runtime.md section 1), so an absent lib is a
+// named FAIL here and never a link-time crash before the first check.
+{
+  let census = null;
+  let censusLoadError = null;
+  try { census = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'git-env-census.mjs')).href); }
+  catch (e) { censusLoadError = e; }
+  if (censusLoadError) {
+    check('git spawn census: module loads', () => `scripts/lib/git-env-census.mjs failed to load: ${censusLoadError.message}`);
+  } else {
+    const report = census.censusGitSpawns(census.collectSources(root));
+    if (report.findings.length === 0) {
+      check(`git spawn census: every one of ${report.spawns} git spawn(s) in ${report.files} source file(s) takes env from gitEnv() alone`, () => null);
+    } else {
+      report.findings.forEach((m, i) => check(`git spawn census: finding ${i + 1}/${report.findings.length}`, () => m));
+    }
+  }
+}
 
 for (const o of oks) console.log(`  ok   ${o}`);
 if (fails.length) {
