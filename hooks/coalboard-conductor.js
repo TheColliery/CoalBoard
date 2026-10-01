@@ -212,7 +212,8 @@ function cfgNotices(proj) {
 // key this hook itself reads (coalboardMode, updateMode) from off/ask to auto, re-activating
 // the AND-gate / self-update nudge a user explicitly silenced. Index 0 = safest end. Mirrors
 // CoalMine hooks/_shared/node-config.js SAFER_ENUM + CoalWash scripts/lib/config-load.mjs
-// mergeSafety verbatim (one flock, one color) -- do not invent a different shape here.
+// mergeSafety (one flock, one color) -- do not invent a different shape here. NAMED DIVERGENCE (CB-R1,
+// r12): the exemplars `continue` past an unknown value; this room reads it as ABSENT (see mergeSafety).
 // Non-consent keys (criticalPaths/criticalImports/criticalKeywords/updateCheckDays) are
 // intentionally absent: they are additive detection seeds or numeric caps, never a
 // consent/spend gate, and stay plain project-wins.
@@ -225,15 +226,24 @@ const SAFER_ENUM = {
   coalboardMode: { order: ['off', 'ask', 'auto'], default: 'ask' },
   updateMode: { order: ['off', 'remind', 'ask', 'auto'], default: 'ask' },
 };
+// CB-R1 (r12 item 1, SkillSpector E1): an UNKNOWN value -- not in the key's enum, or not even a string --
+// is neither clamped nor validated by "skip it", and the shallow-merge result is then the raw string: a
+// cloned repo's junk beat a global off/remind. So an unknown value reads as ABSENT inside the clamp (a
+// project's falls to the global value, a global's falls to the schema default), and the merged value is
+// always the CANONICAL enum literal from `order`, never the config string -- so nothing downstream
+// (updateDue, boardOff, the SessionStart line) can see or print attacker text.
+function enumLiteral(order, v) {
+  if (typeof v !== 'string') return null;
+  const i = order.indexOf(v.toLowerCase());
+  return i === -1 ? null : order[i];
+}
 function mergeSafety(global, project) {
   const out = { ...global, ...project };
   for (const [key, { order, default: def }] of Object.entries(SAFER_ENUM)) {
-    if (project[key] === undefined) continue; // project didn't touch this key -- nothing to clamp
-    const globalValue = global[key] !== undefined ? global[key] : def; // absent global = its schema default, not "anything goes"
-    const gi = order.indexOf(String(globalValue).toLowerCase());
-    const pi = order.indexOf(String(project[key]).toLowerCase());
-    if (gi === -1 || pi === -1) continue; // unknown value: leave the shallow-merge result (schema validates downstream)
-    out[key] = pi <= gi ? project[key] : globalValue; // project may not move PAST the (explicit-or-default) global toward the louder end
+    const g = enumLiteral(order, global[key]);   // unknown/absent global = its schema default, not "anything goes"
+    const base = g !== null ? g : def;
+    const p = project[key] === undefined ? null : enumLiteral(order, project[key]); // unknown project value = absent
+    out[key] = p !== null && order.indexOf(p) <= order.indexOf(base) ? p : base; // project may not move PAST base toward the louder end
   }
   return out;
 }
@@ -322,7 +332,7 @@ function writeUpdateStamp(now) {
 // Self-update is kind-1 (plugin version): the HOOK only SCHEDULES (a throttled stamp);
 // the AGENT verifies the tag online (the /coalboard:update procedure). No network here.
 function updateDue(cfg) {
-  if (lc(cfg.updateMode || 'ask') === 'off') return false;
+  if (enumLiteral(SAFER_ENUM.updateMode.order, cfg.updateMode) === 'off') return false;
   try {
     const days = (Number.isInteger(cfg.updateCheckDays) && cfg.updateCheckDays >= 1 && cfg.updateCheckDays <= 365) ? cfg.updateCheckDays : 14;
     const last = readUpdateStamp();
@@ -393,7 +403,7 @@ function main() {
     // answer" half of `ask` is NOT implemented here -- persisting a chosen mode means
     // writing the user's config, and this hook is not a config writer (Phoenix #10); that
     // half is returned upward as a separate product question, not worked around here.
-    const mode = lc(cfg.updateMode || 'ask');
+    const mode = enumLiteral(SAFER_ENUM.updateMode.order, cfg.updateMode) || SAFER_ENUM.updateMode.default; // the validated literal, never the config string (CB-R1 B)
     const directive = mode === 'remind'
       ? `[self-update due, mode: remind] This is a FREE reminder only -- do NOT web-check or spend on this yourself. Tell the user a CoalBoard update check is due and that they can run it whenever they choose (/coalboard:update, or by hand: compare the latest tag to the installed plugin.json version). No network call, no OFFER, no spend.`
       : `[self-update due, mode: ${mode}] Offer the /coalboard:update check: web-check the latest CoalBoard tag vs the installed plugin.json version; if newer, OFFER \`claude plugin update coalboard@coalboard\`; if current, say "up to date"; if git/network is unavailable, say so and suggest updating manually later (never assume). Consent-gated; the hook only scheduled it.`;
