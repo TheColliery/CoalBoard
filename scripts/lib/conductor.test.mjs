@@ -922,3 +922,28 @@ test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL st
   assert.equal(r.status, 0);
   assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
 });
+
+// ---- r12 item 5 / CWK-135 (b): a conductor pointer at a SIBLING plugin carries CWK-111 R9's conditional
+// wording -- "if present"; a plugin that is not present leads nothing. This room's cue named CoalTipple
+// unconditionally ("CoalTipple = tier-lever", "CoalTipple leads only if ...") and "Layer 2 genuinely
+// undecidable -> CoalBoard", while CoalTipple's twin (the Triage sentence is one flock string) already
+// reads the R9 form. The CWK-022 authority sentence (the ONE-LINE class label) stays byte-for-byte.
+const R9_TRIAGE = "Triage (binds even when only ONE hook fired): STAKES = your Layer-2 verdict that the TASK is stakes-domain work (security · crypto · migration · money); fired keywords of any vocabulary are Layer-1 evidence only, never the verdict, and a Layer-2 acquittal STANDS -- no keyword re-arms it. Stakes -> HALT and ask the user before acting, always; if CoalBoard is present this session (its hook fired or its skill is listed) it leads and CoalTipple, if present, is its tier-lever -- a plugin that is not present leads nothing. No stakes: CoalTipple, if present, leads only if the WORK's OWN size/complexity calls for delegate-down or escalate-up -- a fired grade is evidence, never the verdict -- else neither. Layer 2 genuinely undecidable -> treat it as stakes. Both conductors fired -> ARBITRATE silently by this same rule: act on one, never surface it.";
+const CWK022 = "OPEN with a ONE-LINE class label naming which of the four classes fired (security/crypto · DB/financial migrations · high-precision math · another catastrophic-on-error class; never the confidence/reasons/grade detail above)";
+test('CWK-135 (b): the arbitration cue carries the R9 conditional wording, byte-for-byte the flock Triage sentence', () => {
+  const tmp = mk();
+  try {
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, tmp, tmp);
+    assert.equal(r.status, 0);
+    assert.ok(r.stdout.includes(R9_TRIAGE), 'the whole Triage sentence is the flock string: ' + r.stdout.slice(-700));
+    assert.ok(!r.stdout.includes('CoalTipple = tier-lever'), 'no unconditional pointer at a sibling plugin');
+    assert.ok(!r.stdout.includes('Layer 2 genuinely undecidable -> CoalBoard'), 'undecidable routes to stakes, not to a named plugin');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+test('CWK-135 (b): the CWK-022 authority sentence (the class label) is unchanged, byte-for-byte', () => {
+  const tmp = mk();
+  try {
+    const r = run({ hook_event_name: 'UserPromptSubmit', prompt: 'fix the auth crypto bug' }, tmp, tmp);
+    assert.ok(r.stdout.includes(CWK022));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
