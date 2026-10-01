@@ -298,3 +298,32 @@ test('configure: int keys reject a value outside their declared min/max', () => 
     assert.strictEqual(fs.existsSync(PROJECT_TARGET(sb.proj)), false);
   } finally { clean(sb); }
 });
+
+// ---- r12 item 2 / CWK-125: the CLI's findProjectCfg mirrors the hook's walk and carried the same plain
+// realpathSync physical(): a HOME spelled as its 8.3 alias never equalled the long-spelled cwd, so the walk
+// escaped above home and the CLI WROTE through a FOREIGN config (the legacy-migrate branch rewrites the file
+// it found). Capability probe, never process.platform; the same probe as conductor.test.mjs's shortAlias.
+function shortAlias(dir) {
+  try {
+    const r = spawnSync('cmd.exe', ['/d', '/c', 'for %I in ("' + dir + '") do @echo %~sI'], { encoding: 'utf8', windowsVerbatimArguments: true, timeout: 20000 });
+    const a = r.status === 0 ? String(r.stdout).trim() : '';
+    return a && a.toLowerCase() !== dir.toLowerCase() && fs.existsSync(a) ? a : null;
+  } catch { return null; }
+}
+test('configure CWK-125: HOME spelled as its 8.3 ALIAS -- the walk stops at home, a foreign config above it is neither read nor rewritten', (t) => {
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-125-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const home = path.join(base, 'a-long-home-directory-name-cwk125');
+  const proj = path.join(home, 'a-long-project-directory-name');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.mkdirSync(path.join(base, '.claude'), { recursive: true });
+  const foreign = path.join(base, '.claude', '.coalboard.json');
+  const before = JSON.stringify({ language: 'foreign' });
+  fs.writeFileSync(foreign, before);
+  const alias = shortAlias(home);
+  if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+  const r = run(['--updateMode', 'remind'], { home: alias, proj });
+  assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
+  assert.strictEqual(fs.readFileSync(foreign, 'utf8'), before, 'the foreign config above home must be left untouched');
+  assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the write must land at the project own-dir default');
+});

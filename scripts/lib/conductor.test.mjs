@@ -871,3 +871,54 @@ test('CB-R1: coalboardMode -- a NON-STRING project value under global off keeps 
     assert.equal(r.stdout, '', 'value ' + JSON.stringify(v));
   }
 });
+
+// ---- r12 item 2 / CWK-125 (r3 INSPECT MEDIUM): physical() was PLAIN realpathSync feeding the stop-at-home
+// compare. Plain does NOT expand a Windows 8.3 short name, so a cwd and a USERPROFILE spelling ONE directory
+// two ways never compared equal and the upward walk ESCAPED above home, read a FOREIGN .coalboard.json and
+// printed its path (node/runtime.md section 4: this is an IDENTITY question, so .native on BOTH sides).
+// The 8.3 alias is built through a CAPABILITY PROBE (ask the OS for the alias; null where the volume makes
+// none), never process.platform; one skippable leg per test.
+function shortAlias(dir) {
+  try {
+    const r = spawnSync('cmd.exe', ['/d', '/c', 'for %I in ("' + dir + '") do @echo %~sI'], { encoding: 'utf8', windowsVerbatimArguments: true, timeout: 20000 });
+    const a = r.status === 0 ? String(r.stdout).trim() : '';
+    return a && a.toLowerCase() !== dir.toLowerCase() && fs.existsSync(a) ? a : null;
+  } catch { return null; }
+}
+// base/.claude/.coalboard.json = the FOREIGN config (legacy shape, so a read names it on stdout);
+// base/<long home>/<proj> = the project; the walk must stop at the long-named home.
+function cwk125Layout() {
+  const base = fs.realpathSync.native(mk());
+  const home = path.join(base, 'a-long-home-directory-name-cwk125');
+  const proj = path.join(home, 'a-long-project-directory-name');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.mkdirSync(path.join(base, '.claude'), { recursive: true });
+  const foreign = path.join(base, '.claude', '.coalboard.json');
+  fs.writeFileSync(foreign, JSON.stringify({ updateMode: 'off' }));
+  return { base, home, proj, foreign };
+}
+test('CWK-125 control: cwd and HOME spelled the SAME way -- the walk stops at home, the foreign config above it is not read', (t) => {
+  const { base, home, proj, foreign } = cwk125Layout();
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const r = run({ hook_event_name: 'SessionStart' }, proj, home);
+  assert.equal(r.status, 0);
+  assert.ok(!r.stdout.includes(foreign), 'a config above home is never read');
+});
+test('CWK-125: HOME spelled as its 8.3 ALIAS, cwd long -- the walk must STILL stop at home (no escape above it)', (t) => {
+  const { base, home, proj, foreign } = cwk125Layout();
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const alias = shortAlias(home);
+  if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+  const r = run({ hook_event_name: 'SessionStart' }, proj, alias);
+  assert.equal(r.status, 0);
+  assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
+});
+test('CWK-125: cwd spelled as its 8.3 ALIAS, HOME long -- the walk must STILL stop at home (the mirror mismatch)', (t) => {
+  const { base, home, proj, foreign } = cwk125Layout();
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const alias = shortAlias(proj);
+  if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+  const r = run({ hook_event_name: 'SessionStart' }, alias, home);
+  assert.equal(r.status, 0);
+  assert.ok(!r.stdout.includes(foreign), 'the escaped file must not be read or named: ' + r.stdout);
+});

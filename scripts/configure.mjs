@@ -67,8 +67,11 @@ function parseJsonc(text) {
   return p;
 }
 
+// `.native` on both sides of the stop-at-home compare (CWK-125, mirrors the hook's physical()): plain
+// realpathSync leaves a Windows 8.3 short name unexpanded, so a HOME spelled as its alias never equalled the
+// long-spelled cwd and the walk escaped above home onto a foreign config this CLI then REWROTE.
 function physical(p) {
-  try { return fs.realpathSync(p); } catch { return path.resolve(p); }
+  try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
 }
 
 // Read order — IDENTICAL to hooks/coalboard-conductor.js's own AGENT_DIR_ORDER

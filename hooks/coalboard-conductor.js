@@ -47,9 +47,12 @@ function parseJsonc(text) {
 // realpath (/private/var/...) while os.homedir() returns the raw HOME env (/var/...), so
 // a lexical `dir === home` NEVER matches and the walk escapes above home (CoalHearth
 // beta.3 realpath-both-sides lesson; same class as CoalFace v0.1.0-beta.2). Resolve BOTH
-// sides before comparing.
+// sides before comparing, through `.native` (CWK-125): plain realpathSync does NOT expand a Windows 8.3
+// short name, so a cwd and a USERPROFILE spelling one directory two ways never compared equal and the
+// walk escaped ABOVE home onto a foreign config (node/runtime.md section 4 -- an identity compare, so
+// both sides through one resolver; the allowlist case in that section does not apply here).
 function physical(p) {
-  try { return fs.realpathSync(p); } catch { return path.resolve(p); }
+  try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
 }
 
 // Namespace campaign (#69+#39, owner-designated 2026-08-08). Per-project config lives
