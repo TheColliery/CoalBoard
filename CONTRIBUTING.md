@@ -1,0 +1,71 @@
+# Contributing to CoalBoard
+
+CoalBoard is the consensus & debate board of the [TheColliery](https://github.com/TheColliery) series. We welcome issues, bug reports, and pull requests.
+
+---
+
+## 🤝 Proposing a Change
+
+1. **Open an issue first** describing the problem, gap, or proposed feature (especially for changes to `SKILL.md` — the board contract).
+2. Make your code changes and keep the verification gates green.
+3. For board-behavior or `SKILL.md` changes, **dogfood it live** (convene the board on a real task across at least one platform) and document the behavior in your PR.
+
+---
+
+## 💻 Developing & Testing
+
+CoalBoard is **zero-dependency** (Node.js built-ins only, Node 22+). No `npm install` is required.
+
+Keep the gates green before and after editing:
+
+```bash
+node scripts/verify.mjs   # validates the config schema, the manifest, the factory config, and plugin/ dist-sync
+node scripts/test.mjs     # runs the zero-dependency test suite (node --test)
+```
+
+### Development Rules
+* **Rebuild the dist after a source change:** edit `skills/`, `hooks/`, `commands/`, `scripts/lib/`, or the manifest, then `node scripts/build-plugin.mjs` to re-sync `plugin/` (verify fails on a stale dist).
+* **`config-schema.mjs` is the single source of truth** for every `.coalboard.json` key — `verify.mjs` validates the factory config against it.
+* **Keep the conductor Phoenix-pure:** zero dependencies, fail-silent (wrap in try/catch, never exit non-zero), no network, no spawn, no NUL byte.
+* **Add unit tests:** every shared helper gets a `*.test.mjs`; the conductor change gets a hermetic spawn test. Register new files in `scripts/test.mjs` (the runner fails on an unlisted orphan).
+* **Language & tone:** shipped source and docs stay in English.
+
+### Reading a green check on a docs-only change
+
+Both checks the branch ruleset requires — `all-green` (CI) and `analyze (javascript)` (CodeQL) — now run on **every** push, including one that touches only root docs. On such a push each check reports success **so the ruleset stays satisfiable**, not because anything was verified: the workflows decide per-run, from the changed paths, whether their suite has any work to do.
+
+**So read the job summary, never the green tick alone.** Each check states which of three things happened — the path classifier failed (the check refuses), the suite ran (with its result), or there was nothing to run (naming the changed paths that produced that verdict). A summary saying nothing ran is not a clean bill of health. The two workflows exempt deliberately different path sets: CI still runs on a shipped markdown artifact, because `verify.mjs` checks dist-sync, while CodeQL skips all markdown, because it analyzes JS/TS.
+
+---
+
+## 🖥️ Supported Platforms
+
+CoalBoard is **cross-agent** — it runs on any platform with concurrent subagents (the board spawns parallel-blind lenses; diversity rides the prompts, not a vendor). **Claude Code** additionally lets it run cheap lenses + a premium judge (a cost bonus) and auto-activates via hooks. A platform with no concurrent fan-out degrades to a sequential pass or off — never a broken board. Verify the platform's current subagent support (it churns).
+
+**Two tiers, honestly.** Any subagent platform **works with** CoalBoard — the degrade-safe path runs (conservatively, unverified, design-supported not run end-to-end by us) with no setup, so you can use the board there today. **Claude Code + Antigravity** are **validated** end-to-end. Validation follows *access*, not a request queue: if you run a platform we haven't, open an issue at [Issues](https://github.com/TheColliery/CoalBoard/issues) and we'll walk you through a one-off capability probe **you run** on your side, then we confirm the result and ship a tuned adapter. The probe prompts stay private, and we never mark a platform "validated" until it's actually been run there — the free degrade-safe path is always there; "validated" is earned by whoever has the platform.
+
+---
+
+## 🗂️ Project Layout
+
+| Path | Purpose |
+|---|---|
+| `skills/coalboard/SKILL.md` | The board contract (the load-bearing prompt). |
+| `scripts/lib/` | Core logic: `config-schema`, `trigger` (AND-gate), `rigor` (preset), `secrets` (scrubber), `link-check` (repo-internal link/anchor gate). |
+| `scripts/` | Tool scripts: `build-plugin.mjs`, `verify.mjs`, `test.mjs`. |
+| `hooks/coalboard-conductor.js` | Phoenix-pure conductor hook (SessionStart + UserPromptSubmit). Auto-synced by the build. |
+| `plugin/` | Generated Claude Code plugin distribution. |
+| `platform-configs/.coalboard.json` | Commented factory default configuration. |
+| (benchmark) | The with-the-board-vs-without benchmark lives in the series records — [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) — kept out of the clone (clean-clone: a skill repo carries only the skill). |
+
+---
+
+## 🚀 Releasing (Maintainers)
+
+Bump version in `.claude-plugin/plugin.json` ➡️ add a `CHANGELOG.md` entry ➡️ ensure `verify.mjs` and `test.mjs` pass ➡️ commit ➡️ create a signed git tag (`vX.Y.Z`) ➡️ push ➡️ create a GitHub Release (stable tags only).
+
+---
+
+## 📄 License & Conduct
+
+Contributions are licensed under the [Apache License 2.0](LICENSE). Please assume good faith and be respectful. Report security issues per [SECURITY.md](SECURITY.md).
