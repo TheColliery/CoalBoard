@@ -50,5 +50,22 @@ if (orphans.length) {
   process.exit(1);
 }
 
-const r = spawnSync(process.execPath, ['--test', ...TESTS], { cwd: repo, stdio: 'inherit' });
+// A finite clock (testing.md, Determinism): a hung test would otherwise hold a runner for the 6 h job default.
+// TEST_TIMEOUT_MS is per test. Basis, measured 2026-10-02 on this box (327 tests, serial, 60.3 s whole suite): the
+// slowest single test took 4.5 s, so 60 s is ~13x that, wide enough for a slower runner (macOS, a Windows 8.3
+// TEMP) and still a hard stop. SUITE_TIMEOUT_MS bounds the whole run at ~10x the measured suite time. The heap cap
+// and one-file-at-a-time ride the child (a runaway test child once took the box down, AGENTS.md 2026-09-25).
+const TEST_TIMEOUT_MS = 60000;
+const SUITE_TIMEOUT_MS = 600000;
+const r = spawnSync(
+  process.execPath,
+  ['--test', '--test-concurrency=1', `--test-timeout=${TEST_TIMEOUT_MS}`, ...TESTS],
+  {
+    cwd: repo,
+    stdio: 'inherit',
+    timeout: SUITE_TIMEOUT_MS,
+    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=2048' },
+  },
+);
+if (r.error) console.error(`test runner: the suite did not finish — ${r.error.code || r.error.message}`);
 process.exit(r.status ?? 1);
