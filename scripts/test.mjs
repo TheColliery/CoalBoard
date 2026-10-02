@@ -25,6 +25,9 @@ const TESTS = [
   'scripts/lib/git-env.test.mjs',
   'scripts/lib/git-env-census.test.mjs',
   'scripts/lib/link-check.test.mjs',
+  'scripts/lib/release-shape.test.mjs',
+  'scripts/release-notes.test.mjs',
+  'scripts/verify-release-shape.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/verify.test.mjs',
 ];
