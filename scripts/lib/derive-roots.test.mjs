@@ -8,10 +8,11 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { deriveRootSets } from './derive-roots.mjs';
+import { gitEnv } from './git-env.mjs';
 
 function makeRepo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-'));
-  execFileSync('git', ['init', '--quiet'], { cwd: dir });
+  execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)) });
   fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored-dir/\nignored-file.txt\n');
   fs.mkdirSync(path.join(dir, 'ignored-dir'));
   fs.writeFileSync(path.join(dir, 'ignored-file.txt'), 'x');
@@ -21,6 +22,31 @@ function makeRepo() {
   fs.mkdirSync(path.join(dir, '.github'));
   return dir;
 }
+
+// CWK-133 / C-4 (exemplar CoalFace 0a614ae): inside a LINKED worktree a git hook exports an ABSOLUTE
+// GIT_DIR and GIT_INDEX_FILE, both of which override cwd and GIT_CEILING_DIRECTORIES, so a fixture's
+// `git init` re-initialises the REAL enclosing repository (core.bare flipped to true, 2026-09-10 and
+// 2026-09-23). Reproduced SAFELY: S is a throwaway sandbox repo standing in for the real one, the hook's
+// env is planted AT S (never anywhere outside this test's own tmp), the room's fixture builder runs, and
+// S's config must be byte-identical while the fixture gets its OWN .git.
+test('CWK-133: a planted ABSOLUTE GIT_DIR / GIT_INDEX_FILE never redirects the fixture init onto another repo', (t) => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk133-sandbox-'));
+  t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }));
+  execFileSync('git', ['init', '--quiet'], { cwd: sandbox, env: gitEnv(path.dirname(sandbox)) });
+  const cfg = path.join(sandbox, '.git', 'config');
+  assert.ok(fs.existsSync(cfg), 'fixture precondition: the sandbox repo exists');
+  const before = fs.readFileSync(cfg, 'utf8');
+  const saved = { GIT_DIR: process.env.GIT_DIR, GIT_INDEX_FILE: process.env.GIT_INDEX_FILE };
+  process.env.GIT_DIR = path.join(sandbox, '.git');
+  process.env.GIT_INDEX_FILE = path.join(sandbox, '.git', 'index');
+  let fixture;
+  try { fixture = makeRepo(); } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  assert.equal(fs.readFileSync(cfg, 'utf8'), before, 'the sandbox repo (the stand-in for the REAL enclosing repo) must be untouched');
+  assert.ok(fs.existsSync(path.join(fixture, '.git')), 'the fixture must get its OWN .git, not re-init the planted one');
+});
 
 test('deriveRootSets: a hidden-but-not-ignored dir (the .github shape) never enters ourRoots', () => {
   const dir = makeRepo();

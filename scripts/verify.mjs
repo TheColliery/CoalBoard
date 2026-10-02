@@ -4,13 +4,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { DEFAULT_CRITICAL_PATHS, DEFAULT_CRITICAL_IMPORTS, DEFAULT_CRITICAL_KEYWORDS } from './lib/trigger.mjs';
 import { textFilesEqual, filesEqual } from './lib/dist-compare.mjs';
 import { checkConfigKeys } from './lib/config-keys.mjs';
 import { checkPointers, pointerCandidates, looksPathShaped, DEFAULT_SURFACE_PLAN, collectSurfaces, applyCheckIgnoreProbe } from './lib/pointer-check.mjs';
 import { deriveRootSets } from './lib/derive-roots.mjs';
+import { gitEnv } from './lib/git-env.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -325,7 +326,7 @@ const pcSurfaces = collectSurfaces(root, DEFAULT_SURFACE_PLAN, {
 // top-level-executing shape (no main-guard) cannot offer a test that imports it.
 function pcResolve(rel) {
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe' });
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', rel], { cwd: root, stdio: 'pipe', env: gitEnv(path.dirname(root)) });
     return 'tracked';
   } catch {
     return fs.existsSync(path.join(root, rel)) ? 'untracked' : 'missing';
@@ -466,7 +467,7 @@ if (!pcRoots.ok) {
       PROBE_SUFFIX,
       ignoredRoots,
       fail: (m) => { msg = m; },
-      runCheckIgnore: (input) => spawnSync('git', ['check-ignore', '--stdin'], { cwd: root, encoding: 'utf8', input }),
+      runCheckIgnore: (input) => spawnSync('git', ['check-ignore', '--stdin'], { cwd: root, encoding: 'utf8', input, env: gitEnv(path.dirname(root)) }),
     });
     return msg;
   });
@@ -509,6 +510,14 @@ check('factory config valid against schema', () => {
   let cfg;
   try { cfg = JSON.parse(stripJsonc(raw)); }
   catch (e) { return `platform-configs/.coalboard.json is not valid JSONC: ${e && e.message ? e.message : e}`; }
+  // CWK-120 MEDIUM-3 (INSPECT rev-parse4.mjs): Object.entries([]) is [] and Object.entries(42)
+  // is [], so an array or a primitive body ran zero per-key validations and this check printed
+  // "ok" -- the same object-and-not-array guard the other 3 JSON.parse sites in this room
+  // already carry (hooks/coalboard-conductor.js:39/:339, scripts/configure.mjs:65).
+  if (!(cfg && typeof cfg === 'object' && !Array.isArray(cfg))) {
+    const shape = cfg === null ? 'null' : Array.isArray(cfg) ? 'an array' : typeof cfg;
+    return `platform-configs/.coalboard.json body must be a JSON object, not ${shape}`;
+  }
   const byKey = new Map(CONFIG_SCHEMA.map((s) => [s.key, s]));
   for (const [k, v] of Object.entries(cfg)) {
     const spec = byKey.get(k);
@@ -521,6 +530,27 @@ check('factory config valid against schema', () => {
   if (cross) return `.coalboard.json ${cross}`;
   return null;
 });
+
+// CWK-133 / CWK-136: the git-spawn census. Every git child under scripts/ and hooks/ takes its env from
+// gitEnv() ALONE (scripts/lib/git-env-census.mjs states the three refusals and what it cannot see). The
+// module is imported dynamically, inside this block (node/runtime.md section 1), so an absent lib is a
+// named FAIL here and never a link-time crash before the first check.
+{
+  let census = null;
+  let censusLoadError = null;
+  try { census = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'git-env-census.mjs')).href); }
+  catch (e) { censusLoadError = e; }
+  if (censusLoadError) {
+    check('git spawn census: module loads', () => `scripts/lib/git-env-census.mjs failed to load: ${censusLoadError.message}`);
+  } else {
+    const report = census.censusGitSpawns(census.collectSources(root));
+    if (report.findings.length === 0) {
+      check(`git spawn census: every one of ${report.spawns} git spawn(s) in ${report.files} source file(s) takes env from gitEnv() alone`, () => null);
+    } else {
+      report.findings.forEach((m, i) => check(`git spawn census: finding ${i + 1}/${report.findings.length}`, () => m));
+    }
+  }
+}
 
 for (const o of oks) console.log(`  ok   ${o}`);
 if (fails.length) {

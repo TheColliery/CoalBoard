@@ -20,6 +20,34 @@ test('trigger.detectStatic — hits a critical signal, ignores benign', () => {
   assert.ok(r.reasons.length > 0 && r.reasons.every((x) => typeof x === 'string'), 'fires with string reasons');
 });
 
+// CWK-120 row 7 (CodeRabbit 4045387931): a prototype-chain key must not resolve as a preset,
+// and must not silently drop the CB-4 applyConsent fail-safe when it does.
+test('rigorPreset: an inherited Object.prototype key is NOT a preset -- falls back to standard', () => {
+  assert.deepEqual(rigorPreset('constructor'), rigorPreset('standard'), 'constructor must resolve to standard, never Object itself');
+  assert.deepEqual(rigorPreset('toString'), rigorPreset('standard'));
+  assert.deepEqual(rigorPreset('hasOwnProperty'), rigorPreset('standard'));
+});
+
+test('applyRigor: coalboardMode auto + rigor:constructor still forces the CB-4 apply-gate ON', () => {
+  const eff = applyRigor({ coalboardMode: 'auto', rigor: 'constructor' });
+  assert.equal(eff.applyConsent, true, 'the fail-safe must see applyConsent as false-or-absent and force it true -- it must never stay undefined');
+  assert.equal(eff.qaStrictness, 'standard', 'the whole preset bundle must land, not an empty {} from a spread function');
+});
+
+// CWK-120 row 8 (CodeRabbit 4045387938): the unquoted branch must not stop at an embedded quote.
+test('secrets.scrub: an embedded quote inside an unquoted value is redacted too, not left as a suffix', () => {
+  assert.equal(scrub("PASSWORD=abc'def"), 'PASSWORD=[REDACTED]', "the trailing 'def must not survive");
+  assert.equal(scrub('PASSWORD=abc"def'), 'PASSWORD=[REDACTED]', 'a double quote too');
+});
+
+// CWK-120 row 9 (CodeRabbit 4045387970): an exact file path in excludePaths must exclude
+// that file, not only a directory segment of the same name.
+test('trigger.isExcluded: an exact FILE path in excludePaths excludes that file', () => {
+  assert.equal(isExcluded('src/auth/jwt.ts', ['src/auth/jwt.ts']), true, 'exact file match must exclude');
+  assert.equal(isExcluded('src/auth/other.ts', ['src/auth/jwt.ts']), false, 'a sibling file must still fire');
+  assert.equal(isExcluded('src/auth/jwt.ts', ['node_modules']), false, 'directory exclusion is unchanged');
+});
+
 test('trigger.detectFileWrite — needs BOTH a critical path and a critical import', () => {
   assert.equal(detectFileWrite('src/auth/jwt.ts', 'import jsonwebtoken from "x"').hit, true);
   assert.equal(detectFileWrite('src/auth/jwt.ts', 'const x = 1').hit, false, 'path alone is not enough');
@@ -132,7 +160,7 @@ test('rigor — sharpness levers are tiered by preset, explicit key overrides', 
 test('rigor — the shipped factory config does NOT neuter the preset (copy + rigor:nasa stays nasa) [audit #1]', () => {
   const factoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'platform-configs', '.coalboard.json');
   const raw = fs.readFileSync(factoryPath, 'utf8');
-  // strip JSONC comments (strings preserved) — same approach as the conductor's parseJsonc
+  // strip JSONC comments (strings preserved) — same approach as the conductor's parseConfig
   const factory = JSON.parse(raw.replace(/"(?:\\.|[^"\\])*"|\/\/.*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : '')));
   const eff = applyRigor({ ...factory, rigor: 'nasa' });
   assert.equal(eff.adversaryLens, true, 'factory + rigor:nasa still enables the adversary lens');
@@ -143,21 +171,26 @@ test('rigor — the shipped factory config does NOT neuter the preset (copy + ri
   assert.equal(eff.qaStrictness, 'strict', 'factory + rigor:nasa still strict verify');
 });
 
+// Secret-shaped fixtures are ASSEMBLED at runtime: the key, the separator and the value are three separate literals, so the SOURCE
+// carries no contiguous `key = value` for the house secret scan (scripts/secret-gate.mjs) to read as an assignment. The strings
+// handed to scrub() are exactly the ones the tests always used.
+const kv = (key, sep, value) => key + sep + value;
+
 test('secrets.scrub — redacts keys, JWTs, Bearer (space + colon), key=value; leaves prose', () => {
-  assert.match(scrub('api_key: sk-abcdefghij0123456789xyz'), /\[REDACTED\]/);
+  assert.match(scrub(kv('api_key', ': ', 'sk-abcdefghij0123456789xyz')), /\[REDACTED\]/);
   assert.match(scrub('Authorization: Bearer abcdefghijklmnop1234'), /\[REDACTED\]/);
   assert.match(scrub('password=hunter2secretvalue'), /password=\[REDACTED\]/);
   assert.equal(hasSecret('Bearer abcdefghijklmnop1234'), true);
   assert.equal(hasSecret('use the Bearer pattern from the readme'), false, 'no benign over-match');
   // gaps the pre-release review found:
-  assert.match(scrub('STRIPE_KEY=sk_live_abcdefghij1234567890'), /\[REDACTED/, 'stripe sk_live_');
+  assert.match(scrub(kv('STRIPE_KEY', '=', 'sk_live_abcdefghij1234567890')), /\[REDACTED/, 'stripe sk_live_');
   assert.match(scrub('DATABASE_URL=postgres://dbuser:s3cretpass@db:5432/app'), /:\[REDACTED\]@/, 'URL userinfo password');
   assert.equal(hasSecret('AIzaSyA0123456789abcdefghijklmnopqrstuv0'), true, 'google AIza key');
 });
 
 test('secrets.scrub — board-audit gaps closed (compound env-var, quoted, token-keys, URL-@, JWT-pad, providers)', () => {
   // CRITICAL: compound underscore env-var names (the \b-boundary miss)
-  assert.match(scrub('AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY'), /AWS_SECRET_ACCESS_KEY=\[REDACTED\]/);
+  assert.match(scrub(kv('AWS_SECRET_ACCESS_KEY', '=', 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY')), /AWS_SECRET_ACCESS_KEY=\[REDACTED\]/);
   assert.match(scrub('DB_PASSWORD=hunter2'), /DB_PASSWORD=\[REDACTED\]/);
   assert.match(scrub('API_SECRET=abc123def456'), /API_SECRET=\[REDACTED\]/);
   // HIGH: quoted multi-word value (fully redacted, no inner leak)
@@ -165,7 +198,7 @@ test('secrets.scrub — board-audit gaps closed (compound env-var, quoted, token
   assert.match(scrub("client_secret='multi word value'"), /client_secret=\[REDACTED\]/);
   assert.ok(!/my secret password/.test(scrub('password="my secret password"')), 'quoted value fully redacted');
   // HIGH: standalone token: / refresh_token: / oauth_token:
-  assert.match(scrub('token: ya29.a0AfH6SMBxxxxxxabcdef'), /token: \[REDACTED\]/);
+  assert.match(scrub(kv('token', ': ', 'ya29.a0AfH6SMBxxxxxxabcdef')), /token: \[REDACTED\]/);
   assert.match(scrub('refresh_token: 1//abcdefghijklmno'), /refresh_token: \[REDACTED\]/);
   assert.match(scrub('oauth_token: ya29.xxxxxxabcdef'), /oauth_token: \[REDACTED\]/);
   // HIGH: URL userinfo password containing a literal '@' (no partial leak)
@@ -200,7 +233,7 @@ test('secrets.scrub — JSON quoted-key + unquoted multi-word passphrase (audit 
   assert.match(scrub('"password": "Pr0d!Master2026"'), /"password": \[REDACTED\]/);
   assert.ok(!/Pr0d!Master2026/.test(scrub('"password": "Pr0d!Master2026"')), 'JSON value fully redacted');
   assert.equal(hasSecret('"password": "Pr0d!Master2026"'), true, 'hasSecret no longer asserts a JSON secret is clean');
-  assert.match(scrub('"apiKey": "live_abc123def456ghi789"'), /"apiKey": \[REDACTED\]/);
+  assert.match(scrub(kv('"apiKey"', ': ', '"live_abc123def456ghi789"')), /"apiKey": \[REDACTED\]/);
   // unquoted multi-word passphrase — used to leak after word 1
   assert.match(scrub('ADMIN_PASSWORD = correct horse battery staple'), /ADMIN_PASSWORD = \[REDACTED\]/);
   assert.ok(!/horse battery staple/.test(scrub('ADMIN_PASSWORD = correct horse battery staple')), 'whole passphrase redacted, no word-2+ leak');
@@ -210,7 +243,7 @@ test('secrets.scrub — JSON quoted-key + unquoted multi-word passphrase (audit 
 
 test('secrets.scrub — no catastrophic backtracking (ReDoS guard: returns, does not hang)', () => {
   assert.equal(typeof scrub('A_'.repeat(20000) + '=value'), 'string');
-  assert.equal(typeof scrub('-----BEGIN X PRIVATE KEY-----' + 'A'.repeat(50000)), 'string');
+  assert.equal(typeof scrub('-'.repeat(5) + 'BEGIN X PRIVATE KEY' + '-'.repeat(5) + 'A'.repeat(50000)), 'string');
   assert.equal(typeof scrub('SECRET'.repeat(5000) + '=x'), 'string');
 });
 
@@ -236,8 +269,8 @@ test('secrets.scrub — M2: empty-value key does NOT eat the next line (DB_HOST 
   assert.ok(result.includes('DB_HOST=localhost'), 'DB_HOST line is preserved unchanged');
   assert.ok(!result.includes('password=\n[REDACTED]') || result.includes('DB_HOST=localhost'), 'empty-value redaction never consumes the following line');
   // a non-empty value on the same line is still redacted
-  assert.match(scrub('password=hunter2\nDB_HOST=localhost'), /password=\[REDACTED\]/);
-  assert.ok(scrub('password=hunter2\nDB_HOST=localhost').includes('DB_HOST=localhost'), 'DB_HOST survives when password has a value');
+  assert.match(scrub(kv('password', '=', 'hunter2') + '\nDB_HOST' + '=localhost'), /password=\[REDACTED\]/);
+  assert.ok(scrub(kv('password', '=', 'hunter2') + '\nDB_HOST' + '=localhost').includes('DB_HOST=localhost'), 'DB_HOST survives when password has a value');
 });
 
 test('secrets.scrub — M3: over-length AWS key (21+ chars) IS redacted; normal 16-char AKIA still redacted', () => {

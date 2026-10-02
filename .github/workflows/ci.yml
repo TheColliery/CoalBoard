@@ -48,15 +48,29 @@ jobs:
     outputs:
       code: ${{ steps.detect.outputs.code }}
       files: ${{ steps.detect.outputs.files }}
+    timeout-minutes: 5 # measured max 7 s over 9 runs (2026-10-02); ~40x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false # pushes nothing
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
-        # every step's shell -- no per-step re-declaration, which would be one more place to
-        # drift.
+        # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
+        # below (that block carries only the three event values), because a per-step
+        # re-declaration would be one more place to drift.
         shell: bash
+        # IN THIS STEP, EVERY ${{ }} REACHES THE SHELL THROUGH env:, NEVER INSIDE run:. Actions
+        # expands ${{ }} by TEXT SUBSTITUTION before bash parses the script, so an expression
+        # written inside run: is interpolated as CODE; through env: it arrives as an
+        # environment variable, which is data, always. These three happen to be
+        # GitHub-controlled today (an event name and two commit SHAs), so this is not a live
+        # hole -- the rule is held anyway because an inline exception is exactly where a later
+        # edit (a branch name, a PR title) would slip an attacker-reachable value in unreviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           # `set -f` (noglob) is LOAD-BEARING, not hygiene. Without it, `for g in $DOCS_GLOBS`
@@ -78,10 +92,10 @@ jobs:
           # pair -- a file named `code=false` overwrites the real classifier verdict with no
           # code execution at all (a forged green with nothing run), and a file named
           # `code=x$(...)` / `` code=x`...` `` makes outputs.code ATTACKER-CHOSEN TEXT. Proven
-          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real ci.yml:172
-          # consumer line, run in bash) -- see the CWK-074 commit message (82a9235) for the
-          # payload families and results; the harness itself is a gitignored scratch file, not
-          # a citable path.
+          # end-to-end (real emit() shape, a real $GITHUB_OUTPUT parser, the real consumer
+          # (`needs.changes.outputs.code` as the all-green step reads it), run in bash) -- see
+          # the CWK-074 commit message (82a9235) for the payload families and results; the
+          # harness itself is a gitignored scratch file, not a citable path.
           #
           # THE FIX WORKS BY ORDERING, NOT ENTROPY -- write this down because it is subtle and
           # someone will later "strengthen" a property that never came from here: $RANDOM is
@@ -95,15 +109,15 @@ jobs:
             echo "${2:-}" >> "$GITHUB_OUTPUT"
             echo "$delim" >> "$GITHUB_OUTPUT"
           }
-          if [ "${{ github.event_name }}" != "push" ]; then
+          if [ "$EVENT_NAME" != "push" ]; then
             echo "not a push event -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
-          before="${{ github.event.before }}"
+          before="$EVENT_BEFORE"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
              || ! git rev-parse -q --verify "${before}^{commit}" >/dev/null 2>&1; then
             echo "no usable base commit -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
-          changed="$(git diff --name-only "$before" "${{ github.sha }}" || true)"
+          changed="$(git diff --name-only "$before" "$HEAD_SHA" || true)"
           if [ -z "$changed" ]; then
             echo "empty diff -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
@@ -130,8 +144,11 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]  # supported LTS only (24 Active, 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15 # measured max 72 s (windows, n=9, 2026-10-02); ~12x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # pushes nothing
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
@@ -151,6 +168,7 @@ jobs:
     needs: [changes, gate]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # measured max 6 s over 10 runs (2026-10-02); ~50x headroom
     steps:
       # HONESTY STEP (CWK-058) -- this check now fires on EVERY push, including doc-only ones,
       # so it must say which of THREE things happened. A reader landing on `all-green` in the

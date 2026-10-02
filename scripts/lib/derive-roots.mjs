@@ -24,7 +24,9 @@
 // `.github`-shape test uses it directly to prove a hidden-but-not-ignored entry lands in
 // NEITHER set, a property this function's return shape is the only place that can assert.
 import fs from 'node:fs';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { gitEnv } from './git-env.mjs';
 
 export function deriveRootSets(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -34,7 +36,7 @@ export function deriveRootSets(dir) {
   for (const e of entries) {
     fed++; // counted BEFORE the git call, so a mid-loop bail reports what was actually
             // visited, never the full directory size assumed
-    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir });
+    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir, env: gitEnv(path.dirname(dir)) });
     if (res.error || (res.status !== 0 && res.status !== 1)) return { ok: false, fed };
     if (res.status === 0) ignoredRoots.add(e.name);
     else if (!e.name.startsWith('.')) ourRoots.add(e.name);

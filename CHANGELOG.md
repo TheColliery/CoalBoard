@@ -2,7 +2,66 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.6.1] - 2026-10-02
+
+The docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
+
+### Changed
+- **The skill's page title is now "CoalBoard" (CWK-179 (2)).** The docs site listed the page as "CoalBoard skill" (its `SUMMARY.md` entry) and its H1 read "CoalBoard — the consensus & debate board"; both now read CoalBoard (the H1 is `# CoalBoard`). No ledger, anchor or pointer referred to the old heading.
+
+### Security
+- **`SECURITY.md` no longer says the scanner "ships no tagged releases" (CWK-186).** The line named the scan's pin as an untagged HEAD; it now reads "self-reported version string; scan pinned to commit `c7958a3`, upstream's tag `v2.12.0`".
+- **A house secret scan now runs on pre-commit and pre-push (CWK-174).** `secret-scan.mjs` and `secret-gate.mjs` refuse a staged or pushed token-shaped string; the test fixtures that held literal token shapes now assemble them at run time.
+- **Workflows no longer persist the checkout token where nothing pushes, and the dependabot auto-merge workflow reads the PR URL through `env:` (CWK-154).**
+
+### Fixed
+- **Every workflow job now has a finite `timeout-minutes`, and the test suite runs under a finite `--test-timeout` (CWK-154, R14).** A hung job or test can no longer hold a runner until the platform limit.
+- **`.coalboard/` is ignored by git (CWK-154).**
+- **`create-release.yml` and its two tests are re-adopted from the org canon (R14).** The Release is posted by the tag-push workflow.
+
+## [2.6.0] - 2026-10-01
+
+Unknown consent values are clamped and never echoed; unreadable configs are reported.
+
+### Security
+- **An unrecognised project `updateMode` or `coalboardMode` value bypassed the config-cascade clamp, and v2.5.1 also echoed it into the session (CB-R1, severity HIGH: the echo (B) is HIGH, and the clamp bypass (A) alone is MEDIUM).** Found by reading the v2.5.1 diff, not by the SkillSpector scanner. Two defects, one root: a value outside the known list was neither clamped nor validated. **(A) The clamp failed open** (since v1.9.0, when the clamp was introduced, `3f68bb5`): the safer-value-wins merge skipped any pair with an unknown value, so a cloned repository's `.coalboard.json` carrying an unrecognised `updateMode` overrode the user's global `off` or `remind`, and the SessionStart conductor emitted the update web-check directive anyway; `coalboardMode` shared the same path. **(B) The raw string was echoed** (new in v2.5.1, when the `remind` fix put the mode in the directive header): attacker-chosen text, newlines included, reached the line the agent reads as context. The conductor now reads an unknown value, or a non-string, as absent (a project's falls back to the global value, a global's to the schema default) and prints only the canonical literal. A known louder project value under a global `off` stays clamped, as before. **Two halves, two strengths:** the conductor's own read is code-enforced and tested; the agent's own read of the merged config (the `SKILL.md` Step 0 instruction that decides ask-versus-auto) is prose, and now carries the same rule — a value that is not one of the key's listed values counts as absent, never as a synonym.
+- **A home directory spelled as its Windows 8.3 short name let the project-config walk escape above home (CWK-125).** The stop-at-home compare resolved paths with plain `realpathSync`, which does not expand an 8.3 alias, so a working directory and a `HOME` that spell one directory two ways never compared equal and the walk read a foreign `.coalboard.json` above home. In the conductor that was a read; in `scripts/configure.mjs` (same compare, same resolver) it could write through that foreign config. Both sides now resolve through `realpathSync.native`.
+
+### Added
+- **A config file that exists but cannot be read is now reported instead of silently skipped (UMB-174 (b)).** The SessionStart line carries `UNREADABLE: <path> exists but is not a readable config (<reason>); it was skipped — canonical = <canonical>`, with four reasons: `malformed JSON`, `a directory`, `unreadable` (a permission denial, `EACCES` or `EPERM`) and `not a JSON object`. The file is still skipped, as before; only the silence is gone. A failed legacy-path file is reported as unreadable only, never also as a legacy read. The global tier names the global file's own path as its canonical (CWK-135 (a)); the project tier keeps `.claude/coal/coalboard.json`.
+- **A config file with a leading UTF-8 byte-order mark is now read.** Windows PowerShell 5.1 writes one whenever asked for UTF-8, and a valid config carrying it used to read as malformed JSON.
+
+### Changed
+- **The auto-trigger cue's arbitration sentence now names CoalTipple only conditionally (CWK-135 (b)).** It read as if CoalTipple were always present ("CoalTipple = tier-lever"); it now says that if CoalBoard is present this session it leads, and CoalTipple, if present, is its tier-lever. An undecidable Layer-2 verdict is treated as stakes, so the board still halts and asks. The class-label sentence before it is unchanged.
+
+### Fixed
+- **`scripts/` git spawns inherited the ambient `GIT_*` environment (CWK-133).** Inside a linked worktree a git hook exports an absolute `GIT_DIR`, and a test fixture or gate that spread `process.env` into `git` could re-initialise or read the wrong repository. Every git spawn in `scripts/` now takes its environment from one `gitEnv()` helper that deletes the whole `GIT_*` family. Maintainer-side; reaches no install.
+- **A new gate refuses a git spawn that does not use `gitEnv()` alone (CWK-136).** `verify.mjs` now runs a git-spawn census over `scripts/` and fails on a spawn with no `env:`, one that mentions `process.env`, or one whose env is anything but `gitEnv(...)`. Maintainer-side; reaches no install.
+
+## [2.5.1] - 2026-09-22
+
+### Fixed
+- **`commands/update.md`'s `git ls-remote` call had no `--refs` filter, so a peeled annotated-tag ref (`vX.Y.Z^{}`) could be read alongside the real tag (CWK-120 row 3, CodeRabbit PR 19).** Added `--refs 'v*'`, verified live against the real remote.
+- **`hooks/coalboard-conductor.js`'s emitted self-update directive named no `updateMode`, so the agent following it could not tell whether the user had set `ask`/`auto`/`off` (CWK-120 row 4).** The directive now embeds `cfg.updateMode`.
+- **`updateMode: remind` instructed the same web-check spend as `auto`, contradicting the config template's own documented semantics ("a free periodic reminder, you run it") — CodeRabbit's row-4 comment was right for a stronger reason than first credited (CWK-120 findings-back MEDIUM-1/MEDIUM-2).** `remind` now emits a spend-free reminder with no web-check instruction and no `/coalboard:update` offer; `auto` and `ask` are unchanged. `ask`'s "ask once then persist the answer" half is a separate, unbuilt product question (needs a config writer this hook is not, per Phoenix #10) and is not resolved by this fix.
+- **`scripts/lib/link-check.mjs`'s HTML-entity decoder crashed on a numeric entity above `0x10FFFF` (`String.fromCodePoint` `RangeError`), so one malformed link entity could take down the whole gate (CWK-120 row 5).** Bounded with `Number.isInteger(code) && code >= 0 && code <= 0x10ffff`; RED-FIRST proven.
+- **`scripts/lib/link-check.mjs`'s tracked-markdown listing inherited `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE` from the calling process's environment, so a `git` hook context (which sets all three) could point the listing at the wrong tree (CWK-120 row 6).** Scrubbed from the child's env before spawn; RED-FIRST proven with a real polluted-env spawn test.
+- **`scripts/lib/rigor.mjs`'s `rigorPreset()` did a plain bracket lookup against the preset table, reachable via the object prototype chain (CWK-120 row 7).** Guarded with `Object.hasOwn`.
+- **`scripts/lib/secrets.mjs`'s scrub regex (`[^\n"']+`) truncated redaction at an embedded quote inside a secret value (CWK-120 row 8).** Widened to `[^\n]+`.
+- **`scripts/lib/trigger.mjs`'s `isExcluded()` only matched directory containment, so an exact excluded FILE path never matched (CWK-120 row 9).** Added an exact-file-path branch alongside the directory check.
+- **`platform-configs/.coalboard.json`'s comment claimed a legacy path took priority "over global" — the legacy-path half was already moot as of `v2.5.0`'s UMB-133 fix; the "overrides global" half was never true (CWK-120 row 12).** The moot half removed; the remaining claim corrected with the safer-value-wins caveat this room's `mergeSafety` clamp actually enforces.
+- **`skills/coalboard/references/audit.md`'s whole-repository report-location line sent an audit to `<repo>/reports/`, missing the `.coalboard/` namespace `SKILL.md`'s On-disk ledger requires everywhere (CWK-120 row 10, CodeRabbit PR 19).** Corrected to `<repo>/.coalboard/reports/`, matching both the single-subproject case already on that line and `MEMORY.md`'s dogfood-mirror rule.
+- **`skills/coalboard/references/failure-modes.md`'s SendMessage-availability claim carried no version or date, and measurement found it stale rather than merely unscoped (CWK-120 row 11, CodeRabbit PR 19).** `subagent-safety.md` rule 4 records cross-session `SendMessage`/`ListAgents` as available since CC v2.1.236 (2026-08-19); the line now states that and flags whether it closes CB's own Agent-tool-spawned-lens resume gap as UNVERIFIED, owed to a BUILD-station re-test.
+- **`scripts/verify.mjs`'s factory-config schema check parsed with no object guard, so a config body that was an array or a bare number passed as "valid" while every per-key check silently ran zero times (CWK-120 findings-back MEDIUM-3, ride-along a).** Guarded with the same object-shape check the other three `JSON.parse` sites already carry.
+- **`scripts/lib/link-check.test.mjs`'s clean-fixture spawn test asserted only the exit code, so a gate rewritten as a silent no-op still passed it (CWK-120 findings-back MEDIUM-4, ride-along d).** Now also asserts the gate's printed finding count.
+
+## [2.5.0] - 2026-09-22
+
+### Added
+- **The repo-root project config `<project>/.coalboard.json` is now read (UMB-133).** Before this it was silently dead: the conductor's per-level walk stepped past it while nothing said so. The candidate list per level is now the canonical three (`.claude/coal/coalboard.json`, `.agents/coal/coalboard.json`, `.gemini/coal/coalboard.json`) then both legacy shapes, `.claude/.coalboard.json` first and `.coalboard.json` last; first existing file wins, nearest level wins, 40-level cap, stops at home — all unchanged, and there is still no repository-root resolve. The SessionStart line now also reports a legacy file it read (naming the canonical path to migrate to) and a near-miss config path it ignored (a fixed list of seven shapes of this skill's own config name, at the levels the walk already visits, at most three named plus a count). `scripts/configure.mjs` carries the same candidate list and now migrates the repo-root legacy file on write too.
+
+### Deprecated
+- **Both legacy project-config paths — `<project>/.claude/.coalboard.json` and `<project>/.coalboard.json` — are deprecated in favour of `.claude/coal/coalboard.json` (UMB-133).** Both are still read; nothing breaks. **Window:** deprecated in the release that carries this entry, removable no earlier than the next MAJOR release. **Owner:** this room. **Channel:** this section and the README Configure note only — not a runtime warning (Phoenix #13 bars a hook from emitting a deprecation notice); the SessionStart report of a legacy hit is a report of what was read, not the deprecation itself. To migrate, rename the file, or run `node scripts/configure.mjs` from a repo checkout with any key. The repo-root shape is deprecated in the same release that starts honouring it, so it was never a supported path before this. **Not deprecated:** the global `~/.claude/.coalboard.json`, a separate tier.
 
 ## [2.4.2] - 2026-09-10
 

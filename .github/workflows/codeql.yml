@@ -50,17 +50,32 @@ jobs:
     outputs:
       code: ${{ steps.detect.outputs.code }}
       files: ${{ steps.detect.outputs.files }}
+    timeout-minutes: 5 # measured max 7 s over 10 runs (2026-10-02); ~40x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false # pushes nothing
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
-        # every step's shell -- no per-step re-declaration, which would be one more place to
-        # drift (CWK-058 findings-back LOW-3: this file used to re-declare it here while
-        # ci.yml's own comment argues explicitly against exactly that; ci.yml already followed
-        # its own rule, so this file was the one that had to change).
+        # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
+        # below (that block carries only the three event values), because a per-step
+        # re-declaration would be one more place to drift (CWK-058 findings-back LOW-3: this
+        # file used to re-declare it here while ci.yml's own comment argues explicitly against
+        # exactly that; ci.yml already followed its own rule, so this file was the one that
+        # had to change).
         shell: bash
+        # IN THIS STEP, EVERY ${{ }} REACHES THE SHELL THROUGH env:, NEVER INSIDE run:. Actions
+        # expands ${{ }} by TEXT SUBSTITUTION before bash parses the script, so an expression
+        # written inside run: is interpolated as CODE; through env: it arrives as an
+        # environment variable, which is data, always. These three happen to be
+        # GitHub-controlled today (an event name and two commit SHAs), so this is not a live
+        # hole -- the rule is held anyway because an inline exception is exactly where a later
+        # edit (a branch name, a PR title) would slip an attacker-reachable value in unreviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           # `set -f` (noglob) is LOAD-BEARING, not hygiene. Without it, `for g in $DOCS_GLOBS`
@@ -99,15 +114,15 @@ jobs:
             echo "${2:-}" >> "$GITHUB_OUTPUT"
             echo "$delim" >> "$GITHUB_OUTPUT"
           }
-          if [ "${{ github.event_name }}" != "push" ]; then
+          if [ "$EVENT_NAME" != "push" ]; then
             echo "not a push event -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
-          before="${{ github.event.before }}"
+          before="$EVENT_BEFORE"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
              || ! git rev-parse -q --verify "${before}^{commit}" >/dev/null 2>&1; then
             echo "no usable base commit -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
-          changed="$(git diff --name-only "$before" "${{ github.sha }}" || true)"
+          changed="$(git diff --name-only "$before" "$HEAD_SHA" || true)"
           if [ -z "$changed" ]; then
             echo "empty diff -- treating as code (fail-safe)"; emit true ""; exit 0
           fi
@@ -137,6 +152,7 @@ jobs:
     # always runs and decides for itself, refusing below if the classifier did not succeed.
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # measured max 96 s over 11 runs (2026-10-02); ~19x headroom, CodeQL init/analyze varies with the DB build
     permissions:
       security-events: write
     steps:
@@ -212,14 +228,16 @@ jobs:
       - id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
+        with:
+          persist-credentials: false # pushes nothing
       - id: init
-        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
         with:
           languages: javascript-typescript, actions
           queries: security-and-quality
       - id: analyze
-        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
       # LOW-1 (CWK-074 findings-back): the FIRST honesty step above runs BEFORE checkout/init/
       # analyze exist in this job, so its own "will run" branch can only state INTENT -- it

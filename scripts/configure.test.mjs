@@ -3,7 +3,7 @@
 // same shape as CoalLedger's own configure.test.mjs (the freshest sibling
 // precedent), adapted for CoalBoard's own schema (obj/noFlag keys) AND for
 // CoalBoard's own root-walk mechanism, which is NOT CL's: CB's
-// findProjectCfg has no git/marker-resolved root, it checks all 4 read-order
+// findProjectCfg has no git/marker-resolved root, it checks all 5 read-order
 // candidates at EVERY directory level from cwd up to home, stopping the
 // INSTANT `dir === home` -- BEFORE checking that level's own candidates
 // (hooks/coalboard-conductor.js's own comment: "this room's existing
@@ -123,6 +123,21 @@ test('configure: a LEGACY-location config (.claude/.coalboard.json AT the projec
     assert.strictEqual(cfg.updateCheckDays, 30, 'the pre-existing value survives the migration');
     assert.strictEqual(cfg.language, 'en', 'the new CLI-set value is also present');
     assert.strictEqual(fs.existsSync(path.join(sb.proj, '.claude', '.coalboard.json')), false, 'the legacy file must be removed after a successful migration');
+    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration must be announced, not silent');
+  } finally { clean(sb); }
+});
+
+test('configure (UMB-133): a ROOT-legacy config (<project>/.coalboard.json) is FOUND, migrates on write to the canonical path, old file removed', () => {
+  const sb = sandbox();
+  try {
+    fs.writeFileSync(path.join(sb.proj, '.coalboard.json'), JSON.stringify({ updateCheckDays: 30 }));
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, `expected exit 0, stderr: ${r.stderr}`);
+    assert.ok(fs.existsSync(PROJECT_TARGET(sb.proj)), 'the config must land at the canonical own-dir location');
+    const cfg = JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'));
+    assert.strictEqual(cfg.updateCheckDays, 30, 'the value read from the root legacy file survives the migration -- proof the CLI FOUND it, not just planted a fresh config');
+    assert.strictEqual(cfg.language, 'en');
+    assert.strictEqual(fs.existsSync(path.join(sb.proj, '.coalboard.json')), false, 'the root legacy file must be removed after a successful migration');
     assert.ok(r.stdout.includes('Migrated the project config'), 'the migration must be announced, not silent');
   } finally { clean(sb); }
 });
@@ -283,3 +298,56 @@ test('configure: int keys reject a value outside their declared min/max', () => 
     assert.strictEqual(fs.existsSync(PROJECT_TARGET(sb.proj)), false);
   } finally { clean(sb); }
 });
+
+// ---- r12 item 2 / CWK-125: the CLI's findProjectCfg mirrors the hook's walk and carried the same plain
+// realpathSync physical(): a HOME spelled as its 8.3 alias never equalled the long-spelled cwd, so the walk
+// escaped above home and the CLI WROTE through a FOREIGN config (the legacy-migrate branch rewrites the file
+// it found). Capability probe, never process.platform; the same probe as conductor.test.mjs's shortAlias.
+function shortAlias(dir) {
+  try {
+    const r = spawnSync('cmd.exe', ['/d', '/c', 'for %I in ("' + dir + '") do @echo %~sI'], { encoding: 'utf8', windowsVerbatimArguments: true, timeout: 20000 });
+    const a = r.status === 0 ? String(r.stdout).trim() : '';
+    return a && a.toLowerCase() !== dir.toLowerCase() && fs.existsSync(a) ? a : null;
+  } catch { return null; }
+}
+test('configure CWK-125: HOME spelled as its 8.3 ALIAS -- the walk stops at home, a foreign config above it is neither read nor rewritten', (t) => {
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-125-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const home = path.join(base, 'a-long-home-directory-name-cwk125');
+  const proj = path.join(home, 'a-long-project-directory-name');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.mkdirSync(path.join(base, '.claude'), { recursive: true });
+  const foreign = path.join(base, '.claude', '.coalboard.json');
+  const before = JSON.stringify({ language: 'foreign' });
+  fs.writeFileSync(foreign, before);
+  const alias = shortAlias(home);
+  if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+  const r = run(['--updateMode', 'remind'], { home: alias, proj });
+  assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
+  assert.strictEqual(fs.readFileSync(foreign, 'utf8'), before, 'the foreign config above home must be left untouched');
+  assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the write must land at the project own-dir default');
+});
+
+// ---- CI red on 396cabb: a legacy config must still MIGRATE when cwd is spelled as its 8.3 alias. findProjectCfg
+// returns paths built from the EXPANDED cwd (CWK-125) while legacyPaths was built from the raw process.cwd(), so
+// the string compare missed and the CLI rewrote the legacy file in place. A dev box with a short username makes
+// no alias for its own TEMP, so the runner's condition is built here through the capability probe instead.
+for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude', '.coalboard.json']], ['root .coalboard.json', ['.coalboard.json']]]) {
+  test(`configure: a LEGACY config (${label}) migrates on write when cwd is spelled as its 8.3 ALIAS`, (t) => {
+    const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-alias-')));
+    t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+    const home = path.join(base, 'a-long-home-directory-name-migr');
+    const proj = path.join(home, 'a-long-project-directory-name');
+    fs.mkdirSync(path.dirname(path.join(proj, ...legacyRel)), { recursive: true });
+    const legacy = path.join(proj, ...legacyRel);
+    fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+    const alias = shortAlias(proj);
+    if (!alias) { t.skip('this volume makes no 8.3 alias (capability probe)'); return; }
+    const r = run(['--language', 'en'], { home, proj: alias });
+    assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
+    assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the config must land at the own-dir location, not be rewritten in place');
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(proj), 'utf8')).updateCheckDays, 30, 'the legacy value survives the migration');
+    assert.strictEqual(fs.existsSync(legacy), false, 'the legacy file is removed after the migration');
+    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration is announced');
+  });
+}

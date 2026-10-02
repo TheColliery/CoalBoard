@@ -9,10 +9,10 @@
 // not a re-derivation from description. Adaptations from CM's file, named:
 //   - root-finding + read-order candidates are ported from THIS ROOM'S OWN
 //     hooks/coalboard-conductor.js (AGENT_DIR_ORDER / projectCandidates /
-//     findProjectCfg / parseJsonc), not CM's findGitRoot. CM resolves a
+//     findProjectCfg / parseConfig), not CM's findGitRoot. CM resolves a
 //     single git-marker ROOT then checks candidates once at that level;
 //     CoalBoard's own conductor has NO root-marker concept — it checks all
-//     4 read-order candidates at EVERY directory level from cwd up to home
+//     5 read-order candidates at EVERY directory level from cwd up to home
 //     (the conductor's own comment: "this room's existing upward walk has
 //     no root-marker concept, unlike CoalWash's findProjectRoot"). Porting
 //     CM's git-root shape here would give the CLI a DIFFERENT read order
@@ -38,7 +38,7 @@
 //     renamed. A migration block exists to move an old VALUE onto a new
 //     KEY; there is no new key here to migrate it onto).
 //   - parseJsonc (below) THROWS on a malformed/non-object root where the
-//     hook's own parseJsonc swallows to {} -- deliberate (a CLI fails loud,
+//     hook's own parseConfig classifies (a reason) and contributes {} -- deliberate (a CLI fails loud,
 //     scripts-quality.md §1, where a hook fails silent, Phoenix #4); the
 //     mechanism and reasoning live on the function itself, this line only
 //     NAMES the divergence so this list stays the complete "what differs
@@ -54,7 +54,7 @@ import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
 
 // String-aware JSONC strip + prototype-pollution guard — the SAME stripping
 // regex and __proto__/constructor/prototype reviver as hooks/coalboard-
-// conductor.js's own parseJsonc (verified at source before porting, not
+// conductor.js's own parseConfig (verified at source before porting, not
 // assumed present), but this one THROWS on malformed input instead of
 // swallowing to {} — the hook is a fail-silent Phoenix-13 surface, this is
 // a fail-loud CLI script (scripts-quality.md §1); the caller below tells
@@ -67,8 +67,11 @@ function parseJsonc(text) {
   return p;
 }
 
+// `.native` on both sides of the stop-at-home compare (CWK-125, mirrors the hook's physical()): plain
+// realpathSync leaves a Windows 8.3 short name unexpanded, so a HOME spelled as its alias never equalled the
+// long-spelled cwd and the walk escaped above home onto a foreign config this CLI then REWROTE.
 function physical(p) {
-  try { return fs.realpathSync(p); } catch { return path.resolve(p); }
+  try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
 }
 
 // Read order — IDENTICAL to hooks/coalboard-conductor.js's own AGENT_DIR_ORDER
@@ -78,7 +81,8 @@ function physical(p) {
 const AGENT_DIR_ORDER = ['.claude', '.agents', '.gemini'];
 function projectCandidates(dir) {
   const c = AGENT_DIR_ORDER.map((d) => path.join(dir, d, 'coal', 'coalboard.json'));
-  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY, always last
+  c.push(path.join(dir, '.claude', '.coalboard.json')); // LEGACY 1 (nested), after the canonical three
+  c.push(path.join(dir, '.coalboard.json'));            // LEGACY 2 (repo root, UMB-133), always last
   return c;
 }
 function findProjectCfg(startDir) {
@@ -195,14 +199,19 @@ function main() {
   const globalIdx = args.indexOf('--global');
   const isGlobal = globalIdx !== -1;
   if (isGlobal) args.splice(globalIdx, 1);
-  const cwd = process.cwd();
-  const legacyPath = path.join(cwd, '.claude', '.coalboard.json');
+  // The ONE spelling of cwd for this whole run: findProjectCfg returns paths built from physical(startDir)
+  // (CWK-125), and legacyPaths.includes(readPath) below is a STRING compare, so a raw process.cwd() spelled as a
+  // Windows 8.3 alias (C:\Users\RUNNER~1\...) never matched the expanded readPath -- a legacy config was then
+  // written back IN PLACE and never migrated (CI red on 396cabb: the two configure legacy-migration tests).
+  const cwd = physical(process.cwd());
+  // UMB-133: BOTH legacy shapes at CWD migrate on write (the same two the hook's projectCandidates lists).
+  const legacyPaths = [path.join(cwd, '.claude', '.coalboard.json'), path.join(cwd, '.coalboard.json')];
   const readPath = isGlobal
     ? path.join(os.homedir(), '.claude', '.coalboard.json')
     : (findProjectCfg(cwd) ?? ownDirDefault(cwd));
   const writePath = isGlobal
     ? readPath
-    : (readPath === legacyPath ? ownDirDefault(cwd) : readPath);
+    : (legacyPaths.includes(readPath) ? ownDirDefault(cwd) : readPath);
 
   let cfg = {};
   let hadComments = false;
@@ -262,9 +271,9 @@ function main() {
     // moved away from it). Best-effort -- a failed delete here still leaves a
     // correctly-written new config; the stray legacy file is simply not cleaned
     // up this run.
-    if (readPath === legacyPath && writePath !== legacyPath) {
-      try { fs.rmSync(legacyPath, { force: true }); } catch {}
-      console.log(`Migrated the project config from ${legacyPath} to ${writePath}.`);
+    if (legacyPaths.includes(readPath) && writePath !== readPath) {
+      try { fs.rmSync(readPath, { force: true }); } catch {}
+      console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
     }
     if (hadComments) {
       console.warn('Note: inline comments were stripped (this tool writes plain JSON). Every key stays documented in platform-configs/.coalboard.json.');
