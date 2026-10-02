@@ -2,6 +2,23 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+the docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
+
+### Changed
+- **The skill's page title is now "CoalBoard" (CWK-179 (2)).** The `SKILL.md` H1 read "CoalBoard — the consensus & debate board", so the docs site listed the page under a different name than the README; it is now `# CoalBoard`, and the `SUMMARY.md` entry reads the same. No ledger, anchor or pointer referred to the old heading.
+
+### Security
+- **`SECURITY.md` no longer says the scanner "ships no tagged releases" (CWK-186).** The line named the scan's pin as an untagged HEAD; it now reads "self-reported version string; scan pinned to commit `c7958a3`, upstream's tag `v2.12.0`".
+- **A house secret scan now runs on pre-commit and pre-push (CWK-174).** `secret-scan.mjs` and `secret-gate.mjs` refuse a staged or pushed token-shaped string; the test fixtures that held literal token shapes now assemble them at run time.
+- **Workflows no longer persist the checkout token where nothing pushes, and the dependabot auto-merge workflow reads the PR URL through `env:` (CWK-154).**
+
+### Fixed
+- **Every workflow job now has a finite `timeout-minutes`, and the test suite runs under a finite `--test-timeout` (CWK-154, R14).** A hung job or test can no longer hold a runner until the platform limit.
+- **`.coalboard/` is ignored by git (CWK-154).**
+- **`create-release.yml` and its two tests are re-adopted from the org canon (R14).** The Release is posted by the tag-push workflow.
+
 ## [2.6.0] - 2026-10-01
 
 Unknown consent values are clamped and never echoed; unreadable configs are reported.

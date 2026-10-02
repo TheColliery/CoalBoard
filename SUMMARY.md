@@ -2,4 +2,4 @@
 
 * [CoalBoard](README.md)
 * [Changelog](CHANGELOG.md)
-* [CoalBoard skill](skills/coalboard/SKILL.md)
+* [CoalBoard](skills/coalboard/SKILL.md)
