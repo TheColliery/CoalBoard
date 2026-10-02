@@ -24,6 +24,7 @@
 //     mutation of the declared name is seen;
 //   - a call inside a multi-line block comment whose lines do not start with `*`, or inside a string.
 // Pure: a list of { rel, text } in, a report out, so it is unit-tested red-first without a clone.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -90,10 +91,34 @@ function safeIdentifier(name, text) {
   return !new RegExp(String.raw`delete\s+${n}\b|\b${n}\s*(?:\.|\[)[^=;\n]*=(?!=)|\b${n}\s*=(?!=)`).test(rest);
 }
 
-export function censusGitSpawns(files) {
+// R14 / CWK-174 -- the house secret scan arrives as byte-equal copies of the published-code template (SERIES-CANON
+// "Secret scan": a parity check measures it), so this room cannot route their git spawns through gitEnv() without
+// breaking that parity. The two TEST files below spawn git with no cleaned environment (secret-scan.test.mjs) or with a
+// spread around gitEnv() (secret-gate.test.mjs). Each is exempt ONLY while its content is exactly the pinned blob: any
+// edit, or a template re-sync that changes it, makes the entry a finding again ("re-derive"), so the exemption cannot
+// widen or outlive its reason silently. The pin is a git blob id (git hash-object <file>) against
+// .github/templates/published-code/scripts/ at 05da36a. The real fix belongs to the template (the .github deputy).
+export const EXEMPT_CARRIERS = {
+  'scripts/secret-scan.test.mjs': 'a9cb7145e31139ec3c490dd7714df8fa7dc6cf86',
+  'scripts/secret-gate.test.mjs': '3fcd3f0d020ea3b3f369feca01dc770d102ca5b3',
+};
+
+// The git blob id of `text`, as `git hash-object` prints it for a file holding exactly these bytes.
+export function blobId(text) {
+  const body = Buffer.from(text, 'utf8');
+  return createHash('sha1').update(Buffer.concat([Buffer.from('blob ' + body.length + String.fromCharCode(0)), body])).digest('hex');
+}
+
+export function censusGitSpawns(files, exempt = EXEMPT_CARRIERS) {
   const findings = [];
   let spawns = 0;
   for (const { rel, text } of files) {
+    if (Object.hasOwn(exempt, rel)) {
+      const id = blobId(text);
+      if (id === exempt[rel]) continue;
+      findings.push(`${rel} is an exempt byte-equal org carrier but its blob id is ${id}, not the pinned ${exempt[rel]} -- re-derive it from .github/templates/published-code/scripts/ (CWK-174)`);
+      continue;
+    }
     CALL_RE.lastIndex = 0;
     let m;
     while ((m = CALL_RE.exec(text))) {

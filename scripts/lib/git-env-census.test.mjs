@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { censusGitSpawns, collectSources } from './git-env-census.mjs';
+import { censusGitSpawns, collectSources, blobId, EXEMPT_CARRIERS } from './git-env-census.mjs';
 
 // Fixture source text is BUILT, never written as a literal call: this file is itself scanned by the census
 // (scripts/**/*.mjs), and a literal git spawn inside a string would be read as a real one.
@@ -82,4 +82,22 @@ test("THIS room's own sources pass: every git spawn takes env from gitEnv() alon
   const r = censusGitSpawns(collectSources(repo));
   assert.deepEqual(r.findings, []);
   assert.ok(r.spawns >= 10, "the census must actually SEE this room's spawns, saw " + r.spawns);
+});
+
+test('R14 CWK-174: an exempt carrier passes ONLY while its content is exactly the pinned blob', () => {
+  const rel = 'scripts/carrier.test.mjs';
+  const text = call('{ cwd: d }');
+  assert.equal(censusGitSpawns(files(text, rel)).findings.length, 1, 'not exempt: the bare spawn is refused');
+  const exempt = { [rel]: blobId(text) };
+  assert.equal(censusGitSpawns(files(text, rel), exempt).findings.length, 0, 'pinned blob: exempt');
+  const edited = censusGitSpawns(files(text + ' // edit', rel), exempt).findings;
+  assert.equal(edited.length, 1, 'any edit makes it a finding again');
+  assert.match(edited[0], /re-derive/);
+  assert.equal(censusGitSpawns(files(text, 'scripts/other.mjs'), exempt).findings.length, 1, 'the exemption names a path, nothing else');
+});
+
+test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the two template tests', () => {
+  assert.equal(blobId(''), 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
+  assert.equal(blobId('hello' + String.fromCharCode(10)), 'ce013625030ba8dba906f756967f9e9ca394464a');
+  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
 });
