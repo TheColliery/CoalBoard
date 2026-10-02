@@ -25,6 +25,7 @@ jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # measured max 46 s over 10 runs (2026-10-02); ~13x headroom
     permissions:
       security-events: write
       id-token: write

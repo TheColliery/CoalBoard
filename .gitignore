@@ -19,3 +19,7 @@ scratchpad/
 
 # Generated local coverage output (lcov.info / cobertura.xml from the report-only coverage run)
 coverage/
+
+# CoalBoard's own staging and reports (.coalboard/proposed/, .coalboard/reports/): a board's
+# output lands inside the scanned repo by rule and is read there, never shipped.
+.coalboard/

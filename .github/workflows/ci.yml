@@ -48,10 +48,12 @@ jobs:
     outputs:
       code: ${{ steps.detect.outputs.code }}
       files: ${{ steps.detect.outputs.files }}
+    timeout-minutes: 5 # measured max 7 s over 9 runs (2026-10-02); ~40x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false # pushes nothing
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
         # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
@@ -142,8 +144,11 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]  # supported LTS only (24 Active, 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15 # measured max 72 s (windows, n=9, 2026-10-02); ~12x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # pushes nothing
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
@@ -163,6 +168,7 @@ jobs:
     needs: [changes, gate]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # measured max 6 s over 10 runs (2026-10-02); ~50x headroom
     steps:
       # HONESTY STEP (CWK-058) -- this check now fires on EVERY push, including doc-only ones,
       # so it must say which of THREE things happened. A reader landing on `all-green` in the

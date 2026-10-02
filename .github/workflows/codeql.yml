@@ -50,10 +50,12 @@ jobs:
     outputs:
       code: ${{ steps.detect.outputs.code }}
       files: ${{ steps.detect.outputs.files }}
+    timeout-minutes: 5 # measured max 7 s over 10 runs (2026-10-02); ~40x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false # pushes nothing
       - id: detect
         # DOCS_GLOBS comes from the workflow-level `env:` above, which GitHub exports into
         # every step's shell -- it is deliberately NOT repeated in this step's own `env:`
@@ -150,6 +152,7 @@ jobs:
     # always runs and decides for itself, refusing below if the classifier did not succeed.
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # measured max 96 s over 11 runs (2026-10-02); ~19x headroom, CodeQL init/analyze varies with the DB build
     permissions:
       security-events: write
     steps:
@@ -225,6 +228,8 @@ jobs:
       - id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
+        with:
+          persist-credentials: false # pushes nothing
       - id: init
         uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
