@@ -4,10 +4,10 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
-the docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
+The docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
 
 ### Changed
-- **The skill's page title is now "CoalBoard" (CWK-179 (2)).** The `SKILL.md` H1 read "CoalBoard — the consensus & debate board", so the docs site listed the page under a different name than the README; it is now `# CoalBoard`, and the `SUMMARY.md` entry reads the same. No ledger, anchor or pointer referred to the old heading.
+- **The skill's page title is now "CoalBoard" (CWK-179 (2)).** The docs site listed the page as "CoalBoard skill" (its `SUMMARY.md` entry) and its H1 read "CoalBoard — the consensus & debate board"; both now read CoalBoard (the H1 is `# CoalBoard`). No ledger, anchor or pointer referred to the old heading.
 
 ### Security
 - **`SECURITY.md` no longer says the scanner "ships no tagged releases" (CWK-186).** The line named the scan's pin as an untagged HEAD; it now reads "self-reported version string; scan pinned to commit `c7958a3`, upstream's tag `v2.12.0`".
