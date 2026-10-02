@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.6.1] - 2026-10-02
 
 The docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
 
