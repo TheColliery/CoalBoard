@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkClampProse, hookClampedKeys } from './clamp-prose.mjs';
+import { checkClampProse, hookClampedKeys, hookClampedDefaults } from './clamp-prose.mjs';
 import { CONFIG_SCHEMA } from './config-schema.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -18,7 +18,7 @@ const realFiles = () => [
 ];
 const schemaEnums = Object.fromEntries(CONFIG_SCHEMA.filter((s) => s.type === 'enum').map((s) => [s.key, s.values]));
 const conductor = read(path.join(root, 'hooks', 'coalboard-conductor.js'));
-const run = (files = realFiles(), clampedKeys = hookClampedKeys(conductor)) => checkClampProse({ files, schemaEnums, clampedKeys });
+const run = (files = realFiles(), clampedKeys = hookClampedKeys(conductor), clampedDefaults = hookClampedDefaults(conductor)) => checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaults });
 const mutate = (rel, from, to) => realFiles().map((f) => {
   if (f.rel !== rel) return f;
   assert.equal(f.text.split(from).length - 1, 1, `fixture anchor must match exactly once: ${from.slice(0, 50)}`);
@@ -82,4 +82,20 @@ test('the persist exemption is per MENTION: a read later on the same line as a p
   const f = run(extra);
   assert.equal(f.length, 1, f.join('\n'));
   assert.match(f[0], /reads `applyConsent`/);
+});
+
+// R15 findings-back round 1 (LOW-2): the absent / default RULE of the canonical clause, not only its keys and values.
+test('LOW-2: the schema defaults are derived from the conductor, and the clause must carry the global fallback to that default', () => {
+  assert.deepEqual(hookClampedDefaults(conductor), { coalboardMode: 'ask', updateMode: 'ask' });
+  const f = run(mutate(SKILL, "a global's to the default `ask`", "a global's to `auto`"));
+  assert.ok(f.some((m) => /a global's out-of-set value reads as the schema default `ask`/.test(m)), f.join('\n'));
+});
+
+test("LOW-2: the clause must say a project's out-of-set value falls back to the global value", () => {
+  const f = run(mutate(SKILL, "a project's falls back to the global value", "a project's is used as written"));
+  assert.ok(f.some((m) => /falls back to the global value/.test(m)), f.join('\n'));
+});
+
+test('LOW-2: no derivable defaults is a finding, never a silent pass', () => {
+  assert.ok(run(realFiles(), hookClampedKeys(conductor), {}).some((m) => /no schema defaults were derived/.test(m)));
 });

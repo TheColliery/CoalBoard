@@ -4,7 +4,8 @@
 // WHAT THIS BINDS (and what it does not):
 //  1. THE CANONICAL CLAUSE exists in SKILL.md ("Always"): one line that says an unknown value counts as ABSENT and
 //     names every key the HOOK clamps (derived from the conductor's SAFER_ENUM, never listed here) with EXACTLY the
-//     enum values the schema declares for it (prose cannot drift from config-schema.mjs), and also names the
+//     enum values the schema declares for it (prose cannot drift from config-schema.mjs), says a project's out-of-set
+//     value falls back to the global value and a global's to the conductor's schema default (derived from SAFER_ENUM), and also names the
 //     consent keys the agent reads unclamped (fableConsent, applyConsent) so their unknown-value rule is stated.
 //  2. EVERY OTHER SITE in skills/**/*.md that names one of those keys as something the agent READS must say the
 //     value is the MERGED one (a line that merely names the key reads as the raw project file, which is the
@@ -22,10 +23,17 @@ export function hookClampedKeys(conductorText) {
   return [...block[1].matchAll(/^\s*([A-Za-z]\w*)\s*:\s*\{/gm)].map((m) => m[1]);
 }
 
+// The schema default the hook substitutes for an absent or unknown GLOBAL value: `default: 'x'` inside each SAFER_ENUM entry.
+export function hookClampedDefaults(conductorText) {
+  const block = /const SAFER_ENUM = \{([\s\S]*?)\n\};/.exec(conductorText);
+  if (!block) return {};
+  return Object.fromEntries([...block[1].matchAll(/^\s*([A-Za-z]\w*)\s*:\s*\{[^}]*default:\s*'([^']+)'/gm)].map((m) => [m[1], m[2]]));
+}
+
 const isCanonical = (line) => /\bABSENT\b/.test(line) && /safer-value-wins/i.test(line);
 const wordRe = (key) => new RegExp(`(^|[^A-Za-z0-9_])${key}([^A-Za-z0-9_]|$)`);
 
-export function checkClampProse({ files, schemaEnums, clampedKeys }) {
+export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaults = {} }) {
   const findings = [];
   const keys = [...clampedKeys, ...AGENT_READ_CONSENT_KEYS];
   if (clampedKeys.length === 0) findings.push('no hook-clamped keys were derived (conductor SAFER_ENUM not found): the prose cannot be checked against the hook');
@@ -36,6 +44,12 @@ export function checkClampProse({ files, schemaEnums, clampedKeys }) {
     findings.push(`skills/coalboard/SKILL.md must carry exactly ONE canonical clamp-aware clause (a line holding both ABSENT and safer-value-wins); found ${canonicalLines.length}`);
   } else {
     const clause = canonicalLines[0];
+    // The absent/default RULE itself (LOW-2): keys and enum values were bound, but "a global's to `auto`" read as green.
+    if (!/a project's falls back to the global value/.test(clause)) findings.push("the canonical clause must say a project's out-of-set value falls back to the global value");
+    const defaults = [...new Set(Object.values(clampedDefaults))];
+    if (defaults.length === 0) findings.push('no schema defaults were derived from the conductor SAFER_ENUM: the global fallback cannot be checked');
+    else if (defaults.length === 1 && !clause.includes(`a global's to the default \`${defaults[0]}\``)) findings.push(`the canonical clause must say a global's out-of-set value reads as the schema default \`${defaults[0]}\` (the conductor's SAFER_ENUM default)`);
+    else if (defaults.length > 1 && !/a global's to the default/.test(clause)) findings.push("the canonical clause must say a global's out-of-set value reads as the schema default");
     for (const key of keys) {
       if (!wordRe(key).test(clause)) findings.push(`the canonical clause does not name \`${key}\``);
     }

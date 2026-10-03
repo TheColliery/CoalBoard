@@ -572,7 +572,8 @@ check('factory config valid against schema', () => {
     ];
     const cpEnums = Object.fromEntries(CONFIG_SCHEMA.filter((sp) => sp.type === 'enum').map((sp) => [sp.key, sp.values]));
     const cpKeys = cp.hookClampedKeys(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
-    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys });
+    const cpDefaults = cp.hookClampedDefaults(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
+    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys, clampedDefaults: cpDefaults });
     if (cpFindings.length === 0) {
       check(`clamp prose: the canonical clause matches the schema and the hook (${cpKeys.join(', ')}), and every read site across ${cpFiles.length} skill file(s) says MERGED`, () => null);
     } else {
