@@ -23,7 +23,7 @@ The board's seats RUN things (`feeling` and `adversary` hold a shell; main runs 
 
 ## Probing for a box (S4) — the property, not the platform
 
-Run the probe from a script file, never an inline quoted shell string. A box exists only when the probe shows the real home is NOT reachable from inside it (example question: from inside the distro or container, does the real profile directory resolve?). Probe commands are version-sensitive: re-check them against the platform's own documentation before relying on one, and treat a probe that errors as `no box found`, never as a box.
+Run the probe from a script file, never an inline quoted shell string. A box exists only when the probe shows the real home is NOT reachable from inside it. For a WSL distro ask BOTH ways out, because closing one leaves the other: (1) do the Windows drives reach the real profile? (WSL mounts them under `/mnt` by default; with `[automount] enabled=false` a drive can still be mounted manually or through fstab, and mounting from fstab is on by default), and (2) can a Windows process be launched from inside? (`[interop] enabled` defaults to true, and a launched Windows process reaches the real profile whatever `/mnt` shows). Source: Microsoft Learn, the wsl.conf page (https://learn.microsoft.com/en-us/windows/wsl/wsl-config), read 2026-10-03. The property is the question; no probe command is fixed here. ⚠️ unverified: any concrete probe command: re-check it against the platform's own documentation before relying on one, and treat a probe that errors as `no box found`, never as a box.
 
 ## How this binds the seats
 

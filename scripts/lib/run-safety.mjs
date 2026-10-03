@@ -1,7 +1,9 @@
 // R15 item 2 (CWK-160): the run-safety contract in skills/coalboard/references/run-safety.md.
 //
 // WHAT THIS BINDS: (1) the ledger exists with S1-S5 and N1-N2, each safeguard row naming a proof the return must
-// state; (2) every actor that runs a command, DERIVED from SKILL.md (the Seat-permissions rows with run, plus main's
+// state, and the CONTENT of the owner's amendments, one anchor per sentence in the safeguard's own text (S1 mtime +
+// SHA-256, S2 RESTORE + FINDING, S3 outside the home tree + never the session scratchpad, S5 NARROW + exactly the
+// directory, N2 HOME stays real) and the S4 probe section's two WSL ways out ([interop], [automount] with fstab); (2) every actor that runs a command, DERIVED from SKILL.md (the Seat-permissions rows with run, plus main's
 // `execute` grant class), is bound by S1, S2, S3, S4 and S5 (nobody who holds a shell escapes a safeguard); (3) S4,
 // the box, is declared OPTIONAL with a probe and a fallback to S1-S3 (no-external-assumption: a user may have no
 // isolation tool); (4) the duty reaches the places a model reads at run time: every Bash-holding seat's FIXED rules
@@ -56,6 +58,22 @@ export function checkRunSafety({ files }) {
     if (/\bREQUIRED\b/.test(s4.raw)) findings.push('S4 (the box) must never be REQUIRED');
     if (!/\bprobe\b/i.test(s4.safeguard)) findings.push('S4 names no capability probe');
     if (!/S1-S3/.test(s4.safeguard)) findings.push('S4 names no fallback to S1-S3 when no box is found');
+  }
+  // CONTENT anchors: the two owner amendments ARE these sentences, so the gate binds them in the safeguard's own text
+  // (not its heading cell, which names the verbs). A later edit that reverses one fails here, not only in dist-in-sync.
+  const CONTENT = [
+    ['S1', [/mtime/, /SHA-256/], 'S1 must say to record each real file\'s mtime and SHA-256 before the run'],
+    ['S2', [/\bRESTORE\b/, /\bFINDING\b/], 'S2 must say a changed real file is RESTORED and reported as a FINDING'],
+    ['S3', [/outside the home tree/i, /Never in the session scratchpad/], 'S3 must keep the clone outside the home tree and "Never in the session scratchpad"'],
+    ['S5', [/\bNARROW\b/, /exactly the directory/], 'S5 must keep the NARROW delete of exactly the directory the run created'],
+  ];
+  for (const [id, res, msg] of CONTENT) if (rows[id] && !res.every((re) => re.test(rows[id].safeguard))) findings.push(msg);
+  if (rows.N2 && !(/\bHOME\b/.test(rows.N2.raw) && /stays real/.test(rows.N2.raw))) findings.push('N2 must keep "HOME stays real" unless a real box is in use');
+  const probe = /## Probing for a box[\s\S]*?(?=\n## |$)/.exec(ref.text);
+  if (!probe) findings.push('run-safety.md has no "Probing for a box" section');
+  else {
+    if (!/\[interop\]/.test(probe[0])) findings.push('the S4 probe section must ask whether a Windows process can be launched from inside a WSL box ([interop])');
+    if (!/\[automount\]/.test(probe[0]) || !/fstab/.test(probe[0])) findings.push('the S4 probe section must ask whether the drives reach the real profile, manual and fstab mounts included ([automount])');
   }
   const n1 = rows.N1;
   if (n1 && !/environment variable/i.test(n1.raw)) findings.push('N1 must name the environment-variable form of fake isolation');

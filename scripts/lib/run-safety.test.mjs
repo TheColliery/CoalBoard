@@ -120,3 +120,32 @@ test('a ledger row edited without its agent def is a finding (a data seat given 
   const f = checkSeatRights({ skillText: widened, agentDefs: agentDefs() });
   assert.ok(f.some((m) => /cb-data: the ledger row says run but no shell tool is granted/.test(m)), f.join('\n'));
 });
+
+// R15 findings-back round 1 (MEDIUM-2, LOW-1): content anchors, one red mutant per row of the reviewer's table.
+const sentenceCases = [
+  ['S1', "Record each one's mtime and SHA-256. ", '', /S1 must say to record each real file's mtime and SHA-256/],
+  ['S2', 'RESTORE the file from the backup and report it', 'report it', /S2 must say a changed real file is RESTORED/],
+  ['S3', 'Never in the session scratchpad.', 'The session scratchpad is fine.', /S3 must keep the clone outside the home tree/],
+  ['S5', 'a NARROW delete: exactly the directory this run created', 'a recursive delete of the whole lab root', /S5 must keep the NARROW delete/],
+];
+for (const [id, from, to, expect] of sentenceCases) {
+  test(`MEDIUM-2: reversing the ${id} sentence is a finding (the owner's amendment is bound, not just the row)`, () => {
+    const f = checkRunSafety({ files: mutate(REF, from, to) });
+    assert.ok(f.some((m) => expect.test(m)), `${id}: ${f.join(' | ')}`);
+  });
+}
+
+test('MEDIUM-2: N2 must keep "HOME stays real unless a real box is in use"', () => {
+  const f = checkRunSafety({ files: mutate(REF, 'stays real unless a real box (S4) is in use', 'may point at a temp directory when no box exists') });
+  assert.ok(f.some((m) => /N2 must keep "HOME stays real"/.test(m)), f.join(' | '));
+});
+
+test('LOW-1: the S4 probe section asks BOTH ways out of a WSL box: launched Windows processes and the drives (manual and fstab mounts)', () => {
+  const noInterop = checkRunSafety({ files: mutate(REF, '`[interop] enabled`', '`[interop-removed] enabled`') });
+  assert.ok(noInterop.some((m) => /\[interop\]/.test(m)), noInterop.join(' | '));
+  const noFstab = checkRunSafety({ files: realFiles().map((f) => (f.rel === REF ? { ...f, text: f.text.replace(/fstab/g, 'a table') } : f)) });
+  assert.ok(noFstab.some((m) => /\[automount\]/.test(m)), noFstab.join(' | '));
+  const text = realFiles().find((f) => f.rel === REF).text;
+  assert.ok(text.includes('https://learn.microsoft.com/en-us/windows/wsl/wsl-config'), 'the wsl.conf page is cited');
+  assert.ok(/no probe command is fixed here/.test(text), 'no probe command is invented');
+});
