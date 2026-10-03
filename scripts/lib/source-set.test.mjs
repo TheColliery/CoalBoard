@@ -117,10 +117,25 @@ test('MEDIUM-1: E1 keeps "ONLY inside a box": a host run when no box is found is
   assert.ok(f.some((m) => /E1 must keep "ONLY inside a box"/.test(m)), f.join('\n'));
 });
 
+// A page is CITED when it appears as a whole link token, never as a substring of a longer URL (a substring test also
+// passes "https://other.example/<url>", the shape CodeQL's js/incomplete-url-substring-sanitization names).
+const urlTokens = (text) => text.match(/https?:\/\/[^\s)\],;`'"<>]+/g) || [];
+const cites = (text, url) => urlTokens(text).some((tok) => tok.replace(/\/+$/, '') === url);
+
+test('cites(): a whole link token passes; a removed, extended or host-prefixed URL does not', () => {
+  const url = 'https://docs.github.com/en/rest/dependabot/alerts';
+  assert.ok(cites(`see (${url}), and more`, url));
+  assert.ok(cites(`see ${url}/ and more`, url), 'a trailing slash is the same page');
+  assert.ok(!cites('see nothing here', url), 'removed');
+  assert.ok(!cites(`see ${url}-old`, url), 'altered: a longer path');
+  assert.ok(!cites(`see https://other.example/${url}`, url), 'a substring of another host\'s URL');
+  assert.ok(!cites(`see ${url.replace('https', 'http')}`, url), 'a different scheme is a different token');
+});
+
 test('the shipped provider facts are stated with their vendor page, and only NVD\'s rate limit and the WSL probe stay unverified', () => {
   const t = realFiles().find((x) => x.rel === REF).text;
-  for (const url of ['docs.github.com/en/rest/code-scanning/code-scanning', 'docs.github.com/en/rest/dependabot/alerts', 'docs.github.com/en/rest/secret-scanning/secret-scanning', 'docs.github.com/en/rest/security-advisories/global-advisories', 'google.github.io/osv.dev/api', 'nvd.nist.gov/developers/vulnerabilities']) {
-    assert.ok(t.includes(url), `the vendor page ${url} is cited`);
+  for (const url of ['https://docs.github.com/en/rest/code-scanning/code-scanning', 'https://docs.github.com/en/rest/dependabot/alerts', 'https://docs.github.com/en/rest/secret-scanning/secret-scanning', 'https://docs.github.com/en/rest/security-advisories/global-advisories', 'https://google.github.io/osv.dev/api', 'https://nvd.nist.gov/developers/vulnerabilities']) {
+    assert.ok(cites(t, url), `the vendor page ${url} is cited as a whole link`);
   }
   const unverified = t.split('\n').flatMap((l) => (l.match(/⚠️ unverified:.*?probe command\./g) || []));
   assert.equal(unverified.length, 1, unverified.join('|'));

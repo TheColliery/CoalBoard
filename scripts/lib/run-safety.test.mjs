@@ -140,12 +140,25 @@ test('MEDIUM-2: N2 must keep "HOME stays real unless a real box is in use"', () 
   assert.ok(f.some((m) => /N2 must keep "HOME stays real"/.test(m)), f.join(' | '));
 });
 
+// A page is CITED when it appears as a whole link token, never as a substring of a longer URL (a substring test also
+// passes "https://other.example/<url>", the shape CodeQL's js/incomplete-url-substring-sanitization names).
+const urlTokens = (text) => text.match(/https?:\/\/[^\s)\],;`'"<>]+/g) || [];
+const cites = (text, url) => urlTokens(text).some((tok) => tok.replace(/\/+$/, '') === url);
+
+test('cites(): a whole link token passes; a removed, extended or host-prefixed URL does not', () => {
+  const url = 'https://learn.microsoft.com/en-us/windows/wsl/wsl-config';
+  assert.ok(cites(`Microsoft Learn (${url}), read`, url));
+  assert.ok(!cites('no link here', url), 'removed');
+  assert.ok(!cites(`${url}-evil`, url), 'altered: a longer path');
+  assert.ok(!cites(`https://evil.example/${url}`, url), 'a substring of another host\'s URL');
+});
+
 test('LOW-1: the S4 probe section asks BOTH ways out of a WSL box: launched Windows processes and the drives (manual and fstab mounts)', () => {
   const noInterop = checkRunSafety({ files: mutate(REF, '`[interop] enabled`', '`[interop-removed] enabled`') });
   assert.ok(noInterop.some((m) => /\[interop\]/.test(m)), noInterop.join(' | '));
   const noFstab = checkRunSafety({ files: realFiles().map((f) => (f.rel === REF ? { ...f, text: f.text.replace(/fstab/g, 'a table') } : f)) });
   assert.ok(noFstab.some((m) => /\[automount\]/.test(m)), noFstab.join(' | '));
   const text = realFiles().find((f) => f.rel === REF).text;
-  assert.ok(text.includes('https://learn.microsoft.com/en-us/windows/wsl/wsl-config'), 'the wsl.conf page is cited');
+  assert.ok(cites(text, 'https://learn.microsoft.com/en-us/windows/wsl/wsl-config'), 'the wsl.conf page is cited as a whole link');
   assert.ok(/no probe command is fixed here/.test(text), 'no probe command is invented');
 });
