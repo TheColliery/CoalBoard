@@ -1,7 +1,7 @@
 // R15 item 2 (CWK-160): the run-safety contract in skills/coalboard/references/run-safety.md.
 //
 // WHAT THIS BINDS: (1) the ledger exists with S1-S5 and N1-N2, each safeguard row naming a proof the return must
-// state, and the CONTENT of the owner's amendments, one anchor per sentence in the safeguard's own text (S1 mtime +
+// state, and the ANCHOR PHRASES of the owner's amendments, one per sentence in the safeguard's own text (S1 mtime +
 // SHA-256, S2 RESTORE + FINDING, S3 outside the home tree + never the session scratchpad, S5 NARROW + exactly the
 // directory, N2 HOME stays real) and the S4 probe section's two WSL ways out ([interop], [automount] with fstab); (2) every actor that runs a command, DERIVED from SKILL.md (the Seat-permissions rows with run, plus main's
 // `execute` grant class), is bound by S1, S2, S3, S4 and S5 (nobody who holds a shell escapes a safeguard); (3) S4,
@@ -12,6 +12,7 @@
 // seat-rights.mjs.
 // WHAT IT CANNOT BIND: that a model follows S1-S5 (prose, below probability 1), or that a probe command is right on a
 // given platform (version-sensitive; the reference says so).
+// FOURTH TENSE: an edit that reverses a sentence and keeps its anchor words is not caught.
 import { parseSeatLedger, shellHolders } from './seat-rights.mjs';
 
 const IDS = ['S1', 'S2', 'S3', 'S4', 'S5'];

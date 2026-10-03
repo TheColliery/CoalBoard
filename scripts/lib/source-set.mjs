@@ -7,7 +7,7 @@
 // Seat-permissions ledger, so the widened source set adds no tool right (seat-rights.mjs separately proves the agent
 // defs equal that ledger); (3) the alert rows are main's alone, so no credential reaches the one seat that can fetch;
 // no alert row's carries cell names a value; A3's own text names `hide_secret=true` and the source-set text keeps the
-// never-sent and discard-unread rule (the vendor endpoint returns the literal secret by default, so "never a secret
+// anchor phrases of the never-sent and discard-unread rule (the vendor endpoint returns the literal secret by default, so "never a secret
 // value" holds only through that request form); (4) the unreachable column always says NOT-CHECKED or NOT-WALKED
 // (a missing source is a named gap, never a clean bill); (5) the posix seat names run-safety S4, keeps "ONLY inside a
 // box" and its S1-S3 limit; (6) the places a model reads at run time carry it: the lens-prompts `{class-trace}` placeholder and the code
@@ -15,6 +15,7 @@
 // the Grants table's network row (main's alert read is its one named exception) and the References table (MANDATORY).
 // WHAT IT CANNOT BIND: that a model fetches, walks or traces (prose), or that a provider's endpoint still works (each
 // request form is flagged unverified in the reference and re-checked live by the data seat).
+// FOURTH TENSE: an edit that reverses a sentence and keeps its anchor words is not caught.
 import { parseSeatLedger } from './seat-rights.mjs';
 
 const CLASSES = ['alerts', 'catalogue', 'live-db', 'posix-seat'];
