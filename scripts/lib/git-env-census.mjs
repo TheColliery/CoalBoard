@@ -97,7 +97,7 @@ function safeIdentifier(name, text) {
 // spread around gitEnv() (secret-gate.test.mjs). Each is exempt ONLY while its content is exactly the pinned blob: any
 // edit, or a template re-sync that changes it, makes the entry a finding again ("re-derive"), so the exemption cannot
 // widen or outlive its reason silently. The pin is a git blob id (git hash-object <file>) against
-// .github/templates/published-code/scripts/ at 05da36a. The real fix belongs to the template (the .github deputy).
+// .github/templates/published-code/scripts/ at 5bae944 (R16: secret-scan.test.mjs moved with UMB-379 (10)). The real fix belongs to the template (the .github deputy).
 // 05a (order 04e, .github af46201): three carriers. The two published-code tests above, and the overlay-coal-skill
 // scripts/release-notes.mjs, whose git spawn gives an EXPLICIT allowlist env (no GIT_* inherited): the property this census
 // guards, but not the textual form it accepts (gitEnv(...) alone), so it is blob-pinned instead. secret-gate.test.mjs moved to f61a33e7.
@@ -106,7 +106,7 @@ function safeIdentifier(name, text) {
 // the OS injects into every child) and under coverage (NODE_V8_COVERAGE). It carries no pin: d7e299c4 passes this census as is.
 // Re-sync it to the canon when the canon fixes that assertion.
 export const EXEMPT_CARRIERS = {
-  'scripts/secret-scan.test.mjs': 'a9cb7145e31139ec3c490dd7714df8fa7dc6cf86',
+  'scripts/secret-scan.test.mjs': '22c653b577cfd36a21805f81b983875e59d99c53',
   'scripts/secret-gate.test.mjs': 'f61a33e75a3a420e0de0116f45d2b1fd44936a50',
   'scripts/release-notes.mjs': '674592e0ff25dbdc14a8a4e21e6a598953b90eaa',
 };
