@@ -62,6 +62,7 @@ const SHIP = [
   'skills/coalboard/references/wizard.md',
   'skills/coalboard/references/audit.md',
   'skills/coalboard/references/lens-prompts.md',
+  'skills/coalboard/references/run-safety.md',
   'hooks/coalboard-conductor.js',
   'hooks/hooks.json',
   'commands/update.md',
@@ -576,6 +577,36 @@ check('factory config valid against schema', () => {
     } else {
       cpFindings.forEach((m, i) => check(`clamp prose: finding ${i + 1}/${cpFindings.length}`, () => m));
     }
+  }
+}
+
+// R15 items 1 and 2 (CWK-159, CWK-160): the run-safety ledger (S1-S5) must bind every actor that can run a command and
+// reach the seats' own prompts, and NO seat may gain a tool right from either new duty (the agent defs equal the
+// Seat-permissions ledger). scripts/lib/run-safety.mjs and seat-rights.mjs state what each binds and cannot bind.
+{
+  let rsMods = null;
+  let rsLoadError = null;
+  try {
+    rsMods = {
+      rs: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'run-safety.mjs')).href),
+      sr: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'seat-rights.mjs')).href),
+    };
+  } catch (e) { rsLoadError = e; }
+  if (rsLoadError) {
+    check('run safety + seat rights: modules load', () => `scripts/lib/run-safety.mjs or seat-rights.mjs failed to load: ${rsLoadError.message}`);
+  } else {
+    const skillRoot = path.join(root, 'skills', 'coalboard');
+    const rsFiles = [
+      { rel: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8') },
+      ...fs.readdirSync(path.join(skillRoot, 'references')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `skills/coalboard/references/${f}`, text: fs.readFileSync(path.join(skillRoot, 'references', f), 'utf8') })),
+    ];
+    const agentDefs = fs.readdirSync(path.join(root, 'agents')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `agents/${f}`, text: fs.readFileSync(path.join(root, 'agents', f), 'utf8') }));
+    const rsFindings = rsMods.rs.checkRunSafety({ files: rsFiles });
+    if (rsFindings.length === 0) check('run safety: S1-S5 bind every run-capable actor and reach the seat prompts and Step 4.2', () => null);
+    else rsFindings.forEach((m, i) => check(`run safety: finding ${i + 1}/${rsFindings.length}`, () => m));
+    const srFindings = rsMods.sr.checkSeatRights({ skillText: rsFiles[0].text, agentDefs });
+    if (srFindings.length === 0) check(`seat rights: the ${agentDefs.length} agent defs equal the Seat-permissions ledger (no seat gained a right)`, () => null);
+    else srFindings.forEach((m, i) => check(`seat rights: finding ${i + 1}/${srFindings.length}`, () => m));
   }
 }
 
