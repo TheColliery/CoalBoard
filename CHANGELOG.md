@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.7.0] - 2026-10-03
 
 The data lens now reads the target's own alerts and live advisory databases, every command run against a target is surveyed and compared, and every config read in the skill text is clamp-aware.
 
