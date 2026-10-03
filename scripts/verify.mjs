@@ -552,6 +552,33 @@ check('factory config valid against schema', () => {
   }
 }
 
+// R15 item 3 (the CB-R1 prose half): the clamp-aware clause the AGENT follows must agree with the schema and the
+// hook, and every skill-text read site of a clamped or agent-read consent key must say it is the MERGED value
+// (scripts/lib/clamp-prose.mjs states what this binds and what it cannot). Dynamic import, node/runtime.md section 1.
+{
+  let cp = null;
+  let cpLoadError = null;
+  try { cp = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'clamp-prose.mjs')).href); }
+  catch (e) { cpLoadError = e; }
+  if (cpLoadError) {
+    check('clamp prose: module loads', () => `scripts/lib/clamp-prose.mjs failed to load: ${cpLoadError.message}`);
+  } else {
+    const skillRoot = path.join(root, 'skills', 'coalboard');
+    const cpFiles = [
+      { rel: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8') },
+      ...fs.readdirSync(path.join(skillRoot, 'references')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `skills/coalboard/references/${f}`, text: fs.readFileSync(path.join(skillRoot, 'references', f), 'utf8') })),
+    ];
+    const cpEnums = Object.fromEntries(CONFIG_SCHEMA.filter((sp) => sp.type === 'enum').map((sp) => [sp.key, sp.values]));
+    const cpKeys = cp.hookClampedKeys(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
+    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys });
+    if (cpFindings.length === 0) {
+      check(`clamp prose: the canonical clause matches the schema and the hook (${cpKeys.join(', ')}), and every read site across ${cpFiles.length} skill file(s) says MERGED`, () => null);
+    } else {
+      cpFindings.forEach((m, i) => check(`clamp prose: finding ${i + 1}/${cpFindings.length}`, () => m));
+    }
+  }
+}
+
 for (const o of oks) console.log(`  ok   ${o}`);
 if (fails.length) {
   for (const f of fails) console.log(f);
