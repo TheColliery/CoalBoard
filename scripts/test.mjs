@@ -27,6 +27,7 @@ const TESTS = [
   'scripts/lib/node-options.test.mjs',
   'scripts/lib/clamp-prose.test.mjs',
   'scripts/lib/run-safety.test.mjs',
+  'scripts/lib/source-set.test.mjs',
   'scripts/lib/link-check.test.mjs',
   'scripts/lib/release-shape.test.mjs',
   'scripts/secret-scan.test.mjs',
