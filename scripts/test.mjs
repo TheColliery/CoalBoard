@@ -59,7 +59,8 @@ if (orphans.length) {
 // slowest single test took 4.5 s, so 60 s is ~13x that, wide enough for a slower runner (macOS, a Windows 8.3
 // TEMP) and still a hard stop. SUITE_TIMEOUT_MS bounds the whole run at ~10x the measured suite time. The heap cap
 // and one-file-at-a-time ride the child (a runaway test child once took the box down, AGENTS.md 2026-09-25).
-// The child's NODE_OPTIONS EXTENDS the caller's (scripts/lib/node-options.mjs), never replaces it.
+// The child's NODE_OPTIONS EXTENDS the caller's (scripts/lib/node-options.mjs), never replaces it, except that a
+// caller's heap cap above 2048 is replaced by 2048 (the zone's ninth amendment: the cap is 2048 or lower).
 const TEST_TIMEOUT_MS = 60000;
 const SUITE_TIMEOUT_MS = 600000;
 const { childNodeOptions } = await import(pathToFileURL(path.join(repo, 'scripts', 'lib', 'node-options.mjs')).href);

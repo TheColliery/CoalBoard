@@ -19,12 +19,29 @@ test("a caller's own flags are KEPT and the cap is appended (the old code replac
   assert.equal(childNodeOptions(caller), `${caller} ${HEAP_CAP_FLAG}`);
 });
 
-test("a caller's own heap cap is never duplicated or overridden, in either spelling or form", () => {
-  for (const own of ['--max-old-space-size=4096', '--max_old_space_size=4096', '--max-old-space-size 4096', '--enable-source-maps --max-old-space-size=512']) {
+test("a caller's own heap cap AT OR BELOW 2048 is kept verbatim, never duplicated, in either spelling or form", () => {
+  for (const own of ['--max-old-space-size=2048', '--max_old_space_size=1024', '--max-old-space-size 512', '--enable-source-maps --max-old-space-size=512']) {
     const out = childNodeOptions(own);
     assert.equal(out, own, `kept verbatim: ${own}`);
     assert.equal((out.match(/max[-_]old[-_]space[-_]size/g) || []).length, 1, `exactly one cap in: ${out}`);
   }
+});
+
+// R15 findings-back LOW-4: the zone's ninth amendment (dispatch-transport.md) sets a harness child's cap at "2048 (or
+// lower)", and it outranks "do not duplicate a caller's own". The reviewer's measured case: caller 8192 + source maps
+// ran the child at 8192.
+test('LOW-4: a caller cap ABOVE 2048 is replaced by 2048 (the cap is "2048 or lower"), the caller\'s other flags kept', () => {
+  assert.equal(childNodeOptions('--max-old-space-size=8192 --enable-source-maps'), `${HEAP_CAP_FLAG} --enable-source-maps`);
+  assert.equal(childNodeOptions('--enable-source-maps --max-old-space-size 4096'), `--enable-source-maps ${HEAP_CAP_FLAG}`);
+  assert.equal(childNodeOptions('--max_old_space_size=2049'), HEAP_CAP_FLAG, 'the underscore spelling is normalized, one cap only');
+  for (const own of ['--max-old-space-size=8192', '--max_old_space_size=4096 --require ./p.cjs']) {
+    assert.equal((childNodeOptions(own).match(/max[-_]old[-_]space[-_]size/g) || []).length, 1, own);
+  }
+});
+
+test('LOW-4: a cap value that is not a positive number cannot lift the limit: it is replaced by 2048', () => {
+  assert.equal(childNodeOptions('--max-old-space-size=lots'), HEAP_CAP_FLAG);
+  assert.equal(childNodeOptions('--max-old-space-size=0'), HEAP_CAP_FLAG);
 });
 
 test('a flag that merely CONTAINS the cap name as a value is not mistaken for a cap', () => {
@@ -52,6 +69,7 @@ test('scripts/test.mjs hands its child the CALLER\'s NODE_OPTIONS plus the cap',
     return r.stdout.trim();
   };
   assert.equal(run('--enable-source-maps'), `--enable-source-maps ${HEAP_CAP_FLAG}`);
-  assert.equal(run('--max-old-space-size=4096'), '--max-old-space-size=4096');
+  assert.equal(run('--max-old-space-size=512'), '--max-old-space-size=512');
+  assert.equal(run('--max-old-space-size=8192 --enable-source-maps'), `${HEAP_CAP_FLAG} --enable-source-maps`);
   assert.equal(run(undefined), HEAP_CAP_FLAG);
 });
