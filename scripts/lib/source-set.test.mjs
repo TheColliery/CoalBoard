@@ -96,3 +96,34 @@ test("main's read is named, not hidden: Step 1's brief rail, GATE 1's TARGET blo
 test('the references table lists it MANDATORY at its moment', () => {
   assert.ok(run(mutate(SKILL, '| **MANDATORY for a code / CI / config target or a repo audit**', '| on-demand')).some((m) => /not as MANDATORY/.test(m)));
 });
+
+// R15 findings-back round 1 (MEDIUM-1, HIGH-1): the ledger's CONTENT anchors, each with the reviewer's mutant.
+test('MEDIUM-1: an alert row whose carries cell names a value is a finding (A3 edited to carry the secret value)', () => {
+  const f = run(mutateRow('A3', (r) => r.replace('| the type, state and path |', '| the type, state, path and the secret value |')));
+  assert.ok(f.some((m) => /A3: an alert row's carries cell must not name a value/.test(m)), f.join('\n'));
+});
+
+test('HIGH-1: A3 must name the request form with hide_secret=true, and the text must keep the never-sent / discard-unread rule', () => {
+  const noParam = run(mutateRow('A3', (r) => r.replace('?state=open&hide_secret=true', '?state=open')));
+  assert.ok(noParam.some((m) => /A3 must name its request form with `hide_secret=true`/.test(m)), noParam.join('\n'));
+  const noDiscard = run(mutate(REF, 'is discarded unread and the row is reported', 'is kept and the row is reported'));
+  assert.ok(noDiscard.some((m) => /never sent and a response still carrying a `secret` field is discarded unread/.test(m)), noDiscard.join('\n'));
+  const noNever = run(mutate(REF, 'without `hide_secret=true` is NEVER sent', 'without `hide_secret=true` is usually not sent'));
+  assert.ok(noNever.some((m) => /never sent and a response still carrying/.test(m)), noNever.join('\n'));
+});
+
+test('MEDIUM-1: E1 keeps "ONLY inside a box": a host run when no box is found is a finding even with S4 and S1-S3 still named', () => {
+  const f = run(mutateRow('E1', (r) => r.replace('and ONLY inside a box S4 found', 'and, when S4 finds no box, on the host under S1-S3')));
+  assert.ok(f.some((m) => /E1 must keep "ONLY inside a box"/.test(m)), f.join('\n'));
+});
+
+test('the shipped provider facts are stated with their vendor page, and only NVD\'s rate limit and the WSL probe stay unverified', () => {
+  const t = realFiles().find((x) => x.rel === REF).text;
+  for (const url of ['docs.github.com/en/rest/code-scanning/code-scanning', 'docs.github.com/en/rest/dependabot/alerts', 'docs.github.com/en/rest/secret-scanning/secret-scanning', 'docs.github.com/en/rest/security-advisories/global-advisories', 'google.github.io/osv.dev/api', 'nvd.nist.gov/developers/vulnerabilities']) {
+    assert.ok(t.includes(url), `the vendor page ${url} is cited`);
+  }
+  const unverified = t.split('\n').flatMap((l) => (l.match(/⚠️ unverified:.*?probe command\./g) || []));
+  assert.equal(unverified.length, 1, unverified.join('|'));
+  assert.match(unverified[0], /NVD's keyless rate limit/);
+  assert.match(unverified[0], /wsl\.exe/);
+});

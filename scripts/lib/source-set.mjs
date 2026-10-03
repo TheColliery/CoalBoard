@@ -5,10 +5,12 @@
 // unreachable; (2) EVERY ROW IS EXECUTED BY AN ACTOR THAT ALREADY HOLDS THE RIGHT: `fetch` only by a seat with the fetch
 // cell (data), `run` only by a seat with the run cell (feeling, adversary), `execute` only by main, per SKILL.md's
 // Seat-permissions ledger, so the widened source set adds no tool right (seat-rights.mjs separately proves the agent
-// defs equal that ledger); (3) the alert rows are main's alone, so no credential reaches the one seat that can fetch,
-// and the secret-scanning row never carries a value; (4) the unreachable column always says NOT-CHECKED or NOT-WALKED
-// (a missing source is a named gap, never a clean bill); (5) the posix seat names run-safety S4 and its optional
-// fallback; (6) the places a model reads at run time carry it: the lens-prompts `{class-trace}` placeholder and the code
+// defs equal that ledger); (3) the alert rows are main's alone, so no credential reaches the one seat that can fetch;
+// no alert row's carries cell names a value; A3's own text names `hide_secret=true` and the source-set text keeps the
+// never-sent and discard-unread rule (the vendor endpoint returns the literal secret by default, so "never a secret
+// value" holds only through that request form); (4) the unreachable column always says NOT-CHECKED or NOT-WALKED
+// (a missing source is a named gap, never a clean bill); (5) the posix seat names run-safety S4, keeps "ONLY inside a
+// box" and its S1-S3 limit; (6) the places a model reads at run time carry it: the lens-prompts `{class-trace}` placeholder and the code
 // checklist, the TRACE rule (UNTRACED is a lead), the data seat's role line, SKILL.md Step 1, GATE 1's TARGET block,
 // the Grants table's network row (main's alert read is its one named exception) and the References table (MANDATORY).
 // WHAT IT CANNOT BIND: that a model fetches, walks or traces (prose), or that a provider's endpoint still works (each
@@ -62,7 +64,16 @@ export function checkSourceSet({ files }) {
     if (rows[id].by.join() !== 'main') findings.push(`${id}: alert rows are main's alone (a credential must never reach the seat that can fetch)`);
   }
   if (rows.A3 && !(/\bnever\b|\bever\b/i.test(rows.A3.never) && /\bvalue\b/i.test(rows.A3.never))) findings.push('A3 (secret-scanning) must say a secret VALUE is never carried');
+  // The vendor's endpoint returns the literal secret unless asked not to, so the promise holds only through the request form.
+  for (const id of ids.filter((x) => rows[x].klass === 'alerts')) {
+    if (/\bvalue\b/i.test(rows[id].carries)) findings.push(`${id}: an alert row's carries cell must not name a value (it carries fields, never a secret value)`);
+  }
+  // Built, not written adjacent: a literal `key=value` of this shape reads as an assignment to the house secret scan.
+  const HIDE_SECRET_PARAM = 'hide_secret' + '=true';
+  if (rows.A3 && !rows.A3.raw.includes(HIDE_SECRET_PARAM)) findings.push('A3 must name its request form with `hide_secret=true` (the endpoint returns the literal secret by default)');
+  if (!/discarded unread/.test(ref.text) || !/without `hide_secret=true` is NEVER sent/.test(ref.text)) findings.push('source-set.md must state that a secret-scanning request without `hide_secret=true` is never sent and a response still carrying a `secret` field is discarded unread');
   if (rows.E1) {
+    if (!/ONLY inside a box/.test(rows.E1.raw)) findings.push('E1 must keep "ONLY inside a box" (the POSIX run never happens on the host)');
     if (!/\bS4\b/.test(rows.E1.raw) || !/S1-S3/.test(rows.E1.raw)) findings.push('E1 must name run-safety S4 (the box) and its S1-S3 limit');
     if (!/environment/i.test(rows.E1.unreachable)) findings.push('E1 must name the unreachable case as an ENVIRONMENT gap');
   }
