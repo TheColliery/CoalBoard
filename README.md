@@ -42,7 +42,7 @@ Three doors in — every one behind your consent:
 
 | Lens | Grounds in |
 |---|---|
-| **Empirical** | Live, cross-referenced sources — never training memory. For a code, CI or config target the board also reads the target's own open code-scanning, Dependabot and secret-scanning alerts (fields only, never a secret value) and the GitHub Advisory Database, OSV, NVD, CWE and platform docs; whatever it cannot reach is reported **NOT-CHECKED**, never clean (`references/source-set.md`) |
+| **Empirical** | Live, cross-referenced sources — never training memory. For a code, CI or config target the board also reads the target's own open code-scanning, Dependabot and secret-scanning alerts (fields only; the secret-scanning request asks GitHub not to return the value (`hide_secret=true`), and a response that still carries one is discarded unread and reported NOT-CHECKED) and the GitHub Advisory Database, OSV, NVD, CWE and platform docs; whatever it cannot reach is reported **NOT-CHECKED**, never clean (`references/source-set.md`) |
 | **Formal** | Logic and proof — internal consistency |
 | **Show-me** | Turns every doubt into a concrete evidence-demand (*"show the date", "show it actually runs"*) |
 
