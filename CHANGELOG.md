@@ -2,6 +2,20 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The data lens now reads the target's own alerts and live advisory databases, every command run against a target is surveyed and compared, and every config read in the skill text is clamp-aware.
+
+### Added
+- **The data lens reads more than the model's memory (CWK-159).** `references/source-set.md` adds a source ledger for a code, CI or config target or a repo audit: the target's own open code-scanning, Dependabot and secret-scanning alerts (main reads the fields only, never a secret value, and no credential reaches a lens prompt), a source-to-sink class checklist for the adversary and data seats, the GitHub Advisory Database, OSV, NVD, CWE and platform documentation (the data seat, read-only), and one POSIX seat for the environment-gated classes. A finding with no traced path is reported UNTRACED, a lead and never CRITICAL or HIGH alone, and every source that cannot be reached is named NOT-CHECKED, never clean. It adds sources, not tool rights; main's one new read is a GET of the target's own alerts. The provider endpoints named there are flagged unverified in the file. The A/B re-run that would measure whether the widened set reaches the claims it was built for has not been run.
+- **Run safety: a run is surveyed first and compared after (CWK-160).** `references/run-safety.md` binds main's checks and the show-me and adversary seats whenever a command is run against a target: survey the real files in the tool's reach (mtime and SHA-256), back them up, run, compare, and restore and report any file the run changed; work on a copy outside the home tree, never in the session scratchpad; remove the copy with a narrow delete. An isolation box is optional and used only when a probe finds one whose real home is unreachable from inside; without one the survey, backup and copy steps carry the protection. Faking isolation with an environment variable is forbidden. It adds a duty to a run, never a tool right, and a seat that cannot do the survey and compare does not run. The protection is a prose duty on the seats, not an OS sandbox.
+
+### Changed
+- **Every place the skill text reads the config now says which value it uses (CB-R1 prose half, UMB-365).** The hook already clamped an unrecognised or escalating `coalboardMode` or `updateMode` (v2.6.0). The skill's own reads at the opinion lane, the auto lane, GATE 1, GATE 2, GATE 3, Step 0 and the Fable lens-assignment text now read the merged value, and the one canonical clause treats an unrecognised value of any key the agent reads as absent. Which half each clamp covers: `coalboardMode` and `updateMode` are clamped by the hook and followed in the skill's instructions (a prose duty, weaker than the hook); `fableConsent` and `applyConsent` are not clamped by anything, because a bare project value is the user's own persisted choice and the hook never reads them, so the skill applies the unknown-value rule to them and claims nothing more. A new gate fails a read site that does not say it uses the merged value.
+
+### Fixed
+- **`scripts/test.mjs` extends the caller's `NODE_OPTIONS` instead of replacing it (R15).** It kept only the heap cap, so a caller's flag such as `--enable-source-maps` was dropped from every test child; it now appends the cap and keeps a caller's own `--max-old-space-size`. Not shipped in the plugin (`scripts/` is outside the dist).
+
 ## [2.6.1] - 2026-10-02
 
 The docs page for the skill is now titled CoalBoard, SECURITY.md states the scan pin correctly, and the CI and git gates are hardened.
