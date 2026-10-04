@@ -98,14 +98,17 @@ function safeIdentifier(name, text) {
 // edit, or a template re-sync that changes it, makes the entry a finding again ("re-derive"), so the exemption cannot
 // widen or outlive its reason silently. The pin is a git blob id (git hash-object <file>) against
 // .github/templates/published-code/scripts/ at 05da36a. The real fix belongs to the template (the .github deputy).
-// 05a (order 04e, .github af46201): two overlay-coal-skill files are carriers on the same terms. release-notes.mjs and its test
-// give their git spawns an EXPLICIT allowlist env (no GIT_* inherited), which is the property this census guards, but not the
-// textual form it accepts (gitEnv(...) alone), so each is blob-pinned instead. secret-gate.test.mjs moved to f61a33e7.
+// 05a (order 04e, .github af46201): three carriers. The two published-code tests above, and the overlay-coal-skill
+// scripts/release-notes.mjs, whose git spawn gives an EXPLICIT allowlist env (no GIT_* inherited): the property this census
+// guards, but not the textual form it accepts (gitEnv(...) alone), so it is blob-pinned instead. secret-gate.test.mjs moved to f61a33e7.
+// NAMED DIVERGENCE: scripts/release-notes.test.mjs is held one canon step back (d7e299c4, the R20 adoption), not at canon a8f3ba69,
+// because a8f3ba69's env assertion ("nothing else but what node needs to start") fails on macOS (__CF_USER_TEXT_ENCODING, which
+// the OS injects into every child) and under coverage (NODE_V8_COVERAGE). It carries no pin: d7e299c4 passes this census as is.
+// Re-sync it to the canon when the canon fixes that assertion.
 export const EXEMPT_CARRIERS = {
   'scripts/secret-scan.test.mjs': 'a9cb7145e31139ec3c490dd7714df8fa7dc6cf86',
   'scripts/secret-gate.test.mjs': 'f61a33e75a3a420e0de0116f45d2b1fd44936a50',
   'scripts/release-notes.mjs': '674592e0ff25dbdc14a8a4e21e6a598953b90eaa',
-  'scripts/release-notes.test.mjs': 'a8f3ba69d6229b571ce89b4373362e93f074fb7b',
 };
 
 // The git blob id of `text`, as `git hash-object` prints it for a file holding exactly these bytes.
