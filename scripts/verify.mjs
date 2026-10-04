@@ -62,6 +62,8 @@ const SHIP = [
   'skills/coalboard/references/wizard.md',
   'skills/coalboard/references/audit.md',
   'skills/coalboard/references/lens-prompts.md',
+  'skills/coalboard/references/run-safety.md',
+  'skills/coalboard/references/source-set.md',
   'hooks/coalboard-conductor.js',
   'hooks/hooks.json',
   'commands/update.md',
@@ -549,6 +551,68 @@ check('factory config valid against schema', () => {
     } else {
       report.findings.forEach((m, i) => check(`git spawn census: finding ${i + 1}/${report.findings.length}`, () => m));
     }
+  }
+}
+
+// R15 item 3 (the CB-R1 prose half): the clamp-aware clause the AGENT follows must agree with the schema and the
+// hook, and every skill-text read site of a clamped or agent-read consent key must say it is the MERGED value
+// (scripts/lib/clamp-prose.mjs states what this binds and what it cannot). Dynamic import, node/runtime.md section 1.
+{
+  let cp = null;
+  let cpLoadError = null;
+  try { cp = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'clamp-prose.mjs')).href); }
+  catch (e) { cpLoadError = e; }
+  if (cpLoadError) {
+    check('clamp prose: module loads', () => `scripts/lib/clamp-prose.mjs failed to load: ${cpLoadError.message}`);
+  } else {
+    const skillRoot = path.join(root, 'skills', 'coalboard');
+    const cpFiles = [
+      { rel: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8') },
+      ...fs.readdirSync(path.join(skillRoot, 'references')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `skills/coalboard/references/${f}`, text: fs.readFileSync(path.join(skillRoot, 'references', f), 'utf8') })),
+    ];
+    const cpEnums = Object.fromEntries(CONFIG_SCHEMA.filter((sp) => sp.type === 'enum').map((sp) => [sp.key, sp.values]));
+    const cpKeys = cp.hookClampedKeys(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
+    const cpDefaults = cp.hookClampedDefaults(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
+    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys, clampedDefaults: cpDefaults });
+    if (cpFindings.length === 0) {
+      check(`clamp prose: the canonical clause matches the schema and the hook (${cpKeys.join(', ')}), and every read site across ${cpFiles.length} skill file(s) says MERGED`, () => null);
+    } else {
+      cpFindings.forEach((m, i) => check(`clamp prose: finding ${i + 1}/${cpFindings.length}`, () => m));
+    }
+  }
+}
+
+// R15 items 1 and 2 (CWK-159, CWK-160): the run-safety ledger (S1-S5) must bind every actor that can run a command and
+// reach the seats' own prompts, and NO seat may gain a tool right from either new duty (the agent defs equal the
+// Seat-permissions ledger). scripts/lib/run-safety.mjs and seat-rights.mjs state what each binds and cannot bind.
+{
+  let rsMods = null;
+  let rsLoadError = null;
+  try {
+    rsMods = {
+      rs: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'run-safety.mjs')).href),
+      sr: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'seat-rights.mjs')).href),
+      ss: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'source-set.mjs')).href),
+    };
+  } catch (e) { rsLoadError = e; }
+  if (rsLoadError) {
+    check('run safety + seat rights: modules load', () => `scripts/lib/run-safety.mjs or seat-rights.mjs failed to load: ${rsLoadError.message}`);
+  } else {
+    const skillRoot = path.join(root, 'skills', 'coalboard');
+    const rsFiles = [
+      { rel: 'skills/coalboard/SKILL.md', text: fs.readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8') },
+      ...fs.readdirSync(path.join(skillRoot, 'references')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `skills/coalboard/references/${f}`, text: fs.readFileSync(path.join(skillRoot, 'references', f), 'utf8') })),
+    ];
+    const agentDefs = fs.readdirSync(path.join(root, 'agents')).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `agents/${f}`, text: fs.readFileSync(path.join(root, 'agents', f), 'utf8') }));
+    const rsFindings = rsMods.rs.checkRunSafety({ files: rsFiles });
+    if (rsFindings.length === 0) check('run safety: S1-S5 bind every run-capable actor and reach the seat prompts and Step 4.2', () => null);
+    else rsFindings.forEach((m, i) => check(`run safety: finding ${i + 1}/${rsFindings.length}`, () => m));
+    const srFindings = rsMods.sr.checkSeatRights({ skillText: rsFiles[0].text, agentDefs });
+    if (srFindings.length === 0) check(`seat rights: the ${agentDefs.length} agent defs equal the Seat-permissions ledger (no seat gained a right)`, () => null);
+    else srFindings.forEach((m, i) => check(`seat rights: finding ${i + 1}/${srFindings.length}`, () => m));
+    const ssFindings = rsMods.ss.checkSourceSet({ files: rsFiles });
+    if (ssFindings.length === 0) check('source set: every ledger row is read by an actor that already holds the right, and the duty reaches the seats, Step 1 and GATE 1', () => null);
+    else ssFindings.forEach((m, i) => check(`source set: finding ${i + 1}/${ssFindings.length}`, () => m));
   }
 }
 
