@@ -4,7 +4,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.7.0] - 2026-10-03
 
-The data lens now reads the target's own alerts and live advisory databases, every command run against a target is surveyed and compared, and every config read in the skill text is clamp-aware.
+The data lens reads live alerts, runs are surveyed, configs are clamped.
 
 ### Added
 - **The data lens reads more than the model's memory (CWK-159).** `references/source-set.md` adds a source ledger for a code, CI or config target or a repo audit: the target's own open code-scanning, Dependabot and secret-scanning alerts (main reads the fields only; the secret-scanning request asks GitHub not to return the value (`hide_secret=true`), a response that still carries one is discarded unread and reported NOT-CHECKED, and no credential reaches a lens prompt), a source-to-sink class checklist for the adversary and data seats, the GitHub Advisory Database, OSV, NVD, CWE and platform documentation (the data seat, read-only), and one POSIX seat for the environment-gated classes. A finding with no traced path is reported UNTRACED, a lead and never CRITICAL or HIGH alone, and every source that cannot be reached is named NOT-CHECKED, never clean. It adds sources, not tool rights; main's one new read is a GET of the target's own alerts. The provider request forms are stated with the vendor pages they were read from or measured against on 2026-10-03; only NVD's keyless rate limit and any WSL probe command stay flagged unverified. The A/B re-run that would measure whether the widened set reaches the claims it was built for has not been run.
