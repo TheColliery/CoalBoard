@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The C1 trace keeps two bounded-input cases as findings.
+
+### Changed
+- **The C1 class trace names two judgments it must not clear early (UMB-427 ruling 5).** `references/source-set.md` now says a bounded regex restarted per opener still multiplies, and a bounded read of a user-reachable path is a finding even when it reads our own files. In the A/B of 2026-10-04 the data seat named the right site and class, then cleared it as bounded.
+- **The room adopts the canon release overlay (.github `8ae2f70` band, byte copies of the committed blobs at `097b57f`).** The title builder, its shape check and the create-release workflow now carry the 45-to-75-character summary band and the CamelCase opener rule; not shipped in the plugin (`scripts/` and `.github/` are outside the dist).
+
 ## [2.7.0] - 2026-10-03
 
 The data lens reads live alerts, runs are surveyed, configs are clamped.
