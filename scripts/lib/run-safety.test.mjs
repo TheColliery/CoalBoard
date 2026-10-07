@@ -62,8 +62,8 @@ test('a safeguard that states no proof for the return is a finding (S3)', () => 
   assert.ok(f.some((m) => /S3 names no proof/.test(m)), f.join('\n'));
 });
 
-test('S4 (the box) is OPTIONAL by contract: REQUIRED, or no probe, or no fallback to S1-S3, is a finding', () => {
-  assert.ok(checkRunSafety({ files: mutate(REF, '**S4 THE BOX** (OPTIONAL)', '**S4 THE BOX** (REQUIRED)') }).some((m) => /S4 \(the box\) must be marked OPTIONAL/.test(m)));
+test('S4 (the box) is OPTIONAL in general by contract: REQUIRED, or no probe, or no fallback to S1-S3, is a finding', () => {
+  assert.ok(checkRunSafety({ files: mutate(REF, '**S4 THE BOX** (OPTIONAL; MANDATORY for non-file effects)', '**S4 THE BOX** (REQUIRED)') }).some((m) => /S4 \(the box\) must be marked OPTIONAL/.test(m)));
   const s4 = realFiles().find((f) => f.rel === REF).text.split('\n').find((l) => l.startsWith('| **S4'));
   assert.ok(checkRunSafety({ files: mutate(REF, s4, s4.replace(/probe/gi, 'lookup')) }).some((m) => /S4 names no capability probe/.test(m)));
   assert.ok(checkRunSafety({ files: mutate(REF, 'S1-S3 only, said in one line', 'nothing, said in one line') }).some((m) => /S4 names no fallback to S1-S3/.test(m)));
@@ -161,4 +161,61 @@ test('LOW-1: the S4 probe section asks BOTH ways out of a WSL box: launched Wind
   const text = realFiles().find((f) => f.rel === REF).text;
   assert.ok(cites(text, 'https://learn.microsoft.com/en-us/windows/wsl/wsl-config'), 'the wsl.conf page is cited as a whole link');
   assert.ok(/no probe command is fixed here/.test(text), 'no probe command is invented');
+});
+
+// UMB2-008 (owner 2026-10-07, verbatim: "ถ้างั้นอยู่ที่ไหนก็ได้ แต่ต้องลบ clone ทั้งหมด เมื่อรันจบ"): the clone may live anywhere, the
+// whole clone is removed when the run ends, and the one class S2 cannot restore (non-file effects) never runs outside a box.
+// One red mutant per NEW anchor: each edits ONE cell of ONE row (or the lens line) and the gate must name exactly that part.
+const refText = () => realFiles().find((f) => f.rel === REF).text;
+const mutateCell = (id, cell, from, to, all = false) => {
+  const line = refText().split('\n').find((l) => l.startsWith(`| **${id}`));
+  const cells = line.split('|');
+  const n = cells[cell].split(from).length - 1;
+  assert.ok(all ? n >= 1 : n === 1, `${id} cell ${cell} must hold "${from}" ${all ? 'at least' : 'exactly'} once`);
+  cells[cell] = cells[cell].split(from).join(to);
+  return mutate(REF, line, cells.join('|'));
+};
+const LENS = 'skills/coalboard/references/lens-prompts.md';
+const lensLineText = () => realFiles().find((f) => f.rel === LENS).text.split('\n').find((l) => /run-safety\.md/.test(l) && /^-\s/.test(l));
+const SAFEGUARD = 2;
+const PROOF = 4;
+const newAnchors = [
+  ['S3 RECOMMENDED roots', () => mutateCell('S3', SAFEGUARD, 'RECOMMENDED roots', 'optional roots'), /S3 must name RECOMMENDED lab roots/],
+  ['S3 %ProgramData%', () => mutateCell('S3', SAFEGUARD, '%ProgramData%', '%CommonProgramFiles%'), /S3 must name RECOMMENDED lab roots/],
+  ['S3 mktemp -d', () => mutateCell('S3', SAFEGUARD, 'mktemp -d', 'a temp folder'), /S3 must name RECOMMENDED lab roots/],
+  ['S3 MAY use another place', () => mutateCell('S3', SAFEGUARD, 'MAY use another place', 'must use one of these'), /S3 must say a run MAY use another place/],
+  ['S3 the drive-root instruction is back', () => mutateCell('S3', SAFEGUARD, 'MAY use another place', 'MAY use another place, but use a directory off the drive root'), /S3 must not tell Windows to use a directory off the drive root/],
+  ['S3 proof names the path', () => mutateCell('S3', PROOF, 'NAMES the path the run used', 'states a path'), /S3 proof must have the return name the path the run used/],
+  ['S4 label hides the mandatory class', () => mutate(REF, '(OPTIONAL; MANDATORY for non-file effects)', '(OPTIONAL)'), /S4 \(the box\) label must say MANDATORY/],
+  ['S4 OPTIONAL in general', () => mutateCell('S4', SAFEGUARD, 'OPTIONAL in general', 'a nicety'), /S4 must say it is OPTIONAL in general/],
+  ['S4 effects are not files', () => mutateCell('S4', SAFEGUARD, 'effects are not files', 'effects are unusual'), /S4 must name the non-file-effects class/],
+  ['S4 registry', () => mutateCell('S4', SAFEGUARD, 'registry writes', 'config writes'), /S4 must name the non-file-effects class/],
+  ['S4 Appx', () => mutateCell('S4', SAFEGUARD, 'Appx', 'app'), /S4 must name the non-file-effects class/],
+  ['S4 NEVER executed outside a real S4 box', () => mutateCell('S4', SAFEGUARD, 'NEVER executed outside a real S4 box', 'executed wherever the seat likes'), /S4 must say the non-file-effects class is NEVER executed outside a real S4 box/],
+  ['S4 read statically', () => mutateCell('S4', SAFEGUARD, 'read statically', 'skimmed', true), /S4 must say that class is read statically/],
+  ['S5 WHOLE clone', () => mutateCell('S5', SAFEGUARD, 'WHOLE clone', 'lab files'), /S5 must remove the WHOLE clone/],
+  ['S5 EVERY run', () => mutateCell('S5', SAFEGUARD, 'EVERY run', 'a failed run'), /S5 must apply to EVERY run/],
+  ['S5 root it was created in', () => mutateCell('S5', SAFEGUARD, 'under the root it was created in', 'under the lab root'), /S5 must assert the real path under the root the clone was created in/],
+  ['S5 never forced', () => mutateCell('S5', SAFEGUARD, 'never forced', 'forced when needed'), /S5 must say a refused delete is reported, never forced/],
+  ['S5 NOT met done-criteria', () => mutateCell('S5', SAFEGUARD, 'has NOT met its own done-criteria', 'is fine'), /S5 must say a run that leaves its clone has NOT met its own done-criteria/],
+  ['S5 proof clone removed', () => mutateCell('S5', PROOF, 'clone removed', 'cleaned up'), /S5 proof must be `clone removed`/],
+  ['S5 proof gone', () => mutateCell('S5', PROOF, 'gone', 'absent'), /S5 proof must state the path is gone/],
+  ['lens: NEVER run outside a real box', () => mutate(LENS, 'NEVER run outside a real box', 'run anywhere'), /lens-prompts\.md FIXED rule must say the non-file-effects class is NEVER run outside a real box/],
+  ['lens: read statically', () => mutate(LENS, 'only read statically', 'only skimmed'), /lens-prompts\.md FIXED rule must say that class is read statically/],
+  ['lens: clone removed', () => mutate(LENS, 'and say `clone removed`', 'and say it is clean'), /lens-prompts\.md FIXED rule must carry the clone-removal proof/],
+  ['lens: gone', () => mutate(LENS, 'and that it is gone', 'and nothing more'), /lens-prompts\.md FIXED rule must say the removal proof includes that the path is gone/],
+];
+for (const [name, build, expect] of newAnchors) {
+  test(`UMB2-008 red mutant: ${name}`, () => {
+    const f = checkRunSafety({ files: build() });
+    assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
+  });
+}
+
+test('UMB2-008: the shipped text carries the owner ruling (no drive-root instruction, the S4 label names the mandatory class, S5 is the hard rule)', () => {
+  const rows = parseSafeguardLedger(refText());
+  assert.ok(!/off the drive root/.test(rows.S3.safeguard), 'S3 must not carry the drive-root instruction');
+  assert.match(rows.S4.first, /OPTIONAL; MANDATORY for non-file effects/);
+  for (const re of [/WHOLE clone/, /EVERY run/, /NOT met its own done-criteria/]) assert.match(rows.S5.safeguard, re);
+  assert.match(lensLineText(), /NEVER run outside a real box/);
 });
