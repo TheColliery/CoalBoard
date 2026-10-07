@@ -2,6 +2,18 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The run-safety lab clone has recommended roots and is always removed.
+
+### Changed
+- **Run safety S3 gives recommended roots for the lab clone.** `references/run-safety.md` names `%ProgramData%\CoalBoard\lab\<run-id>` on Windows and `mktemp -d` under `TMPDIR` or `/tmp` on POSIX as advice against scatter, not a requirement; a run may use another place, and its return names the path it used.
+- **Run safety S5 is a hard rule.** Every run, success or failure, removes the whole clone with a narrow delete of exactly the directory it created, checks it is gone, and says `clone removed`; a refused delete is reported and the clone counts as not removed.
+- **Run safety S4 is mandatory for a target whose effects are not files** (registry writes, Appx or package removal, services, scheduled tasks, system settings): such a target is never run outside a real isolation box and is otherwise read statically (`read statically, not run`). The box stays optional for every other target.
+- **The lens prompts carry the same S3, S4 and S5 duties** in `references/lens-prompts.md`.
+- **The README Permissions section, `SECURITY.md` and `PRIVACY.md` name the lab clone, where a run puts it and its removal.**
+- **`references/source-set.md` states what OSV answers:** `GET /v1/vulns/{id}`; its package query is a `POST`, which the data seat's GET-only fetch does not send, so a package-to-advisory lookup goes through the Advisory Database's `GET /advisories`.
+
 ## [2.7.1] - 2026-10-04
 
 The C1 trace keeps two bounded-input cases as findings.
