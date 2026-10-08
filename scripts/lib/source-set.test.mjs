@@ -142,3 +142,17 @@ test('the shipped provider facts are stated with their vendor page, and only NVD
   assert.match(unverified[0], /NVD's keyless rate limit/);
   assert.match(unverified[0], /wsl\.exe/);
 });
+
+// u2 (t24 #8): ledger row L2 promised OSV "by package and version", which the data seat's GET-only fetch cannot send (OSV's package query is a
+// POST, as the request-forms paragraph says two screens below). L2 is read by id; the package lookup is L1's GET /advisories form.
+const L2_NOW = 'a vulnerability by id; a package-and-version lookup goes through L1\'s `GET /advisories?ecosystem=…&affects=…`';
+test('RED-FIRST t24 #8: L2 promising OSV by package and version is a finding', () => {
+  const f = run(mutateRow('L2', (r) => r.replace(L2_NOW, 'a vulnerability by id, and by package and version')));
+  assert.ok(f.some((m) => /L2 must not promise an OSV lookup by package/.test(m)), f.join('\n'));
+  assert.ok(f.some((m) => /L2 must point the package-and-version lookup at L1/.test(m)), f.join('\n'));
+});
+test('t24 #8: L2 must say OSV is read by id, and must point the package lookup at L1\'s affects= form', () => {
+  assert.ok(run(mutateRow('L2', (r) => r.replace('a vulnerability by id', 'a vulnerability'))).some((m) => /L2 must say OSV is read by id/.test(m)));
+  assert.ok(run(mutateRow('L2', (r) => r.replace(L2_NOW, 'a vulnerability by id'))).some((m) => /L2 must point the package-and-version lookup at L1/.test(m)));
+  assert.ok(run(mutateRow('L2', (r) => r.replace('affects=', 'filter='))).some((m) => /L2 must point the package-and-version lookup at L1/.test(m)));
+});

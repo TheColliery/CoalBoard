@@ -73,6 +73,13 @@ export function checkSourceSet({ files }) {
   const HIDE_SECRET_PARAM = 'hide_secret' + '=true';
   if (rows.A3 && !rows.A3.raw.includes(HIDE_SECRET_PARAM)) findings.push('A3 must name its request form with `hide_secret=true` (the endpoint returns the literal secret by default)');
   if (!/discarded unread/.test(ref.text) || !/without `hide_secret=true` is NEVER sent/.test(ref.text)) findings.push('source-set.md must state that a secret-scanning request without `hide_secret=true` is never sent and a response still carrying a `secret` field is discarded unread');
+  // t24 #8: OSV answers a package query only by POST, which the data seat's GET-only fetch does not send, so L2 is read by id and the
+  // package-and-version lookup is L1's GET /advisories?ecosystem=...&affects=... form (the request-forms paragraph says the same).
+  if (rows.L2) {
+    if (!/a vulnerability by id/.test(rows.L2.source)) findings.push('L2 must say OSV is read by id ("a vulnerability by id")');
+    if (/by package/.test(rows.L2.source)) findings.push('L2 must not promise an OSV lookup by package: that query is a POST, which the data seat\'s GET-only fetch does not send');
+    if (!/\bL1\b/.test(rows.L2.source) || !/affects=/.test(rows.L2.source)) findings.push('L2 must point the package-and-version lookup at L1 (GET /advisories?ecosystem=...&affects=...)');
+  }
   if (rows.E1) {
     if (!/ONLY inside a box/.test(rows.E1.raw)) findings.push('E1 must keep "ONLY inside a box" (the POSIX run never happens on the host)');
     if (!/\bS4\b/.test(rows.E1.raw) || !/S1-S3/.test(rows.E1.raw)) findings.push('E1 must name run-safety S4 (the box) and its S1-S3 limit');
