@@ -16,10 +16,14 @@
 // it lives INSIDE the run directory as a SIBLING of the clone (never an ancestor: a tool that walks up would read a
 // copy as a real config), under SHA-256 names plus one manifest, and S5 removes it WITH the clone after S2's restore;
 // S3 names the run directory and advises restricting it to the current user on Windows (icacls /inheritancelevel:r,
-// the form Microsoft Learn documents) because %ProgramData% is readable by other local accounts by default; (5) the duty reaches the places a model reads at run time: every
-// Bash-holding seat's FIXED rules in lens-prompts.md (naming the ledger, all five ids, the never-outside-a-box class
-// and the removal proof), and Step 4.2's isolation line in SKILL.md; (6) the references table lists the file as
-// MANDATORY. The no-new-right half (run safety adds a duty, never a tool) is seat-rights.mjs.
+// the form Microsoft Learn documents) because %ProgramData% is readable by other local accounts by default;
+// (4c) u2: S3 asserts the run directory's real path is outside the home tree BEFORE anything is copied in (a TMPDIR inside the
+// home falls back to /tmp), S4 says a box the probe passes is used for the non-file class, and the lens line carries every one of
+// these S3 clauses because a shell seat sees only that line;
+// (5) the duty reaches the places a model reads at run time: every Bash-holding seat's FIXED rules in lens-prompts.md
+// (naming the ledger, all five ids, the never-outside-a-box class and the removal proof), and Step 4.2's isolation
+// line in SKILL.md; (6) the references table lists the file as MANDATORY. The no-new-right half (run safety adds a
+// duty, never a tool) is seat-rights.mjs.
 // WHAT IT CANNOT BIND: that a model follows S1-S5 (prose, below probability 1), that a clone WAS removed (that is a
 // run-time act the return states; the gate reads the text that demands it), that the non-file class list is complete,
 // that the icacls form still holds on a later Windows (the Learn page and the date read are in the text), or that a
@@ -100,6 +104,11 @@ export function checkRunSafety({ files }) {
     ['S3', [/RUN DIRECTORY/], 'S3 must name the RUN DIRECTORY that holds clone/ and backup/'],
     ['S3', [/restrict the run directory to the current user/], 'S3 must advise restricting the run directory to the current user on Windows, before anything is copied in'],
     ['S3', [/icacls/, /\/inheritancelevel:r/], 'S3 must give the icacls form that Microsoft Learn documents (/inheritancelevel:r)'],
+    // u2 (t24 #7, #6, the S8 walk note): the real-path assert before the copy, its /tmp fallback, the no-outside-place fallback, the box used when found.
+    ['S3', [/\breal path\b/, /outside the home tree BEFORE anything is copied in/], "S3 must assert the run directory's real path is outside the home tree BEFORE anything is copied in"],
+    ['S3', [/then use `\/tmp`/], 'S3 must say a TMPDIR inside the home tree falls back to /tmp (or states why it could not)'],
+    ['S3', [/let S2 carry the weight/], 'S3 must say, with no outside place, to say so and let S2 carry the weight'],
+    ['S4', [/with a box the probe passes, run it inside that box/], 'S4 must say that with a box the probe passes the non-file class runs inside that box'],
     ['S5', [/together with its backup/], 'S5 must remove the backup together with the clone'],
     ['S5', [/AFTER S2's restore/], 'S5 must run AFTER S2\'s restore (the restore needs the backup)'],
   ];
@@ -142,6 +151,12 @@ export function checkRunSafety({ files }) {
       [/\bgone\b/, 'the lens-prompts.md FIXED rule must say the removal proof includes that the path is gone'],
       [/never above the clone/, 'the lens-prompts.md FIXED rule must put the S2 backup beside the clone, never above it'],
       [/clone and S2 backup together/, 'the lens-prompts.md FIXED rule must remove the S2 backup with the clone'],
+      [/ONE run directory holding/, 'the lens-prompts.md FIXED rule must name the ONE run directory that holds clone/ and backup/'],
+      [/real path is outside the home tree BEFORE anything is copied in/, "the lens-prompts.md FIXED rule must assert the run directory's real path is outside the home tree BEFORE anything is copied in"],
+      [/icacls <run-dir> \/inheritancelevel:r/,'the lens-prompts.md FIXED rule must carry the Windows restrict-to-your-user step (icacls /inheritancelevel:r)'],
+      [/let S2 carry the weight/, 'the lens-prompts.md FIXED rule must say, with no outside place, to say so and let S2 carry the weight'],
+      [/cannot do S1, S2 or S5/, 'the lens-prompts.md FIXED rule must say a seat that cannot do S1, S2 or S5 does not run (NOT-CHECKED)'],
+      [/with a box the probe passes, run it inside that box/, 'the lens-prompts.md FIXED rule must say that with a box the probe passes the non-file class runs inside that box'],
     ]) if (!re.test(lensLine)) findings.push(msg);
   }
   const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));

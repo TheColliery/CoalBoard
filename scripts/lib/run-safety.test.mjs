@@ -78,7 +78,9 @@ test('the duty must reach the seat: a lens-prompts FIXED rule missing, or missin
   const lensRel = 'skills/coalboard/references/lens-prompts.md';
   const line = realFiles().find((f) => f.rel === lensRel).text.split('\n').find((l) => /run-safety\.md/.test(l) && /^-\s/.test(l));
   assert.ok(checkRunSafety({ files: mutate(lensRel, line, '- (removed)') }).some((m) => /no FIXED rule that points at references\/run-safety\.md/.test(m)));
-  assert.ok(checkRunSafety({ files: mutate(lensRel, ' · S5 remove your clone', ' · remove your clone') }).some((m) => /lens-prompts\.md FIXED rule does not name S5/.test(m)));
+  // u2: the lens line's closing sentence now also says "S1, S2 or S5", so dropping the S5 clause alone no longer drops the id; both go.
+  const noS5 = mutate(lensRel, ' · S5 remove your clone', ' · remove your clone').map((f) => (f.rel === lensRel ? { ...f, text: f.text.replace('You cannot do S1, S2 or S5', 'You cannot do the above') } : f));
+  assert.ok(checkRunSafety({ files: noS5 }).some((m) => /lens-prompts\.md FIXED rule does not name S5/.test(m)));
 });
 
 test("main's own runs: Step 4.2 must point at the ledger and the references table must list it MANDATORY", () => {
@@ -177,6 +179,9 @@ const mutateCell = (id, cell, from, to, all = false) => {
 };
 const LENS = 'skills/coalboard/references/lens-prompts.md';
 const lensLineText = () => realFiles().find((f) => f.rel === LENS).text.split('\n').find((l) => /run-safety\.md/.test(l) && /^-\s/.test(l));
+// These two index the RAW row.split('|') used by mutateCell, where cell 0 is the empty text before the leading pipe and cell 1 the id. They sit one
+// off from parseSafeguardLedger's cells (it takes slice(1, -1), so its safeguard is cells[1] and its proof cells[3]): a swap to the parser's cells
+// would shift every mutant by one without a failure (t24 #3).
 const SAFEGUARD = 2;
 const PROOF = 4;
 const LEARN = 'https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls';
@@ -243,4 +248,33 @@ test('UMB2-008: the shipped text carries the owner ruling (no drive-root instruc
   assert.match(rows.S4.first, /OPTIONAL; MANDATORY for non-file effects/);
   for (const re of [/WHOLE clone/, /EVERY run/, /NOT met its own done-criteria/]) assert.match(rows.S5.safeguard, re);
   assert.match(lensLineText(), /NEVER run outside a real box/);
+});
+
+// u2 (CodeRabbit t24 #6 and #7, 08b R2-MEDIUM-1 and R2-LOW-2, the S8 walk note): the lens line is all a shell seat reads, so every S3 clause the
+// ledger carries reaches it; S3 asserts the run directory's real path is outside the home tree before the copy; S4's class line says a box the
+// probe passes is used. One red mutant per NEW anchor, as above.
+const u2Anchors = [
+  ['S3 real path asserted before the copy', () => mutateCell('S3', SAFEGUARD, 'outside the home tree BEFORE anything is copied in', 'outside the home tree sometime'), /S3 must assert the run directory's real path is outside the home tree BEFORE anything is copied in/],
+  ['S3 says real path', () => mutateCell('S3', SAFEGUARD, 'real path', 'location', true), /S3 must assert the run directory's real path is outside the home tree BEFORE anything is copied in/],
+  ['S3 a TMPDIR inside home falls back to /tmp', () => mutateCell('S3', SAFEGUARD, 'so then use `/tmp`', 'so carry on'), /S3 must say a TMPDIR inside the home tree falls back to \/tmp/],
+  ['S3 no outside place: S2 carries the weight', () => mutateCell('S3', SAFEGUARD, 'let S2 carry the weight', 'carry on'), /S3 must say, with no outside place, to say so and let S2 carry the weight/],
+  ['S4 a box the probe passes is used', () => mutateCell('S4', SAFEGUARD, 'with a box the probe passes, run it inside that box', 'use a box if you like'), /S4 must say that with a box the probe passes the non-file class runs inside that box/],
+  ['lens: ONE run directory', () => mutate(LENS, 'S3 make ONE run directory holding', 'S3 make a folder holding'), /lens-prompts\.md FIXED rule must name the ONE run directory that holds clone\/ and backup\//],
+  ['lens: real path asserted before the copy', () => mutate(LENS, 'assert its real path is outside the home tree BEFORE anything is copied in', 'check it later'), /lens-prompts\.md FIXED rule must assert the run directory's real path is outside the home tree BEFORE anything is copied in/],
+  ['lens: Windows restrict step', () => mutate(LENS, '/inheritancelevel:r', '/inheritance:r'), /lens-prompts\.md FIXED rule must carry the Windows restrict-to-your-user step \(icacls \/inheritancelevel:r\)/],
+  ['lens: no outside place', () => mutate(LENS, 'let S2 carry the weight', 'carry on'), /lens-prompts\.md FIXED rule must say, with no outside place, to say so and let S2 carry the weight/],
+  ['lens: NOT-CHECKED covers S5', () => mutate(LENS, 'You cannot do S1, S2 or S5', 'You cannot do S1-S2'), /lens-prompts\.md FIXED rule must say a seat that cannot do S1, S2 or S5 does not run/],
+  ['lens: a box the probe passes is used', () => mutate(LENS, 'with a box the probe passes, run it inside that box', 'use a box if you like'), /lens-prompts\.md FIXED rule must say that with a box the probe passes the non-file class runs inside that box/],
+];
+for (const [name, build, expect] of u2Anchors) {
+  test(`u2 red mutant: ${name}`, () => {
+    const f = checkRunSafety({ files: build() });
+    assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
+  });
+}
+
+test('u2 (R2-LOW-2): the icacls page is a WRAPPED link in S3 (angle brackets), still one whole link token', () => {
+  const s3 = parseSafeguardLedger(refText()).S3.safeguard;
+  assert.ok(s3.includes('(<' + LEARN + '>,'), 'the bare URL is wrapped as <...>');
+  assert.ok(cites(s3, LEARN), 'the wrapped link is still cited as a whole link token');
 });
