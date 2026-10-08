@@ -39,6 +39,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA } from './lib/config-schema.mjs';
+import { gitEnv } from './lib/git-env.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '..');
@@ -351,3 +352,52 @@ for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude',
     assert.ok(r.stdout.includes('Migrated the project config'), 'the migration is announced');
   });
 }
+
+// ---- PR 19 #15 (u2): the migration must never delete a file git tracks (the room's own CodeRabbit path instruction). A tracked legacy file
+// survives with a printed note; an untracked one is removed as before; with no git on PATH behaviour is unchanged (git stays optional).
+const gitIn = (dir, ...args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 20000, env: gitEnv(path.dirname(dir)) });
+const legacyRepo = (sb, rel) => {
+  const legacy = path.join(sb.proj, ...rel);
+  fs.mkdirSync(path.dirname(legacy), { recursive: true });
+  fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+  assert.strictEqual(gitIn(sb.proj, 'init', '--quiet').status, 0);
+  return legacy;
+};
+for (const [label, rel] of [['nested .claude/.coalboard.json', ['.claude', '.coalboard.json']], ['root .coalboard.json', ['.coalboard.json']]]) {
+  test(`configure (PR 19 #15): a git-TRACKED legacy config (${label}) survives the migration with a printed note, and the new config is written`, () => {
+    const sb = sandbox();
+    try {
+      const legacy = legacyRepo(sb, rel);
+      assert.strictEqual(gitIn(sb.proj, 'add', '--', path.join(...rel)).status, 0);
+      const r = run(['--language', 'en'], sb);
+      assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+      assert.ok(fs.existsSync(legacy), 'a file git tracks must not be deleted');
+      assert.ok(/git tracks/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+      assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the migration still writes the new config');
+    } finally { clean(sb); }
+  });
+}
+test('configure (PR 19 #15): an UNTRACKED legacy config inside a git repository is still removed by the migration', () => {
+  const sb = sandbox();
+  try {
+    const legacy = legacyRepo(sb, ['.coalboard.json']);
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.strictEqual(fs.existsSync(legacy), false, 'an untracked legacy file is removed as before');
+    assert.ok(r.stdout.includes('Migrated the project config'));
+  } finally { clean(sb); }
+});
+test('configure (PR 19 #15): with no git on PATH the migration is unchanged (a tracked file is removed; git is optional)', () => {
+  const sb = sandbox();
+  try {
+    const legacy = legacyRepo(sb, ['.coalboard.json']);
+    assert.strictEqual(gitIn(sb.proj, 'add', '--', '.coalboard.json').status, 0);
+    const emptyBin = path.join(sb.home, 'empty-bin');
+    fs.mkdirSync(emptyBin);
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^path$/i.test(k)));
+    const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: { ...env, PATH: emptyBin, HOME: sb.home, USERPROFILE: sb.home }, timeout: 20000 });
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.strictEqual(fs.existsSync(legacy), false, 'with no git the legacy file is removed exactly as before');
+    assert.ok(r.stdout.includes('Migrated the project config'));
+  } finally { clean(sb); }
+});

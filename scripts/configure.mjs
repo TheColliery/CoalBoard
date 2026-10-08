@@ -50,7 +50,16 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
+import { gitEnv } from './lib/git-env.mjs';
+
+// PR 19 #15: true when git tracks `file` (it is in the index of the repository around it). git is OPTIONAL (no-external-assumption): no git on PATH,
+// no repository, or a timeout all read as NOT tracked, so the migration behaves exactly as it did before this check. The spawn takes gitEnv() (census).
+function gitTracks(file) {
+  const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', path.basename(file)], { cwd: path.dirname(file), stdio: 'ignore', timeout: 20000, env: gitEnv() });
+  return !r.error && r.status === 0;
+}
 
 // String-aware JSONC strip + prototype-pollution guard — the SAME stripping
 // regex and __proto__/constructor/prototype reviver as hooks/coalboard-
@@ -272,7 +281,9 @@ function main() {
     // correctly-written new config; the stray legacy file is simply not cleaned
     // up this run.
     if (legacyPaths.includes(readPath) && writePath !== readPath) {
-      try { fs.rmSync(readPath, { force: true }); } catch {}
+      // Never delete a file git tracks (the room's own CodeRabbit path instruction): it is recoverable from git, but the CLI must not be the one to remove it.
+      if (gitTracks(readPath)) console.log(`Kept ${readPath}: git tracks it, so the migration does not delete it. Remove it with git rm once you agree.`);
+      else { try { fs.rmSync(readPath, { force: true }); } catch {} }
       console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
     }
     if (hadComments) {
