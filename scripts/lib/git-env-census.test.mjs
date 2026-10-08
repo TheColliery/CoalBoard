@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { censusGitSpawns, collectSources, blobId, EXEMPT_CARRIERS } from './git-env-census.mjs';
@@ -96,8 +97,47 @@ test('R14 CWK-174: an exempt carrier passes ONLY while its content is exactly th
   assert.equal(censusGitSpawns(files(text, 'scripts/other.mjs'), exempt).findings.length, 1, 'the exemption names a path, nothing else');
 });
 
-test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the four org-carried files', () => {
+test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the three org-carried files', () => {
   assert.equal(blobId(''), 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
   assert.equal(blobId('hello' + String.fromCharCode(10)), 'ce013625030ba8dba906f756967f9e9ca394464a');
-  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/release-notes.mjs', 'scripts/release-notes.test.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
+  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/release-notes.test.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
+});
+
+// UMB-456 (2), 08c: the census learns the ALLOWLIST env shape. Fixtures are built, never written as a literal call (see GIT above).
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const NOSYS = "GIT_CONFIG_NOSYSTEM: '1'";
+const KEEP = "const keep = ['PATH', 'Path', 'SystemRoot', 'GIT_CEILING_DIRECTORIES'];\n";
+const FILTERED = '...Object.fromEntries(keep.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]]))';
+const allow = (extra = '') => '{ ' + FILTERED + ', ' + NOSYS + extra + ' }';
+
+test('UMB-456 (2) RED-FIRST: an allowlist env passes: named keys, a filtered read of process.env, GIT_CONFIG_NOSYSTEM=1', () => {
+  assert.deepEqual(refused(KEEP + 'const env = ' + allow() + ';\n' + call('{ cwd: d, env }')), [], 'a declared object, shorthand use');
+  assert.deepEqual(refused(KEEP + call('{ cwd: d, env: ' + allow(", GIT_TERMINAL_PROMPT: '0'") + ' }')), [], 'an inline object');
+  assert.deepEqual(refused(call("{ env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1' } }")), [], 'named keys, property reads');
+});
+
+test('UMB-456 (2) RED-FIRST: the canon release-notes.mjs, as committed, passes the census with NO pin', () => {
+  const text = fs.readFileSync(path.join(repoRoot, 'scripts', 'release-notes.mjs'), 'utf8');
+  const r = censusGitSpawns([{ rel: 'scripts/release-notes.mjs', text }], {});
+  assert.equal(r.spawns, 1, 'the census must SEE its one git spawn');
+  assert.deepEqual(r.findings, []);
+});
+
+test('UMB-456 (2): an UNFILTERED process.env is still refused, however the object is dressed', () => {
+  for (const [why, env] of [
+    ['a spread beside the sentinel', '{ ...process.env, ' + NOSYS + ' }'],
+    ['Object.assign', 'Object.assign({}, process.env, { ' + NOSYS + ' })'],
+    ['the whole env as entries', '{ ...Object.fromEntries(Object.entries(process.env)), ' + NOSYS + ' }'],
+    ['a spread of an identifier the census cannot see through', '{ PATH: process.env.PATH, ...extra, ' + NOSYS + ' }'],
+  ]) assert.equal(refused(call('{ env: ' + env + ' }')).length, 1, why);
+  assert.equal(refused(KEEP + 'const env = { ...process.env, ' + NOSYS + ' };\n' + call('{ env }')).length, 1, 'declared with the spread');
+});
+
+test('UMB-456 (2): an allowlist needs GIT_CONFIG_NOSYSTEM=1 and no repository-aiming GIT_* key, in the object or the key list it filters', () => {
+  assert.equal(refused(KEEP + call('{ env: { ' + FILTERED + ' } }')).length, 1, 'no sentinel');
+  assert.equal(refused(KEEP + call("{ env: { " + FILTERED + ", GIT_CONFIG_NOSYSTEM: '0' } }")).length, 1, 'sentinel off');
+  assert.equal(refused(KEEP + call('{ env: ' + allow(", GIT_DIR: '/x'") + ' }')).length, 1, 'GIT_DIR in the object');
+  assert.equal(refused(KEEP.replace("'Path'", "'GIT_INDEX_FILE'") + call('{ env: ' + allow() + ' }')).length, 1, 'GIT_INDEX_FILE in the key list');
+  assert.equal(refused(call('{ env: ' + allow() + ' }')).length, 1, 'a key list the census cannot find is refused');
+  assert.equal(refused(KEEP + 'const env = ' + allow() + ";\nenv.GIT_DIR = 'x';\n" + call('{ env }')).length, 1, 'mutated after its declaration');
 });

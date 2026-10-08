@@ -11,6 +11,14 @@
 //       identifier declared `const NAME = gitEnv(...)` in the same file and not mutated afterwards. An
 //       expression that merely CONTAINS gitEnv( -- `base || gitEnv()`, Object.assign(gitEnv(), ...) -- is
 //       refused: the helper's presence is not the property, the absence of everything else is.
+// ONE other shape passes, the ALLOWLIST env (UMB-456 (2), 08c): an OBJECT, written inline or declared `const NAME = {...}` in the
+// same file and not mutated, built from NAMED keys. Every read of process.env in it names its key (process.env[k], process.env.PATH),
+// so an unfiltered `...process.env`, `Object.assign({}, process.env)` or Object.entries(process.env) is refused; its only spreads are
+// `...Object.fromEntries(`; it sets GIT_CONFIG_NOSYSTEM to '1'; and no GIT_* name other than GIT_CONFIG_NOSYSTEM, GIT_TERMINAL_PROMPT and
+// GIT_CEILING_DIRECTORIES (the last only NARROWS where git searches) appears in the object or in the key list it filters (a
+// `const KEYS = [...]` in the same file; one the census cannot find is refused). GIT_TERMINAL_PROMPT is allowed beside the ruling's
+// GIT_CONFIG_NOSYSTEM because the canon release-notes.mjs sets it: it stops a prompt, it aims git nowhere. A helper CALL
+// (`env: sandboxEnv(cwd)`) is not followed: it keeps a blob pin.
 // A node child (process.execPath) and any other non-git command is not a git spawn and is left alone.
 //
 // It is TEXTUAL, not a parser. What it sees: a direct spawnSync / execFileSync / spawn / execFile call whose
@@ -91,6 +99,41 @@ function safeIdentifier(name, text) {
   return !new RegExp(String.raw`delete\s+${n}\b|\b${n}\s*(?:\.|\[)[^=;\n]*=(?!=)|\b${n}\s*=(?!=)`).test(rest);
 }
 
+const ALLOWED_GIT_KEYS = new Set(['GIT_CONFIG_NOSYSTEM', 'GIT_TERMINAL_PROMPT', 'GIT_CEILING_DIRECTORIES']);
+
+// The object literal an env expression denotes: the literal itself, or the one `const NAME = {...}` in the file when the
+// name is never reassigned or mutated. null when it is neither (then the gitEnv() rules decide).
+function envObject(expr, text) {
+  if (expr.startsWith('{')) return closeOf(expr, 0) === expr.length - 1 ? expr : null;
+  if (!/^[A-Za-z_$][\w$]*$/.test(expr)) return null;
+  const decl = new RegExp(String.raw`(?:const|let|var)\s+${esc(expr)}\s*=\s*\{`).exec(text);
+  if (!decl) return null;
+  const open = decl.index + decl[0].length - 1;
+  const close = closeOf(text, open);
+  if (close === -1) return null;
+  const rest = text.replace(text.slice(decl.index, close + 1), '');
+  const n = `(?<![.\\w$])${esc(expr)}`; // not a property of something else: process.env.X is not a write to a local named env
+  if (new RegExp(String.raw`delete\s+${n}\b|${n}\s*(?:\.|\[)[^=;\n]*=(?!=)|${n}\s*=(?!=)`).test(rest)) return null;
+  return text.slice(open, close + 1);
+}
+
+// null when `obj` is a safe allowlist env, else the reason it is not.
+function allowlistRefusal(obj, text) {
+  if (/process\s*\.\s*env(?!\s*(?:\[|\.\s*[A-Za-z_$]))/.test(obj)) return 'takes env from process.env without naming its keys -- route it through gitEnv() or filter by named key (CWK-136)';
+  for (const m of obj.matchAll(/\.\.\.\s*([^\s,}]*)/g)) if (!m[1].startsWith('Object.fromEntries(')) return `spreads ${m[1].slice(0, 30)}, which the census cannot see through (UMB-456 (2))`;
+  let keys = obj;
+  for (const m of obj.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(?:filter|map)\s*\(/g)) {
+    const decl = new RegExp(String.raw`(?:const|let|var)\s+${esc(m[1])}\s*=\s*\[`).exec(text);
+    const open = decl ? decl.index + decl[0].length - 1 : -1;
+    const close = open === -1 ? -1 : closeOf(text, open);
+    if (close === -1) return `filters ${m[1]}, a key list the census cannot find in this file (UMB-456 (2))`;
+    keys += text.slice(open, close + 1);
+  }
+  for (const m of keys.matchAll(/GIT_[A-Z0-9_]+/g)) if (!ALLOWED_GIT_KEYS.has(m[0])) return `names ${m[0]}, a GIT_* variable that can aim git at another repository (UMB-456 (2))`;
+  if (!/['"`]?GIT_CONFIG_NOSYSTEM['"`]?\s*:\s*(['"`])1\1/.test(obj)) return 'does not set GIT_CONFIG_NOSYSTEM to 1 (UMB-456 (2))';
+  return null;
+}
+
 // R14 / CWK-174 -- the house secret scan arrives as byte-equal copies of the published-code template (SERIES-CANON
 // "Secret scan": a parity check measures it), so this room cannot route their git spawns through gitEnv() without
 // breaking that parity. The two TEST files below spawn git with no cleaned environment (secret-scan.test.mjs) or with a
@@ -99,15 +142,15 @@ function safeIdentifier(name, text) {
 // widen or outlive its reason silently. The pin is a git blob id (git hash-object <file>) against
 // .github/templates/published-code/scripts/ (the pins below are the blobs of the 08c re-sync: the scanner and its test from Bankfire,
 // the gate and its test from .github 690c2de). The real fix belongs to the template (the .github deputy).
-// 08c (order 08c, .github 06c099d): the overlay-coal-skill scripts are carriers on the same terms. release-notes.mjs gives its git
-// spawn an EXPLICIT allowlist env (no GIT_* inherited): the property this census guards, but not the textual form it accepts
-// (gitEnv(...) alone), so it is blob-pinned until the census learns the allowlist shape. release-notes.test.mjs spawns git through
-// its own sandboxEnv(cwd) helper, which the census does not follow. The 05a held copy of that test (d7e299c4) is RELEASED: the
-// canon 8cf7e5fd now allows __CF_USER_TEXT_ENCODING and NODE_V8_COVERAGE in a child's environment.
+// 08c (UMB-456 (2)): scripts/release-notes.mjs is NO LONGER pinned: its allowlist env is now an accepted shape (see the header).
+// The three pins that stay, each with its reason: secret-scan.test.mjs (a git spawn with a hand-built cleanEnv and others the census
+// cannot verify), secret-gate.test.mjs (`env: { ...gitEnv(), ...extra }`, a spread around the helper) and release-notes.test.mjs (its
+// git spawns take `env: sandboxEnv(cwd)`, a helper CALL the census does not follow, and the helper sets no GIT_CONFIG_NOSYSTEM).
+// The 05a held copy of release-notes.test.mjs (d7e299c4) is RELEASED: the canon 8cf7e5fd allows __CF_USER_TEXT_ENCODING and
+// NODE_V8_COVERAGE in a child's environment.
 export const EXEMPT_CARRIERS = {
   'scripts/secret-scan.test.mjs': '4433fb56bc97d1facc3fb27804e1934c0577115f',
   'scripts/secret-gate.test.mjs': 'a17ae233275c05c6d030f7aa7f0654002b310356',
-  'scripts/release-notes.mjs': 'f8d998d8fe14a5972440043123398115d02fc50e',
   'scripts/release-notes.test.mjs': '8cf7e5fd58b89d051395efc53cc0a4f6c86848da',
 };
 
@@ -137,7 +180,9 @@ export function censusGitSpawns(files, exempt = EXEMPT_CARRIERS) {
       const where = `${rel}:${lineOf(text, m.index)}`;
       if (close === -1) { findings.push(`${where} unbalanced parens scanning a ${m[1]}('git', ...) call -- census cannot verify it`); continue; }
       const expr = envExpr(text.slice(open, close + 1));
+      const obj = expr === null ? null : envObject(expr, text);
       if (expr === null) findings.push(`${where} ${m[1]}('git', ...) carries no 'env:' -- it inherits the ambient GIT_* family (CWK-133)`);
+      else if (obj !== null) { const why = allowlistRefusal(obj, text); if (why) findings.push(`${where} ${m[1]}('git', ...) env ${why}`); }
       else if (/process\s*\.\s*env/.test(expr)) findings.push(`${where} ${m[1]}('git', ...) takes env from process.env -- route it through gitEnv() (CWK-136)`);
       else if (!isGitEnvCall(expr) && !safeIdentifier(expr, text)) findings.push(`${where} ${m[1]}('git', ...) env is not gitEnv(...) alone (got: ${expr.slice(0, 60)}) -- an expression that merely contains it is refused (CWK-136)`);
     }
