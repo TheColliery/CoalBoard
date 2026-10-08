@@ -4,14 +4,17 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
-The run-safety lab clone has recommended roots and is always removed.
+Every run removes its whole run directory, backup included.
 
 ### Changed
 - **Run safety S3 gives recommended roots for the lab clone.** `references/run-safety.md` names `%ProgramData%\CoalBoard\lab\<run-id>` on Windows and `mktemp -d` under `TMPDIR` or `/tmp` on POSIX as advice against scatter, not a requirement; a run may use another place, and its return names the path it used.
-- **Run safety S5 is a hard rule.** Every run, success or failure, removes the whole clone with a narrow delete of exactly the directory it created, checks it is gone, and says `clone removed`; a refused delete is reported and the clone counts as not removed.
+- **Run safety S3 advises restricting the run directory to the current user on Windows** (`icacls`, before anything is copied in), because `%ProgramData%` is readable by every local account by default.
+- **Run safety S2 keeps the backup of the real configs in the run directory, beside the clone** and never above it, so a tool that walks up from the clone cannot read a copy as a real config; files are named by SHA-256 with one manifest.
+- **Run safety S5 is a hard rule.** Every run, success or failure, removes the whole run directory (clone and S2 backup together) with a narrow delete of exactly the directory it created, checks it is gone, and says `clone removed`; a refused delete is reported and the clone counts as not removed.
 - **Run safety S4 is mandatory for a target whose effects are not files** (registry writes, Appx or package removal, services, scheduled tasks, system settings): such a target is never run outside a real isolation box and is otherwise read statically (`read statically, not run`). The box stays optional for every other target.
-- **The lens prompts carry the same S3, S4 and S5 duties** in `references/lens-prompts.md`.
-- **The README Permissions section, `SECURITY.md` and `PRIVACY.md` name the lab clone, where a run puts it and its removal.**
+- **The lens prompts carry the same S2, S3, S4 and S5 duties** in `references/lens-prompts.md`.
+- **The README Permissions section, `SECURITY.md` and `PRIVACY.md` name the lab clone, the S2 backup, where a run puts them and their removal,** and name `scripts/configure.mjs`'s two other writes: the `<config>.bak` copy it saves when the config it reads is malformed, and the removal of the legacy file it migrated.
+- **`references/failure-modes.md` no longer cites a machine-local rules file** for the cross-session messaging availability claim.
 - **`references/source-set.md` states what OSV answers:** `GET /v1/vulns/{id}`; its package query is a `POST`, which the data seat's GET-only fetch does not send, so a package-to-advisory lookup goes through the Advisory Database's `GET /advisories`.
 
 ## [2.7.1] - 2026-10-04
