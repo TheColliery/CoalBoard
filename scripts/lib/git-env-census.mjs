@@ -12,29 +12,34 @@
 // object (a literal, with no spread, computed key or method in it) must carry exactly ONE `env` key, and that env is
 // SAFE only when it is one of
 //   (i)   gitEnv(...) / gitTestEnv(...) ALONE -- the whole expression is one call. The name is trusted only when this file
-//         does not define it (function, const, import-alias): a file-local gitEnv proves nothing (F42), so it needs a blob pin.
-//   (ii)  an IDENTIFIER bound by exactly one `const|let|var NAME = <(i) or (iii)>;` in this file (no export), where EVERY
+//         does not define, alias or reassign it (an import is fine): a file-local gitEnv proves nothing by its NAME (F42), so it
+//         is read as in (iv), and Bankfire's denylist copy of it (an Object.entries(process.env) filter) is a pin, not a pass.
+//   (ii)  an IDENTIFIER bound by exactly one `const|let|var NAME = <(i), (iii) or (iv)>;` in this file (no export), where EVERY
 //         other occurrence of NAME is the env value of a spawn call's options object -- never an argument, an alias, an
 //         assignment, a method call, a parameter, a shadow or a second declaration. That whitelist is what closes mutation
 //         (F15-F18, F35-F40) and scope confusion (F31-F34) without a scope analysis: anything else is unprovable and refused.
 //   (iii) an ALLOWLIST object literal (inline or as the initializer of (ii)): plain-identifier or quoted-literal keys, no
 //         duplicate key (case-insensitive: a Windows env is), no GIT_* key other than GIT_CONFIG_NOSYSTEM,
 //         GIT_TERMINAL_PROMPT and GIT_CEILING_DIRECTORIES (each only NARROWS git); GIT_CONFIG_NOSYSTEM present as the
-//         literal '1' and AFTER every spread; values drawn from a small token set (a literal, a call on a name, a
-//         `process.env.X` or `process.env['X']` read of ONE key -- never the whole env, an object, a spread or an arrow); its
+//         literal '1' and AFTER every spread; values drawn from a small token set (a literal, a call on a name, a regex literal,
+//         a `process.env.X` or `process.env['X']` read of ONE key -- never the whole env, an object, a spread or an arrow); its
 //         only spread is `...Object.fromEntries(KEYS.filter(f).map(g))` or `...Object.fromEntries(KEYS.map(g))` where KEYS is
 //         a const array of plain string literals (no GIT_* name beyond the three) that is read nowhere else, f is a small
 //         predicate over its parameter and process.env[param] / `param in process.env`, and g is exactly
-//         `(k) => [k, process.env[k]]`. The region holds no regex or template literal (F41: a narrower grammar, not a tokenizer's
-//         trust).
-// Anything else -- a helper CALL (sandboxEnv(cwd)), an expression that merely contains gitEnv( -- is a finding unless its file
-// is blob-pinned in EXEMPT_CARRIERS.
+//         `(k) => [k, process.env[k]]`. A template literal inside the region is refused; a regex literal is lexed, not trusted
+//         (F41: the lexer sees every key, so a quote inside a regex cannot hide a GIT_DIR entry).
+//   (iv)  a CALL of a helper this file defines once and only ever calls: `const NAME = (p) => ({...})`,
+//         `const NAME = (p) => { return {...}; }` or `function NAME(p) { return {...}; }`, simple parameters, and the one returned
+//         object judged as (iii) (P2: the canon release-notes.test.mjs sandboxEnv). Any other body -- a second return path (F13),
+//         a default parameter, a statement before the return -- and any non-call use of NAME is refused.
+// Anything else -- a helper called but defined elsewhere (F14), an expression that merely contains gitEnv( -- is a finding unless
+// its file is blob-pinned in EXEMPT_CARRIERS.
 //
 // NAMED OPEN, on purpose:
 //   - a callee reached any other way (`const run = spawnSync`, a wrapper defined elsewhere), a command that is not a literal
 //     (`spawnSync(bin, ...)`, a template with ${}), git through a shell (`sh -c`, execSync strings, `shell:`);
-//   - eval, `with`, Function(...), getters on the options object built elsewhere, and the body of a TRUSTED helper (gitEnv's own
-//     body in git-env.mjs is its own test's job, not read here);
+//   - eval, `with`, Function(...), getters on the options object built elsewhere, and the body of an IMPORTED gitEnv/gitTestEnv
+//     (git-env.mjs is its own test's job, not read here);
 //   - the lexer's one heuristic: a `/` after `)` `]` `}` or a value is division, any other `/` starts a regex literal. A file
 //     that fools that heuristic into hiding a spawn is not seen; one that makes the braces unbalanced is a finding.
 // Pure: a list of { rel, text } in, a report out, so it is unit-tested red-first without a clone.
@@ -280,17 +285,55 @@ function endsStatement(ctx, c) {
   return next.t === 'id' && /\n/.test(ctx.text.slice(ctx.toks[c].e, next.s));
 }
 
-// null when `name` is a helper this file does not define (so the name can be trusted), else why not (F42).
-function helperRefusal(ctx, name) {
+// Params of a helper are plain names: ids and commas, no default value, no destructuring.
+const simpleParams = (toks, open, close) => toks.slice(open + 1, close).every((t, j) => (j % 2 === 0 ? t.t === 'id' : isP(t, ',')));
+
+// null when the helper definition whose name is toks[d] returns exactly one safe allowlist object: `const NAME = (p) => ({...})`,
+// `const NAME = (p) => { return {...}; }` or `function NAME(p) { return {...}; }`. A second return path, a default parameter or any other
+// statement makes it unreadable (F13), so it is refused.
+function helperBodyRefusal(ctx, d) {
   const { toks } = ctx;
-  for (let i = 0; i < toks.length; i++) {
-    if (!isId(toks[i], name)) continue;
-    const prev = toks[i - 1];
-    if (isP(prev, '.') || isP(prev, '?.')) continue;
-    if (isId(prev) && ['function', 'class', 'const', 'let', 'var', 'as'].includes(prev.v)) return `env calls ${name}(), but this file defines or aliases ${name} itself, so the name proves nothing -- import it from scripts/lib/git-env.mjs or pin this file by blob (CWK-136)`;
-    if (isP(toks[i + 1], '=') && !isP(prev, '.')) return `env calls ${name}(), but this file assigns ${name}, so the name proves nothing (CWK-136)`;
+  const bad = `env helper ${toks[d].v} is not a function whose whole body returns one object literal the census can read (F13/F42, CWK-136)`;
+  let k;
+  if (isId(toks[d - 1], 'function')) {
+    if (!isP(toks[d + 1], '(')) return bad;
+    const pc = closeIdx(toks, d + 1);
+    if (pc === -1 || !simpleParams(toks, d + 1, pc)) return bad;
+    k = pc + 1;
+  } else {
+    k = d + 2;
+    if (isP(toks[k], '(')) { const pc = closeIdx(toks, k); if (pc === -1 || !simpleParams(toks, k, pc)) return bad; k = pc + 1; }
+    else if (isId(toks[k])) k++;
+    else return bad;
+    if (!isP(toks[k], '=>')) return bad;
+    k++;
+    if (isP(toks[k], '(') && isP(toks[k + 1], '{')) {
+      const c = closeIdx(toks, k + 1);
+      return c !== -1 && isP(toks[c + 1], ')') && endsStatement(ctx, c + 1) ? allowlistRefusal(ctx, k + 1) : bad;
+    }
   }
-  return null;
+  if (!isP(toks[k], '{') || !isId(toks[k + 1], 'return') || !isP(toks[k + 2], '{')) return bad;
+  const c = closeIdx(toks, k + 2);
+  const end = closeIdx(toks, k);
+  if (c === -1 || end === -1 || !(c + 1 === end || (isP(toks[c + 1], ';') && c + 2 === end)) || !endsStatement(ctx, end)) return bad;
+  return allowlistRefusal(ctx, k + 2);
+}
+
+// null when a call NAME(...) provably returns a safe env. A name this file does NOT define may be an imported gitEnv/gitTestEnv
+// (trusted by name only then, F42); any other name is a helper the census cannot follow. A helper this file defines is read
+// (helperBodyRefusal), and it must be defined once and only ever called -- no alias, no assignment, no other use.
+function helperCallRefusal(ctx, name) {
+  const { toks } = ctx;
+  const defs = [];
+  for (const i of occurrences(ctx, name)) {
+    const prev = toks[i - 1];
+    if (isDecl(toks, i) || isId(prev, 'function')) defs.push(i);
+    else if (isId(prev, 'as') || isId(prev, 'class') || isP(toks[i + 1], '=')) return `env calls ${name}(), but this file aliases, reassigns or redefines ${name}, so the name proves nothing (F42, CWK-136)`;
+  }
+  if (defs.length > 1) return `env helper ${name} is defined ${defs.length} times in this file (CWK-136)`;
+  if (defs.length === 0) return TRUSTED.has(name) ? null : `env is not gitEnv(...) alone (got: ${name}(...)) -- a helper defined elsewhere cannot be followed; pin the file by blob (CWK-136)`;
+  const other = occurrences(ctx, name).some((i) => i !== defs[0] && !isP(toks[i + 1], '('));
+  return other ? `env helper ${name} is used where the census cannot follow it (CWK-136)` : helperBodyRefusal(ctx, defs[0]);
 }
 
 const VALUE_P = new Set(['.', '?.', '(', ')', '[', ']', ',', '+', '-', '*', '?', ':', '||', '&&', '??', '!', '===', '!==', '==', '!=', '<', '>', '<=', '>=']);
@@ -401,7 +444,7 @@ function spreadRefusal(ctx, p) {
 function allowlistRefusal(ctx, o) {
   const { toks } = ctx;
   const c = closeIdx(toks, o);
-  for (let k = o; k <= c; k++) if (['re', 'tpl', 'tplHead', 'tplMid', 'tplTail'].includes(toks[k].t)) return 'env holds a regex or template literal, which the census does not read inside an allowlist (UMB-456 (2))';
+  for (let k = o; k <= c; k++) if (['tpl', 'tplHead', 'tplMid', 'tplTail'].includes(toks[k].t)) return 'env holds a template literal, which the census does not read inside an allowlist (UMB-456 (2))';
   const props = propsOf(toks, o, c);
   if (!props) return 'env object has brackets the census cannot balance (UMB-456 (2))';
   const seen = new Set();
@@ -434,11 +477,11 @@ function initializerRefusal(ctx, i) {
     const c = closeIdx(toks, i);
     return c !== -1 && endsStatement(ctx, c) ? allowlistRefusal(ctx, i) : 'env initializer is an object the census cannot read to its end (CWK-136)';
   }
-  if (isId(toks[i]) && TRUSTED.has(toks[i].v) && isP(toks[i + 1], '(')) {
+  if (isId(toks[i]) && isP(toks[i + 1], '(')) {
     const c = closeIdx(toks, i + 1);
-    return c !== -1 && endsStatement(ctx, c) ? helperRefusal(ctx, toks[i].v) : 'env initializer is a call the census cannot read to its end (CWK-136)';
+    return c !== -1 && endsStatement(ctx, c) ? helperCallRefusal(ctx, toks[i].v) : 'env initializer is a call the census cannot read to its end (CWK-136)';
   }
-  return 'env initializer is neither gitEnv(...) alone nor an allowlist object (CWK-136)';
+  return 'env initializer is neither a helper call nor an allowlist object (CWK-136)';
 }
 
 // null when the env identifier `name` provably holds a safe env at every spawn that reads it.
@@ -471,7 +514,7 @@ function spawnRefusal(ctx, call) {
   if (p.kind === 'shorthand') return identifierRefusal(ctx, 'env');
   const first = toks[p.vs];
   if (p.ve - p.vs === 1 && first.t === 'id') return identifierRefusal(ctx, first.v);
-  if (first.t === 'id' && TRUSTED.has(first.v) && isP(toks[p.vs + 1], '(') && closeIdx(toks, p.vs + 1) === p.ve - 1) return helperRefusal(ctx, first.v);
+  if (first.t === 'id' && isP(toks[p.vs + 1], '(') && closeIdx(toks, p.vs + 1) === p.ve - 1) return helperCallRefusal(ctx, first.v);
   if (isP(first, '{') && closeIdx(toks, p.vs) === p.ve - 1) return allowlistRefusal(ctx, p.vs);
   const expr = ctx.text.slice(first.s, toks[p.ve - 1].e);
   if (toks.slice(p.vs, p.ve).some((t) => isId(t, 'process'))) return 'takes env from process.env -- route it through gitEnv() (CWK-136)';
@@ -483,16 +526,19 @@ function spawnRefusal(ctx, call) {
 // breaking that parity. Each file below is exempt ONLY while its content is exactly the pinned blob: any edit, or a template
 // re-sync that changes it, makes the entry a finding again ("re-derive"), so the exemption cannot widen or outlive its reason
 // silently. The pin is a git blob id (git hash-object <file>). The real fix belongs to the canon (the .github deputy).
-// Why each stays (08d, measured with the 08d census):
-//   secret-scan.test.mjs  -- a hand-built cleanEnv and spawns the census cannot verify (Bankfire d0db994d re-copy).
-//   secret-gate.test.mjs  -- `env: { ...gitEnv(), ...extra }`, a spread around the helper.
-//   secret-gate.mjs       -- it DEFINES gitEnv itself (an Object.entries(process.env) filter) and so cannot be trusted by name (F42).
-//   release-notes.test.mjs -- see the re-copy commit: its pin is released when the canon blob passes unpinned.
+// Why each stays (08d, measured with the 08d census against the re-copied blobs; the finding it raises without the pin is quoted):
+//   secret-scan.test.mjs  d0db994d (Bankfire 6dd3c8e8): "env helper gitEnv is not a function whose whole body returns one object literal the
+//     census can read" -- it defines its own gitEnv as `(envSeen = { ...withoutGit(), ... })`, a DENYLIST that strips GIT_* from a copy of the
+//     whole process.env. Its decoy call now takes that sandbox env too (no longer a separate finding), but the sandbox is not an allowlist.
+//   secret-gate.test.mjs  71452210 (canon d31a091): "env spreads something other than Object.fromEntries(KEYS.filter(...).map(...))" --
+//     `env: { ...gitEnv(), ...extra }` spreads around the helper (:40); its other two spawns call a gitEnv the file defines itself.
+//   secret-gate.mjs       856956a1 (canon d31a091): the same "env spreads something other than Object.fromEntries(...)" -- its own gitEnv is an
+//     Object.entries(process.env) filter that strips GIT_*, a denylist, so the name cannot vouch for it (F42).
+// Released at 08d: release-notes.test.mjs (canon 7e779ef8): its sandboxEnv is one literal of named keys defined in the same file (P2), read as (iv).
 export const EXEMPT_CARRIERS = {
-  'scripts/secret-scan.test.mjs': '4433fb56bc97d1facc3fb27804e1934c0577115f',
-  'scripts/secret-gate.test.mjs': 'a17ae233275c05c6d030f7aa7f0654002b310356',
-  'scripts/secret-gate.mjs': '044ec4464e83895f1a988198c93b73300652bdf2',
-  'scripts/release-notes.test.mjs': '8cf7e5fd58b89d051395efc53cc0a4f6c86848da',
+  'scripts/secret-scan.test.mjs': 'd0db994df855ccd647f3ded878a6867bb198e196',
+  'scripts/secret-gate.test.mjs': '71452210d6a6f793895bc502557fce7e1f3e890c',
+  'scripts/secret-gate.mjs': '856956a1cca6f716e5507f6c23ac90ed34cbbe5f',
 };
 
 // The git blob id of `text`, as `git hash-object` prints it for a file holding exactly these bytes.

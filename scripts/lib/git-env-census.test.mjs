@@ -102,10 +102,10 @@ test('R14 CWK-174: an exempt carrier passes ONLY while its content is exactly th
   assert.equal(censusGitSpawns(files(text, 'scripts/other.mjs'), exempt).findings.length, 1, 'the exemption names a path, nothing else');
 });
 
-test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the four org-carried files', () => {
+test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the three org-carried files', () => {
   assert.equal(blobId(''), 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
   assert.equal(blobId('hello' + String.fromCharCode(10)), 'ce013625030ba8dba906f756967f9e9ca394464a');
-  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/release-notes.test.mjs', 'scripts/secret-gate.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
+  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/secret-gate.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
 });
 
 // UMB-456 (2), 08c: the census learns the ALLOWLIST env shape. Fixtures are built, never written as a literal call (see GIT above).
@@ -281,6 +281,49 @@ for (const use of FORMS) {
     const r = verdict(HEAD + KEEP2 + 'const env = { ' + MAPPED + ', ' + NOSYS + ' };\n' + spawnText(use) + spawnText(use));
     assert.equal(r.spawns, 2);
     assert.deepEqual(r.findings, []);
+  });
+}
+
+// P2: the canon release-notes.test.mjs (overlay blob 7e779ef8) takes `env: sandboxEnv(cwd)` from a helper it defines in the same file as one literal
+// of named keys. Its pin comes OUT: the census reads a same-file helper that returns one allowlist object (iv).
+test('08d P2 MUST PASS with no pin: the canon release-notes.test.mjs (sandboxEnv is one allowlist literal in the same file)', () => {
+  const text = fs.readFileSync(path.join(repoRoot, 'scripts', 'release-notes.test.mjs'), 'utf8');
+  const r = censusGitSpawns([{ rel: 'scripts/release-notes.test.mjs', text }], {});
+  assert.ok(r.spawns >= 1, 'the census must SEE its git spawns, saw ' + r.spawns);
+  assert.deepEqual(r.findings, []);
+});
+
+// Same-file helpers (iv): a helper this file defines once, with a body that is one `return {allowlist}`, and only ever calls.
+const HELPER = "const mk = (dir) => ({ PATH: process.env.PATH, HOME: dir, " + NOSYS + ' });\n';
+for (const [id, why, text] of [
+  ['P7a', 'a same-file arrow helper returning one allowlist object', HELPER + spawnText('{ env: mk(d) }')],
+  ['P7b', 'a same-file block-bodied arrow helper with one return', 'const mk = (dir) => { return { PATH: process.env.PATH, HOME: dir, ' + NOSYS + ' }; };\n' + spawnText('{ env: mk(d) }')],
+  ['P7c', 'a same-file function declaration with one return', 'function mk(dir) { return { PATH: process.env.PATH, HOME: dir, ' + NOSYS + ' }; }\n' + spawnText('{ env: mk(d) }')],
+  ['P7d', 'a declared env that holds a helper call, read by shorthand', HELPER + 'const env = mk(d);\n' + spawnText('{ env }')],
+  ['P8', 'a regex literal inside an allowlist value is lexed, not trusted', "const strip = (p) => ({ PATH: p.replace(/[/]+$/, ''), " + NOSYS + ' });\n' + spawnText('{ env: strip(d) }')],
+  ['P9', 'gitEnv imported from the room helper is trusted by name', "import { gitEnv } from './git-env.mjs';\n" + spawnText('{ env: gitEnv(d) }')],
+]) {
+  test('08d ' + id + ' MUST PASS with no pin: ' + why, () => {
+    const r = verdict(HEAD + text);
+    assert.equal(r.spawns, 1);
+    assert.deepEqual(r.findings, []);
+  });
+}
+for (const [id, why, text] of [
+  ['F13b', 'a helper with a second return path', 'const mk = (dir) => { if (dir) return ' + SAFE_ENV + '; return process.env; };\n' + spawnText('{ env: mk(d) }')],
+  ['F13c', 'a helper defined twice (the second returns process.env)', HELPER + 'function mk(dir) { return { ...process.env }; }\n' + spawnText('{ env: mk(d) }')],
+  ['F13d', 'a helper reassigned after its definition', 'let mk = (dir) => (' + SAFE_ENV + ');\nmk = (dir) => process.env;\n' + spawnText('{ env: mk(d) }')],
+  ['F13e', 'a helper also used as a value (aliased)', HELPER + 'const alias = mk;\n' + spawnText('{ env: mk(d) }')],
+  ['F13f', 'a helper with a default parameter', 'const mk = (dir = process.env.GIT_DIR) => (' + SAFE_ENV + ');\n' + spawnText('{ env: mk(d) }')],
+  ['F13g', 'a helper name shadowed by a parameter at the spawn', HELPER + 'function f(mk) { ' + spawnText('{ env: mk(d) }') + ' }\n'],
+  ['F13h', 'a helper with a statement before its return', 'function mk(dir) { process.env.X = 1; return ' + SAFE_ENV + '; }\n' + spawnText('{ env: mk(d) }')],
+  ['F13i', 'a helper whose returned object spreads process.env', 'const mk = (dir) => ({ ...process.env, ' + NOSYS + ' });\n' + spawnText('{ env: mk(d) }')],
+  ['F14b', 'a helper imported from another file is not followed', "import { sandboxEnv } from './sandbox.mjs';\n" + spawnText('{ env: sandboxEnv(d) }')],
+]) {
+  test('08d ' + id + ' MUST FAIL: ' + why, () => {
+    const r = verdict(HEAD + text);
+    assert.equal(r.spawns, 1, 'the census must COUNT the spawn');
+    assert.ok(r.findings.length >= 1);
   });
 }
 
