@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The scanner, gate and release overlay are re-synced by blob id.
+
+### Changed
+- **The secret scanner and gate are re-synced by blob id; not shipped in the plugin (`scripts/` is outside the dist).** `scripts/lib/secret-scan.mjs` `8a3d43e6` to `270a21a2` and `scripts/secret-scan.test.mjs` `22c653b5` to `4433fb56` (source: Bankfire; the `.github` published-code template's test still reads `bd5b156c`, a template lag, so the source was taken); `scripts/secret-gate.mjs` `4f008ed4` to `044ec446` and `scripts/secret-gate.test.mjs` `f61a33e7` to `a17ae233` (source: the `.github` canon). The scanner parity check read DRIFT before and IDENTICAL after (`270a21a2337c` lib, `4433fb56bc97` test). The hook and header divergences of `dbb8656` are released: the gate is now the canon blob, and `.githooks/pre-commit` and `pre-push` hash `0aed0914`, byte-equal to the canon template.
+- **The release overlay is re-synced by blob id; not shipped in the plugin.** `scripts/release-notes.mjs` `674592e0` to `f8d998d8`, `scripts/release-notes.test.mjs` `d7e299c4` to `8cf7e5fd`, `scripts/lib/release-shape.mjs` `e2950631` to `bfb29332` and `scripts/lib/release-shape.test.mjs` `12462874` to `771a7e60` (source: overlay-coal-skill). The held `release-notes.test.mjs` divergence at `d7e299c4` is released: the canon test accepts the two child variables macOS and coverage add (`__cf_user_text_encoding`, `node_v8_coverage`) and refuses a credential or workflow variable.
+- **The git-spawn census accepts an allowlist env; not shipped in the plugin.** `scripts/lib/git-env-census.mjs` now accepts an object env that reads `process.env` only by named key, spreads only `Object.fromEntries(`, sets `GIT_CONFIG_NOSYSTEM` to `'1'`, and carries no `GIT_*` name other than `GIT_CONFIG_NOSYSTEM`, `GIT_TERMINAL_PROMPT` and `GIT_CEILING_DIRECTORIES`. Still refused: an unfiltered `process.env` (a spread, `Object.assign`, `Object.fromEntries(Object.entries(process.env))`), a declared object that is mutated afterwards, a missing or `'0'` sentinel, `GIT_DIR`, `GIT_WORK_TREE` or `GIT_INDEX_FILE`, and a key list the census cannot find. A helper call as env is not followed. The canon `release-notes.mjs` now passes with no pin; the census pins for the new scanner, gate and overlay tests remain.
+
 ## [2.8.0] - 2026-10-08
 
 Every run removes its whole run directory, backup included.
