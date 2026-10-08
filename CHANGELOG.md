@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [Unreleased]
+## [2.8.0] - 2026-10-08
 
 Every run removes its whole run directory, backup included.
 
