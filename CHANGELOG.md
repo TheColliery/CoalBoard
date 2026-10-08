@@ -4,7 +4,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
-The lens line carries every run-safety step; S4 runs in a found box.
+Board runs follow every safety step; risky targets need a box.
 
 ### Changed
 - **The secret scanner and gate are re-synced by blob id; not shipped in the plugin (`scripts/` is outside the dist).** `scripts/lib/secret-scan.mjs` `8a3d43e6` to `270a21a2` and `scripts/secret-scan.test.mjs` `22c653b5` to `d0db994d` (source: Bankfire); `scripts/secret-gate.mjs` `4f008ed4` to `856956a1` and `scripts/secret-gate.test.mjs` `f61a33e7` to `71452210` (source: the `.github` canon). The scanner parity check reads IDENTICAL for this room (lib `270a21a2337c`, test `d0db994df855`). The hook and header divergences of `dbb8656` are released: the gate is the canon blob, and `.githooks/pre-commit` and `pre-push` are the whole canon hooks, hash `1979bcaf`.
