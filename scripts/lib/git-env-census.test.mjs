@@ -62,10 +62,14 @@ test('L-5: a backtick-quoted git command is SEEN and refused without gitEnv, and
   assert.deepEqual(ok.findings, []);
 });
 
+// 08d: the census reads TOKENS, so a comment is a comment wherever it sits. The old line-prefix test fed a bare `*` line; a real
+// block comment is the honest form of the same case.
 test('a comment mention, a node child and a non-git command are not git spawns', () => {
   const text = [
     '// ' + call('{ env: process.env }'),
-    '  * ' + call('{}'),
+    '/*',
+    ' * ' + call('{}'),
+    ' */',
     'spawnSync(process.execPath, ["a"], { env: process.env });',
     "spawnSync('cmd.exe', ['/c'], {});",
   ].join('\n');
@@ -76,9 +80,10 @@ test('a comment mention, a node child and a non-git command are not git spawns',
 
 test('unbalanced parens report as a finding, never a silent pass', () => {
   assert.match(refused('spawnSync(' + GIT + ", ['init'], { env: gitEnv()")[0], /unbalanced/);
+  assert.match(refused('spawnSync(' + GIT + ", ['init'], { env: gitEnv( }); ")[0], /unbalanced/);
 });
 
-test("THIS room's own sources pass: every git spawn takes env from gitEnv() alone", () => {
+test("THIS room's own sources pass: every git spawn takes env from gitEnv() or a checked allowlist", () => {
   const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const r = censusGitSpawns(collectSources(repo));
   assert.deepEqual(r.findings, []);
@@ -97,10 +102,10 @@ test('R14 CWK-174: an exempt carrier passes ONLY while its content is exactly th
   assert.equal(censusGitSpawns(files(text, 'scripts/other.mjs'), exempt).findings.length, 1, 'the exemption names a path, nothing else');
 });
 
-test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the three org-carried files', () => {
+test('R14 CWK-174: blobId matches git hash-object for a known blob, and the pins name only the four org-carried files', () => {
   assert.equal(blobId(''), 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
   assert.equal(blobId('hello' + String.fromCharCode(10)), 'ce013625030ba8dba906f756967f9e9ca394464a');
-  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/release-notes.test.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
+  assert.deepEqual(Object.keys(EXEMPT_CARRIERS).sort(), ['scripts/release-notes.test.mjs', 'scripts/secret-gate.mjs', 'scripts/secret-gate.test.mjs', 'scripts/secret-scan.test.mjs']);
 });
 
 // UMB-456 (2), 08c: the census learns the ALLOWLIST env shape. Fixtures are built, never written as a literal call (see GIT above).
@@ -140,4 +145,147 @@ test('UMB-456 (2): an allowlist needs GIT_CONFIG_NOSYSTEM=1 and no repository-ai
   assert.equal(refused(KEEP.replace("'Path'", "'GIT_INDEX_FILE'") + call('{ env: ' + allow() + ' }')).length, 1, 'GIT_INDEX_FILE in the key list');
   assert.equal(refused(call('{ env: ' + allow() + ' }')).length, 1, 'a key list the census cannot find is refused');
   assert.equal(refused(KEEP + 'const env = ' + allow() + ";\nenv.GIT_DIR = 'x';\n" + call('{ env }')).length, 1, 'mutated after its declaration');
+});
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// 08d: THE CENSUS WITNESS LIST (U/scratchpad/dispatch/08d-census-witness-list.md): F1-F42 must FAIL, R1-R2 must be COUNTED and FAIL,
+// P1-P6 must PASS with no pin. One test per vector; a vector that declares a `const env` runs BOTH call forms ({ env } and env: env).
+// The probe text exists only in memory, handed to the pure census with no exemptions.
+// ------------------------------------------------------------------------------------------------------------------------------
+const HEAD = "import { spawnSync } from 'node:child_process';\n";
+const spawnText = (opts) => 'spawnSync(' + GIT + ", ['status'], " + opts + ');\n';
+const verdict = (text) => censusGitSpawns([{ rel: 'scripts/vector.mjs', text }], {});
+const KEEP2 = "const keep = ['PATH', 'HOME'];\n";
+const MAPPED = '...Object.fromEntries(keep.map((k) => [k, process.env[k]]))';
+const SAFE_ENV = '{ PATH: process.env.PATH, ' + NOSYS + ' }';
+const FORMS = ['{ env }', '{ env: env }'];
+
+// [id, why, text before the spawn, the env expression written inline]
+const FAIL_INLINE = [
+  ['F2', 'Object.fromEntries(Object.entries(process.env)) copies the whole env', '', '{ ...Object.fromEntries(Object.entries(process.env)), ' + NOSYS + ' }'],
+  ['F3', 'a filter over the whole env is not a named key list', '', '{ ...Object.fromEntries(Object.entries(process.env).filter(() => true)), ' + NOSYS + ' }'],
+  ['F4', "process['env'] spread", '', "{ ...process['env'], " + NOSYS + ' }'],
+  ['F5', 'an imported alias of process.env spread', "import { env as penv } from 'node:process';\n", '{ ...penv, ' + NOSYS + ' }'],
+  ['F6', 'process.env spread after gitEnv()', '', '{ ...gitEnv(d), ...process.env }'],
+  ['F7', 'a copy of process.env spread after gitEnv()', 'const base = { ...process.env };\n', '{ ...gitEnv(d), ...base }'],
+  ['F8', 'process.env spread in a nested object', '', '{ ' + NOSYS + ', extra: { ...process.env } }'],
+  ['F9', 'the tail of an allowed spread: .concat(Object.entries(process.env))', KEEP2, '{ ...Object.fromEntries(keep.filter(Boolean).map((k) => [k, process.env[k]]).concat(Object.entries(process.env))), ' + NOSYS + ' }'],
+  ['F10', 'flatMap over Object.entries(process.env) inside the spread', KEEP2, '{ ...Object.fromEntries(keep.filter(Boolean).flatMap(() => Object.entries(process.env))), ' + NOSYS + ' }'],
+  ['F11', 'a value that IS process.env', '', '{ ' + NOSYS + ', all: process.env }'],
+  ['F12', 'a helper returning process.env inside fromEntries', 'function all() { return process.env; }\n', '{ ...Object.fromEntries(Object.entries(all())), ' + NOSYS + ' }'],
+  ['F13', 'a helper with a clean first return and process.env on a second path', 'function mk(x) { if (x) return ' + SAFE_ENV + '; return process.env; }\n', 'mk(d)'],
+  ['F14', 'a helper CALL the census cannot follow', '', 'sandboxEnv(cwd)'],
+  ['F18', 'the key list mutated after its declaration', "const KEYS = ['PATH'];\nKEYS.push('GIT_DIR');\n", '{ ...Object.fromEntries(KEYS.map((k) => [k, process.env[k]])), ' + NOSYS + ' }'],
+  ['F19', 'a key list carrying GIT_DIR', "const keep = ['PATH', 'GIT_DIR'];\n", '{ ' + MAPPED + ', ' + NOSYS + ' }'],
+  ['F20', 'GIT_DIR two consts away', "const k2 = ['GIT_DIR'];\nconst keep = ['PATH', ...k2];\n", '{ ' + MAPPED + ', ' + NOSYS + ' }'],
+  ['F21', 'a computed GIT_ name in the key list', "const keep = ['PATH', 'GIT_' + 'DIR'];\n", '{ ' + MAPPED + ', ' + NOSYS + ' }'],
+  ['F22', 'a computed property key in the object', '', "{ " + NOSYS + ", ['GIT' + '_DIR']: process.env['GIT' + '_DIR'] }"],
+  ['F23', 'GIT_CONFIG_NOSYSTEM set to 0', '', "{ PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '0' }"],
+  ['F24', 'a duplicate sentinel, the last one wins', '', "{ " + NOSYS + ", GIT_CONFIG_NOSYSTEM: '0' }"],
+  ['F25', "the sentinel '1' then a spread that sets '0'", KEEP2 + "const over = { GIT_CONFIG_NOSYSTEM: '0' };\n", '{ ' + NOSYS + ', ' + MAPPED + ', ...over }'],
+  ['F25b', 'a key-list spread AFTER the sentinel can overwrite it', KEEP2, '{ ' + NOSYS + ', ' + MAPPED + ' }'],
+  ['F26', 'no GIT_CONFIG_NOSYSTEM at all', '', '{ PATH: process.env.PATH }'],
+  ['F27', 'GIT_CONFIG_NOSYSTEM not a literal', "const flag = '1';\n", '{ GIT_CONFIG_NOSYSTEM: flag }'],
+  ['F28a', 'the sentinel only inside a block comment', '', "{ PATH: process.env.PATH /* GIT_CONFIG_NOSYSTEM: '1' */ }"],
+  ['F28b', 'the sentinel only inside a line comment', '', "{\n  PATH: process.env.PATH,\n  // GIT_CONFIG_NOSYSTEM: '1'\n}"],
+  ['F29', 'a lower-case git_dir key (a Windows env is case-insensitive)', '', '{ ' + NOSYS + ', git_dir: d }'],
+  ['F30', 'an explicit GIT_DIR key', '', '{ ' + NOSYS + ', GIT_DIR: x }'],
+  ['F41a', "a regex literal holding a quote before a GIT_DIR entry", '', "{ A: /'/.source, " + NOSYS + ', GIT_DIR: d }'],
+  ['F41b', 'a template value holding a backtick before a GIT_DIR entry', '', '{ A: ' + BT + 'x${' + "'" + BT + "'" + '}y' + BT + ', ' + NOSYS + ', GIT_DIR: d }'],
+  ['F41c', 'a regex literal earlier in the file does not hide a GIT_DIR entry', 'const re = /"/;\nconst re2 = /\'/;\n', '{ ' + NOSYS + ', GIT_DIR: d }'],
+  ['F42a', 'a file-local helper NAMED gitEnv that spreads process.env', 'function gitEnv() { return { ...process.env }; }\n', 'gitEnv()'],
+  ['F42b', 'a file-local helper NAMED gitTestEnv that returns process.env', 'const gitTestEnv = () => process.env;\n', 'gitTestEnv(d)'],
+  ['F42c', 'gitEnv imported under an alias from somewhere else', "import { other as gitEnv } from './x.mjs';\n", 'gitEnv()'],
+];
+
+// [id, why, build(use)] -- every one declares `const env`, so both call forms run. F31-F34 are the scope-binding vectors.
+const FAIL_DECL = [
+  ['F1', 'a copy of process.env one hop away', (u) => 'const base = { ...process.env };\nconst env = { ...base, ' + NOSYS + ' };\n' + spawnText(u)],
+  ['F15', 'Object.assign(env, process.env) after the declaration', (u) => 'const env = ' + SAFE_ENV + ';\nObject.assign(env, process.env);\n' + spawnText(u)],
+  ['F16', 'a for-of copy of process.env into env', (u) => 'const env = { ' + NOSYS + ' };\nfor (const k of Object.keys(process.env)) env[k] = process.env[k];\n' + spawnText(u)],
+  ['F17', 'env.GIT_DIR assigned after the declaration', (u) => 'const env = ' + SAFE_ENV + ";\nenv.GIT_DIR = '/elsewhere/.git';\n" + spawnText(u)],
+  ['F31', 'a clean env in function a(), process.env in function b() where the spawn is', (u) => 'function a() { const env = ' + SAFE_ENV + '; return env; }\nfunction b() { const env = { ...process.env }; ' + spawnText(u) + ' }\n'],
+  ['F32', 'a module-level clean env shadowed by an inner let at the spawn', (u) => 'const env = ' + SAFE_ENV + ';\nfunction f() { let env = { ...process.env }; ' + spawnText(u) + ' }\n'],
+  ['F33', 'env is a function PARAMETER at the spawn, a clean env elsewhere', (u) => 'const env = ' + SAFE_ENV + ';\nfunction f(env) { ' + spawnText(u) + ' }\n'],
+  ['F35', 'an alias, then a for-in copy through the alias', (u) => 'const env = ' + SAFE_ENV + ';\nconst alias = env;\nfor (const k in process.env) alias[k] = process.env[k];\n' + spawnText(u)],
+  ['F36', 'the copy moved into a helper that is handed env', (u) => 'const env = ' + SAFE_ENV + ';\nfunction fill(o) { for (const k in process.env) o[k] = process.env[k]; }\nfill(env);\n' + spawnText(u)],
+  ['F37', 'Reflect.set(env, GIT_DIR, ...)', (u) => 'const env = ' + SAFE_ENV + ";\nReflect.set(env, 'GIT_DIR', d);\n" + spawnText(u)],
+  ['F38', 'an alias, then alias.GIT_DIR = ...', (u) => 'const env = ' + SAFE_ENV + ';\nconst alias = env;\nalias.GIT_DIR = d;\n' + spawnText(u)],
+  ['F39', 'Object.assign(Object(env), { GIT_DIR })', (u) => 'const env = ' + SAFE_ENV + ';\nObject.assign(Object(env), { GIT_DIR: d });\n' + spawnText(u)],
+  ['F40', 'a method call on the env object that is not in any mutator list', (u) => 'const env = ' + SAFE_ENV + ";\nenv.__defineGetter__('GIT_DIR', () => d);\n" + spawnText(u)],
+  ['F40b', 'a method call on the env object: Object.defineProperty', (u) => 'const env = ' + SAFE_ENV + ";\nObject.defineProperty(env, 'GIT_DIR', { value: d });\n" + spawnText(u)],
+  ['F43', 'a declared env that is exported (an importer can mutate it)', (u) => 'export const env = ' + SAFE_ENV + ';\n' + spawnText(u)],
+];
+
+for (const [id, why, pre, envExpr] of FAIL_INLINE) {
+  test('08d ' + id + ' MUST FAIL: ' + why, () => {
+    const r = verdict(HEAD + pre + spawnText('{ env: ' + envExpr + ' }'));
+    assert.equal(r.spawns, 1, 'the census must COUNT the spawn');
+    assert.ok(r.findings.length >= 1, 'a finding is required for: ' + envExpr);
+  });
+}
+
+for (const [id, why, build] of FAIL_DECL) {
+  for (const use of FORMS) {
+    test('08d ' + id + ' MUST FAIL (' + use + '): ' + why, () => {
+      const r = verdict(HEAD + build(use));
+      assert.equal(r.spawns, 1, 'the census must COUNT the spawn');
+      assert.ok(r.findings.length >= 1, 'a finding is required for ' + id);
+    });
+  }
+}
+
+test('08d F34 MUST FAIL: env: e2 where two functions each declare const e2, the first clean, the second process.env', () => {
+  const text = HEAD + 'function a() { const e2 = ' + SAFE_ENV + '; return e2; }\nfunction b() { const e2 = { ...process.env }; ' + spawnText('{ env: e2 }') + ' }\n';
+  const r = verdict(text);
+  assert.equal(r.spawns, 1);
+  assert.ok(r.findings.length >= 1);
+});
+
+for (const [id, text] of [
+  ['R1', 'spawnSync(' + BT + 'git' + BT + ", ['status'], { env: process.env });\n"],
+  ['R2', "spawnSync('git.exe', ['status'], { env: process.env });\n"],
+  ['R3', "spawnSync('/usr/bin/git', ['status'], { env: process.env });\n"],
+  ['R4', "child_process.spawnSync('git', ['status'], { env: process.env });\n"],
+]) {
+  test('08d ' + id + ' MUST BE COUNTED then FAIL: ' + text.slice(0, 40), () => {
+    const r = verdict(HEAD + text);
+    assert.equal(r.spawns, 1, 'the census must COUNT the spawn');
+    assert.ok(r.findings.length >= 1);
+  });
+}
+
+// P1: the on-disk canon release-notes.mjs is the R15 test above ('the canon release-notes.mjs, as committed, passes ... NO pin').
+// P2 (the canon release-notes.test.mjs at 7e779ef8) is added with its re-copy.
+for (const [id, why, pre, envExpr] of [
+  ['P3a', 'env: gitEnv(d)', '', 'gitEnv(d)'],
+  ['P4', 'an inline allowlist literal of named keys', '', "{ PATH: process.env.PATH, HOME: process.env.HOME, " + NOSYS + ' }'],
+  ['P5', 'the named-pick form with nothing after the final paren', KEEP2, '{ ...Object.fromEntries(keep.filter((k) => k in process.env).map((k) => [k, process.env[k]])), ' + NOSYS + ' }'],
+  ['P5b', 'the pick without a filter', KEEP2, '{ ' + MAPPED + ', ' + NOSYS + ' }'],
+  ['P6', 'the three allowed GIT_* names together', KEEP2, '{ ' + MAPPED + ', ' + NOSYS + ", GIT_TERMINAL_PROMPT: '0', GIT_CEILING_DIRECTORIES: d }"],
+]) {
+  test('08d ' + id + ' MUST PASS with no pin: ' + why, () => {
+    const r = verdict(HEAD + pre + spawnText('{ env: ' + envExpr + ' }'));
+    assert.equal(r.spawns, 1);
+    assert.deepEqual(r.findings, []);
+  });
+}
+
+for (const use of FORMS) {
+  test('08d P3b MUST PASS with no pin (' + use + '): const env = gitEnv(d)', () => {
+    const r = verdict(HEAD + 'const env = gitEnv(d);\n' + spawnText(use));
+    assert.equal(r.spawns, 1);
+    assert.deepEqual(r.findings, []);
+  });
+  test('08d P4b MUST PASS with no pin (' + use + '): a declared allowlist read by two spawns', () => {
+    const r = verdict(HEAD + KEEP2 + 'const env = { ' + MAPPED + ', ' + NOSYS + ' };\n' + spawnText(use) + spawnText(use));
+    assert.equal(r.spawns, 2);
+    assert.deepEqual(r.findings, []);
+  });
+}
+
+test('08d: a file the census cannot read whole is a finding, never a silent pass', () => {
+  const r = censusGitSpawns([{ rel: 'scripts/broken.mjs', text: "const s = 'never closed;\n" + spawnText('{ env: process.env }') }], {});
+  assert.equal(r.findings.length, 1);
+  assert.match(r.findings[0], /cannot be read whole/);
 });
