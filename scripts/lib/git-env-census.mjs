@@ -19,7 +19,8 @@
 //         assignment, a method call, a parameter, a shadow or a second declaration. That whitelist is what closes mutation
 //         (F15-F18, F35-F40) and scope confusion (F31-F34) without a scope analysis: anything else is unprovable and refused.
 //   (iii) an ALLOWLIST object literal (inline or as the initializer of (ii)): plain-identifier or quoted-literal keys, no
-//         duplicate key (case-insensitive: a Windows env is), no GIT_* key other than GIT_CONFIG_NOSYSTEM,
+//         duplicate key (case-insensitive: a Windows env is), no __proto__ key (it sets the prototype, which git inherits through
+//         for...in), no GIT_* key other than GIT_CONFIG_NOSYSTEM,
 //         GIT_TERMINAL_PROMPT and GIT_CEILING_DIRECTORIES (each only NARROWS git); GIT_CONFIG_NOSYSTEM present as the
 //         literal '1' and AFTER every spread; values drawn from a small token set (a literal, a call on a name, a regex literal,
 //         a `process.env.X` or `process.env['X']` read of ONE key -- never the whole env, an object, a spread or an arrow); its
@@ -40,8 +41,12 @@
 //     (`spawnSync(bin, ...)`, a template with ${}), git through a shell (`sh -c`, execSync strings, `shell:`);
 //   - eval, `with`, Function(...), getters on the options object built elsewhere, and the body of an IMPORTED gitEnv/gitTestEnv
 //     (git-env.mjs is its own test's job, not read here);
-//   - the lexer's one heuristic: a `/` after `)` `]` `}` or a value is division, any other `/` starts a regex literal. A file
-//     that fools that heuristic into hiding a spawn is not seen; one that makes the braces unbalanced is a finding.
+//   - the lexer's one heuristic (regex versus division for a /): a regex follows an operator, a keyword like return, the ) of an
+//     if/while/for/with, and a } that closes a statement block; a division follows a name, a number, a string, any other ) and an
+//     object-literal }. A file that fools it can hide a git spawn OR a statement that changes an env (a mutation, F15): a regex
+//     read as division opens a string at its quote and swallows the next statement. The shapes still ambiguous are a } that ends a
+//     function EXPRESSION (read as a block, so a / after it is a regex) and an unusual ) (division). A file that unbalances the
+//     braces is a finding; one that stays balanced and hides a statement is not seen.
 // Pure: a list of { rel, text } in, a report out, so it is unit-tested red-first without a clone.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -55,6 +60,7 @@ const TRUSTED = new Set(['gitEnv', 'gitTestEnv']);
 const ALLOWED_GIT_KEYS = new Set(['GIT_CONFIG_NOSYSTEM', 'GIT_TERMINAL_PROMPT', 'GIT_CEILING_DIRECTORIES']);
 const PUNCTS = ['>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '>>>', '&&=', '||=', '??=', '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '++', '--', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<', '>>', '**'];
 const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'delete', 'void', 'throw', 'new', 'instanceof', 'yield', 'await']);
+const CONTROL_WORDS = new Set(['if', 'while', 'for', 'with']);
 const OPENERS = { '(': ')', '[': ']', '{': '}' };
 
 const isP = (t, v) => !!t && t.t === 'p' && t.v === v;
@@ -84,6 +90,7 @@ function cook(raw) {
 function tokenize(text) {
   const toks = [];
   const stack = [];
+  const parens = []; // per ( : did an if/while/for/with open it? Then the / after its ) starts a regex (F45)
   const n = text.length;
   let i = text.startsWith('#!') ? Math.max(text.indexOf('\n'), 0) : 0;
   const regexOk = () => {
@@ -91,7 +98,7 @@ function tokenize(text) {
     if (!t) return true;
     if (t.t === 'num' || t.t === 'str' || t.t === 're' || t.t === 'tpl' || t.t === 'tplTail') return false;
     if (t.t === 'id') return REGEX_AFTER_WORD.has(t.v);
-    if (t.t === 'p') return t.v !== ')' && t.v !== ']' && t.v !== '}';
+    if (t.t === 'p') return t.v === ')' ? t.ctl === true : t.v === '}' ? t.block === true : t.v !== ']';
     return true;
   };
   // from = the index just after the opening backtick or the closing brace of a ${...}; returns the index after the piece.
@@ -156,15 +163,25 @@ function tokenize(text) {
         continue;
       }
     }
-    if (c === '{') { stack.push('brace'); toks.push({ t: 'p', v: '{', s: i, e: i + 1 }); i++; continue; }
+    if (c === '{') {
+      // A { opens a statement BLOCK after ) ; { } => or a name (class A {), else an object literal. A / after a block's } is a regex (F45).
+      const p = toks[toks.length - 1];
+      const block = !p || (p.t === 'p' && [')', ';', '{', '}', '=>'].includes(p.v)) || (p.t === 'id' && !REGEX_AFTER_WORD.has(p.v)) || (p.t === 'id' && ['else', 'do'].includes(p.v));
+      stack.push(block ? 'block' : 'obj');
+      toks.push({ t: 'p', v: '{', s: i, e: i + 1 });
+      i++;
+      continue;
+    }
     if (c === '}') {
       const top = stack.pop();
       if (top === undefined) throw new Unreadable('unbalanced braces: a } with no {');
       if (top === 'tpl') { i = template(i + 1, false); continue; }
-      toks.push({ t: 'p', v: '}', s: i, e: i + 1 });
+      toks.push({ t: 'p', v: '}', s: i, e: i + 1, block: top === 'block' });
       i++;
       continue;
     }
+    if (c === '(') { const p = toks[toks.length - 1]; parens.push(!!p && p.t === 'id' && CONTROL_WORDS.has(p.v)); }
+    if (c === ')') { toks.push({ t: 'p', v: ')', s: i, e: i + 1, ctl: parens.pop() === true }); i++; continue; }
     const long = PUNCTS.find((p) => text.startsWith(p, i));
     const v = long || c;
     toks.push({ t: 'p', v, s: i, e: i + v.length });
@@ -453,6 +470,8 @@ function allowlistRefusal(ctx, o) {
   for (const [n, p] of props.entries()) {
     if (p.kind === 'computed' || p.kind === 'other') return `env object has a ${p.kind} property the census cannot read (UMB-456 (2))`;
     if (p.kind === 'spread') { const why = spreadRefusal(ctx, p); if (why) return why; lastSpread = n; continue; }
+    // F44: in an object literal this key sets the PROTOTYPE, and Node's spawn walks the env with for...in, so git inherits what it holds.
+    if (p.key === '__proto__') return 'env object has a __proto__ key, which sets the prototype that git inherits through for...in (F44, UMB-456 (2))';
     const up = String(p.key).toUpperCase();
     if (seen.has(up)) return `env object repeats the key ${p.key}; the last one wins (UMB-456 (2))`;
     seen.add(up);

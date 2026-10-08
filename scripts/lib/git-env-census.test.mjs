@@ -327,6 +327,55 @@ for (const [id, why, text] of [
   });
 }
 
+// 08d round 2 (reviewer 938ee6bc, witness rev-census.mjs N1a-N2b).
+// F44: a __proto__ key in an object literal SETS THE PROTOTYPE; Node's spawn walks the env with for...in, so git inherits whatever the
+// prototype holds (measured by the reviewer: GIT_DIR through the prototype reaches git). The census refuses the key, quoted or not.
+const PROTO_SAFE = "PATH: process.env.PATH, " + NOSYS;
+for (const [id, why, pre, envExpr] of [
+  ['F44a', '__proto__: an imported alias of process.env', "import { env as penv } from 'node:process';\n", '{ __proto__: penv, ' + PROTO_SAFE + ' }'],
+  ['F44b', "a quoted '__proto__' key whose value is a helper call returning process.env", 'function all() { return process.env; }\n', "{ '__proto__': all(), " + PROTO_SAFE + ' }'],
+  ['F44c', 'a same-file helper (iv) that takes the prototype as a parameter', 'const mk = (b) => ({ __proto__: b, ' + PROTO_SAFE + ' });\n', 'mk(process.env)'],
+  ['F44e', 'a shorthand __proto__ property', 'const __proto__ = process.env;\n', '{ __proto__, ' + PROTO_SAFE + ' }'],
+]) {
+  test('08d ' + id + ' MUST FAIL: ' + why, () => {
+    const r = verdict(HEAD + pre + spawnText('{ env: ' + envExpr + ' }'));
+    assert.equal(r.spawns, 1, 'the census must COUNT the spawn');
+    assert.ok(r.findings.length >= 1, 'a finding is required for: ' + envExpr);
+    assert.match(r.findings[0], /__proto__|prototype/, 'the finding must name the prototype');
+  });
+}
+for (const use of FORMS) {
+  test('08d F44d MUST FAIL (' + use + '): const env with __proto__ over a copy of process.env', () => {
+    const r = verdict(HEAD + 'const base = { ...process.env };\nconst env = { __proto__: base, ' + NOSYS + ' };\n' + spawnText(use));
+    assert.equal(r.spawns, 1);
+    assert.ok(r.findings.length >= 1);
+  });
+}
+
+// F45: a regex literal after the ) of an if/while/for/with, or after a block }, must be lexed as a regex. Read as division, the quote
+// inside it opens a string that swallows the next statement, so a MUTATION of the env hides while the spawn the census sees passes.
+for (const [id, why, tail] of [
+  ['F45a', 'a regex after if (...)', "if (true) /'/.test(''); Object.assign(env, process.env); //'\n"],
+  ['F45b', 'a regex after a block }', "function f() {}\n/'/.test(''); Object.assign(env, process.env); //'\n"],
+  ['F45c', 'a regex after while (...)', "while (false) /'/.test(''); Object.assign(env, process.env); //'\n"],
+  ['F45d', 'a regex after for (...)', "for (;false;) /'/.test(''); Object.assign(env, process.env); //'\n"],
+  ['F45e', 'a regex after an else block', "if (false) { } else { }\n/'/.test(''); Object.assign(env, process.env); //'\n"],
+]) {
+  for (const use of FORMS) {
+    test('08d ' + id + ' MUST FAIL (' + use + '): the mutation is not hidden by ' + why, () => {
+      const r = verdict(HEAD + 'const env = ' + SAFE_ENV + ';\n' + tail + spawnText(use));
+      assert.equal(r.spawns, 1);
+      assert.ok(r.findings.length >= 1, 'the Object.assign(env, process.env) must be seen');
+    });
+  }
+}
+test('08d F45 control: a division after a non-control ) or an object } stays a division and the file is read whole', () => {
+  const text = HEAD + "const half = (a + b) / 2, third = ({ x: 1 }.x) / 'x'.length, obj = { y: 2 } / 3;\n" + spawnText('{ env: ' + SAFE_ENV + ' }');
+  const r = verdict(text);
+  assert.equal(r.spawns, 1);
+  assert.deepEqual(r.findings, []);
+});
+
 test('08d: a file the census cannot read whole is a finding, never a silent pass', () => {
   const r = censusGitSpawns([{ rel: 'scripts/broken.mjs', text: "const s = 'never closed;\n" + spawnText('{ env: process.env }') }], {});
   assert.equal(r.findings.length, 1);
