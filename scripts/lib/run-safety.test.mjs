@@ -179,9 +179,25 @@ const LENS = 'skills/coalboard/references/lens-prompts.md';
 const lensLineText = () => realFiles().find((f) => f.rel === LENS).text.split('\n').find((l) => /run-safety\.md/.test(l) && /^-\s/.test(l));
 const SAFEGUARD = 2;
 const PROOF = 4;
+const LEARN = 'https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls';
 const newAnchors = [
+  // UMB2-008 round 2
+  ['S2 inside the run directory', () => mutateCell('S2', SAFEGUARD, 'inside the run directory', 'somewhere the run cannot reach'), /S2 must put the backup inside the run directory/],
+  ['S2 SIBLING of the clone', () => mutateCell('S2', SAFEGUARD, 'SIBLING of the clone', 'child of the clone'), /S2 must put the backup beside the clone as a SIBLING/],
+  ['S2 never an ancestor', () => mutateCell('S2', SAFEGUARD, 'never an ancestor of the clone', 'sometimes above the clone'), /S2 must say the backup is never an ancestor of the clone/],
+  ['S2 manifest.txt', () => mutateCell('S2', SAFEGUARD, 'manifest.txt', 'notes'), /S2 must name backup files by SHA-256 and keep the original paths in one manifest\.txt/],
+  ['S3 RUN DIRECTORY', () => mutateCell('S3', SAFEGUARD, 'RUN DIRECTORY', 'folder'), /S3 must name the RUN DIRECTORY/],
+  ['S3 restrict to the current user', () => mutateCell('S3', SAFEGUARD, 'restrict the run directory to the current user', 'leave the run directory as it is'), /S3 must advise restricting the run directory to the current user/],
+  ['S3 icacls', () => mutateCell('S3', SAFEGUARD, 'icacls', 'attrib', true), /S3 must give the icacls form/],
+  ['S3 /inheritancelevel:r', () => mutateCell('S3', SAFEGUARD, '/inheritancelevel:r', '/inheritance:r', true), /S3 must give the icacls form/],
+  ['S5 together with its backup', () => mutateCell('S5', SAFEGUARD, 'together with its backup', 'alone'), /S5 must remove the backup together with the clone/],
+  ['S5 AFTER the restore', () => mutateCell('S5', SAFEGUARD, "AFTER S2's restore", 'at any time'), /S5 must run AFTER S2's restore/],
+  ['S5 proof backup gone', () => mutateCell('S5', PROOF, 'the clone and the backup are gone', 'the clone is gone'), /S5 proof must state the backup is gone too/],
+  ['S5 proof run directory', () => mutateCell('S5', PROOF, 'run directory', 'folder'), /S5 proof must name the run directory path/],
+  ['lens: backup never above the clone', () => mutate(LENS, 'never above the clone', 'anywhere'), /lens-prompts\.md FIXED rule must put the S2 backup beside the clone/],
+  ['lens: backup removed with the clone', () => mutate(LENS, 'clone and S2 backup together', 'the clone'), /lens-prompts\.md FIXED rule must remove the S2 backup with the clone/],
   ['S3 RECOMMENDED roots', () => mutateCell('S3', SAFEGUARD, 'RECOMMENDED roots', 'optional roots'), /S3 must name RECOMMENDED lab roots/],
-  ['S3 %ProgramData%', () => mutateCell('S3', SAFEGUARD, '%ProgramData%', '%CommonProgramFiles%'), /S3 must name RECOMMENDED lab roots/],
+  ['S3 %ProgramData%', () => mutateCell('S3', SAFEGUARD, '%ProgramData%', '%CommonProgramFiles%', true), /S3 must name RECOMMENDED lab roots/],
   ['S3 mktemp -d', () => mutateCell('S3', SAFEGUARD, 'mktemp -d', 'a temp folder'), /S3 must name RECOMMENDED lab roots/],
   ['S3 MAY use another place', () => mutateCell('S3', SAFEGUARD, 'MAY use another place', 'must use one of these'), /S3 must say a run MAY use another place/],
   ['S3 the drive-root instruction is back', () => mutateCell('S3', SAFEGUARD, 'MAY use another place', 'MAY use another place, but use a directory off the drive root'), /S3 must not tell Windows to use a directory off the drive root/],
@@ -211,6 +227,15 @@ for (const [name, build, expect] of newAnchors) {
     assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
   });
 }
+
+test('UMB2-008 round 2: the Learn page is cited as a whole link with the date read, and the shipped S3 icacls form is the one the page documents', () => {
+  const text = refText();
+  assert.ok(cites(text, LEARN), 'the icacls Learn page is cited as a whole link token');
+  assert.ok(!cites(text.replace(LEARN, LEARN + '-evil'), LEARN), 'an extended URL is not the citation');
+  const s3 = parseSafeguardLedger(text).S3.safeguard;
+  assert.match(s3, /read 2026-10-08/);
+  assert.ok(!/\/inheritance:r/.test(s3), 'the page documents /inheritancelevel:r, never the short form');
+});
 
 test('UMB2-008: the shipped text carries the owner ruling (no drive-root instruction, the S4 label names the mandatory class, S5 is the hard rule)', () => {
   const rows = parseSafeguardLedger(refText());

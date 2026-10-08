@@ -12,13 +12,18 @@
 // the whole clone is removed when the run ends": S3 offers RECOMMENDED roots (%ProgramData% on Windows, mktemp -d on
 // POSIX), says a run MAY use another place, drops the "off the drive root" instruction and has the return name the
 // path; S5 removes the WHOLE clone EVERY run, proves it (clone removed, the path, gone) and says a run that leaves
-// its clone has NOT met its own done-criteria; (5) the duty reaches the places a model reads at run time: every
+// its clone has NOT met its own done-criteria; (4b) round 2: the S2 backup holds copies of the user's real configs, so
+// it lives INSIDE the run directory as a SIBLING of the clone (never an ancestor: a tool that walks up would read a
+// copy as a real config), under SHA-256 names plus one manifest, and S5 removes it WITH the clone after S2's restore;
+// S3 names the run directory and advises restricting it to the current user on Windows (icacls /inheritancelevel:r,
+// the form Microsoft Learn documents) because %ProgramData% is readable by other local accounts by default; (5) the duty reaches the places a model reads at run time: every
 // Bash-holding seat's FIXED rules in lens-prompts.md (naming the ledger, all five ids, the never-outside-a-box class
 // and the removal proof), and Step 4.2's isolation line in SKILL.md; (6) the references table lists the file as
 // MANDATORY. The no-new-right half (run safety adds a duty, never a tool) is seat-rights.mjs.
 // WHAT IT CANNOT BIND: that a model follows S1-S5 (prose, below probability 1), that a clone WAS removed (that is a
 // run-time act the return states; the gate reads the text that demands it), that the non-file class list is complete,
-// or that a probe command is right on a given platform (version-sensitive; the reference says so).
+// that the icacls form still holds on a later Windows (the Learn page and the date read are in the text), or that a
+// probe command is right on a given platform (version-sensitive; the reference says so).
 // FOURTH TENSE: an edit that reverses a sentence and keeps its anchor words is not caught.
 import { parseSeatLedger, shellHolders } from './seat-rights.mjs';
 
@@ -87,12 +92,24 @@ export function checkRunSafety({ files }) {
     ['S5', [/under the root it was created in/], 'S5 must assert the real path under the root the clone was created in, before the delete'],
     ['S5', [/never forced/], 'S5 must say a refused delete is reported, never forced, and counts as the clone not removed'],
     ['S5', [/NOT met its own done-criteria/], 'S5 must say a run that leaves its clone has NOT met its own done-criteria'],
+    // UMB2-008 round 2 (INSPECT MEDIUM-1, MEDIUM-2): where the S2 backup lives and goes, and who may read the run root.
+    ['S2', [/inside the run directory/], 'S2 must put the backup inside the run directory (so S5 removes it with the clone)'],
+    ['S2', [/SIBLING of the clone/], 'S2 must put the backup beside the clone as a SIBLING'],
+    ['S2', [/never an ancestor of the clone/], 'S2 must say the backup is never an ancestor of the clone (a tool that walks up would read a copy as a real config)'],
+    ['S2', [/manifest\.txt/], 'S2 must name backup files by SHA-256 and keep the original paths in one manifest.txt'],
+    ['S3', [/RUN DIRECTORY/], 'S3 must name the RUN DIRECTORY that holds clone/ and backup/'],
+    ['S3', [/restrict the run directory to the current user/], 'S3 must advise restricting the run directory to the current user on Windows, before anything is copied in'],
+    ['S3', [/icacls/, /\/inheritancelevel:r/], 'S3 must give the icacls form that Microsoft Learn documents (/inheritancelevel:r)'],
+    ['S5', [/together with its backup/], 'S5 must remove the backup together with the clone'],
+    ['S5', [/AFTER S2's restore/], 'S5 must run AFTER S2\'s restore (the restore needs the backup)'],
   ];
   // the return must state these (the proof column is what the return carries)
   const PROOF = [
     ['S3', /NAMES the path the run used/, 'S3 proof must have the return name the path the run used'],
     ['S5', /clone removed/, 'S5 proof must be `clone removed`'],
     ['S5', /\bgone\b/, 'S5 proof must state the path is gone (a re-check that it no longer exists)'],
+    ['S5', /the clone and the backup are gone/, 'S5 proof must state the backup is gone too'],
+    ['S5', /run directory/, 'S5 proof must name the run directory path'],
   ];
   for (const [id, re, msg] of PROOF) if (rows[id] && !re.test(rows[id].proof)) findings.push(msg);
   if (rows.S3 && /off the drive root/.test(rows.S3.safeguard)) findings.push('S3 must not tell Windows to use a directory off the drive root: no standard names such a folder, and the owner ruled the clone may live anywhere');
@@ -123,6 +140,8 @@ export function checkRunSafety({ files }) {
       [/read statically/, 'the lens-prompts.md FIXED rule must say that class is read statically when no box exists'],
       [/`clone removed`/, 'the lens-prompts.md FIXED rule must carry the clone-removal proof (`clone removed`)'],
       [/\bgone\b/, 'the lens-prompts.md FIXED rule must say the removal proof includes that the path is gone'],
+      [/never above the clone/, 'the lens-prompts.md FIXED rule must put the S2 backup beside the clone, never above it'],
+      [/clone and S2 backup together/, 'the lens-prompts.md FIXED rule must remove the S2 backup with the clone'],
     ]) if (!re.test(lensLine)) findings.push(msg);
   }
   const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));
