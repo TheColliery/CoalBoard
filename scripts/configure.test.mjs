@@ -401,3 +401,46 @@ test('configure (PR 19 #15): with no git on PATH the migration is unchanged (a t
     assert.ok(r.stdout.includes('Migrated the project config'));
   } finally { clean(sb); }
 });
+
+// ---- t29 #1 (09a): git is asked about the file, and an answer that is neither "tracked" nor "not tracked" keeps it where a repository exists.
+// Only status 1 (a repository answered: not tracked) or no git at all (ENOENT) lets the migration delete. A corrupt index, a repository git refuses
+// (dubious ownership, a broken .git file) and a timeout all answer something else, so the file stays when a .git entry (file or directory) sits in its
+// directory or above it. No git and no repository at all still delete (the legs above and the nested-legacy migration legs).
+test('configure (t29 #1): a legacy config committed to a repository whose index is CORRUPT survives the migration, with the note', () => {
+  const sb = sandbox();
+  try {
+    const legacy = legacyRepo(sb, ['.coalboard.json']);
+    assert.strictEqual(gitIn(sb.proj, 'add', '--', '.coalboard.json').status, 0);
+    assert.strictEqual(gitIn(sb.proj, '-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'x').status, 0);
+    fs.writeFileSync(path.join(sb.proj, '.git', 'index'), 'not an index');
+    assert.notStrictEqual(gitIn(sb.proj, 'ls-files', '--error-unmatch', '--', '.coalboard.json').status, 0, 'precondition: git cannot read the index');
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.ok(fs.existsSync(legacy), 'git could not say, and a repository exists: the file must not be deleted');
+    assert.ok(/git tracks/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the new config is still written');
+  } finally { clean(sb); }
+});
+test('configure (t29 #1): a .git FILE git cannot follow (a broken worktree pointer) is still a repository entry, so the legacy config is kept', () => {
+  const sb = sandbox();
+  try {
+    const legacy = path.join(sb.proj, '.coalboard.json');
+    fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+    fs.writeFileSync(path.join(sb.proj, '.git'), 'gitdir: ' + path.join(sb.home, 'nowhere') + '\n');
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.ok(fs.existsSync(legacy), 'a .git file is an entry: the walk tests existence, not isDirectory');
+  } finally { clean(sb); }
+});
+test('configure (t29 #1): the repository may sit ABOVE the file (an ancestor .git), and a broken one still keeps a nested legacy config', () => {
+  const sb = sandbox();
+  try {
+    fs.writeFileSync(path.join(sb.home, '.git'), 'gitdir: ' + path.join(sb.home, 'nowhere') + '\n');
+    const legacy = path.join(sb.proj, '.claude', '.coalboard.json');
+    fs.mkdirSync(path.dirname(legacy), { recursive: true });
+    fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.ok(fs.existsSync(legacy), 'an ancestor .git entry counts');
+  } finally { clean(sb); }
+});

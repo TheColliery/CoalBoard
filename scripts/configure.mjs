@@ -54,11 +54,24 @@ import { spawnSync } from 'child_process';
 import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
 
-// PR 19 #15: true when git tracks `file` (it is in the index of the repository around it). git is OPTIONAL (no-external-assumption): no git on PATH,
-// no repository, or a timeout all read as NOT tracked, so the migration behaves exactly as it did before this check. The spawn takes gitEnv() (census).
-function gitTracks(file) {
+// True when a .git entry (a directory, or the file of a linked worktree) sits in the file's directory or any directory above it.
+function insideRepoTree(file) {
+  for (let dir = path.dirname(path.resolve(file)); ; dir = path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, '.git'))) return true;
+    if (path.dirname(dir) === dir) return false;
+  }
+}
+
+// PR 19 #15, t29 #1: true when the migration must KEEP `file`. git is OPTIONAL (no-external-assumption), so only two answers let the delete run: no git on
+// PATH (ENOENT), and status 1 (a repository answered: not tracked). Status 0 is tracked. Anything else (128 for a corrupt index, dubious ownership or a
+// broken .git file, a timeout, another error) leaves git unable to say, so the file is kept wherever a repository exists around it (fail closed); with no
+// repository at all it is deleted as before. The spawn takes gitEnv() (census).
+function gitMayTrack(file) {
   const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', path.basename(file)], { cwd: path.dirname(file), stdio: 'ignore', timeout: 20000, env: gitEnv() });
-  return !r.error && r.status === 0;
+  if (r.error && r.error.code === 'ENOENT') return false;
+  if (!r.error && r.status === 1) return false;
+  if (!r.error && r.status === 0) return true;
+  return insideRepoTree(file);
 }
 
 // String-aware JSONC strip + prototype-pollution guard — the SAME stripping
@@ -282,7 +295,7 @@ function main() {
     // up this run.
     if (legacyPaths.includes(readPath) && writePath !== readPath) {
       // Never delete a file git tracks (the room's own CodeRabbit path instruction): it is recoverable from git, but the CLI must not be the one to remove it.
-      if (gitTracks(readPath)) console.log(`Kept ${readPath}: git tracks it, so the migration does not delete it. Remove it with git rm once you agree.`);
+      if (gitMayTrack(readPath)) console.log(`Kept ${readPath}: git tracks it (or could not say), so the migration does not delete it. Remove it with git rm once you agree.`);
       else { try { fs.rmSync(readPath, { force: true }); } catch {} }
       console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
     }
