@@ -17,9 +17,11 @@
 // copy as a real config), under SHA-256 names plus one manifest, and S5 removes it WITH the clone after S2's restore;
 // S3 names the run directory and advises restricting it to the current user on Windows (icacls /inheritancelevel:r,
 // the form Microsoft Learn documents) because %ProgramData% is readable by other local accounts by default;
-// (4c) u2: S3 asserts the run directory's real path is outside the home tree BEFORE anything is copied in (a TMPDIR inside the
-// home falls back to /tmp), S4 says a box the probe passes is used for the non-file class, and the lens line carries every one of
-// these S3 clauses because a shell seat sees only that line;
+// (4c) u2, t29 #4: S3 asserts the run directory's real path is outside the home tree BEFORE anything is copied in (a TMPDIR inside the
+// home falls back to /tmp), S4 says a box the probe passes is used for the non-file class, and the lens line carries the S3 clauses that
+// place and secure the run directory (the ONE run directory, the real-path assert, the TMPDIR fallback to /tmp, the Windows restrict step,
+// the no-outside-place fallback) and that S4 clause, each anchored below, because a shell seat sees only that line; the RECOMMENDED roots
+// and the icacls documentation stay in the ledger, which the lens line points at;
 // (5) the duty reaches the places a model reads at run time: every Bash-holding seat's FIXED rules in lens-prompts.md
 // (naming the ledger, all five ids, the never-outside-a-box class and the removal proof), and Step 4.2's isolation
 // line in SKILL.md; (6) the references table lists the file as MANDATORY. The no-new-right half (run safety adds a
@@ -153,6 +155,7 @@ export function checkRunSafety({ files }) {
       [/clone and S2 backup together/, 'the lens-prompts.md FIXED rule must remove the S2 backup with the clone'],
       [/ONE run directory holding/, 'the lens-prompts.md FIXED rule must name the ONE run directory that holds clone/ and backup/'],
       [/real path is outside the home tree BEFORE anything is copied in/, "the lens-prompts.md FIXED rule must assert the run directory's real path is outside the home tree BEFORE anything is copied in"],
+      [/then use `\/tmp`/, 'the lens-prompts.md FIXED rule must say a TMPDIR inside the home tree falls back to /tmp (then use `/tmp`, or state why not)'],
       [/icacls <run-dir> \/inheritancelevel:r/,'the lens-prompts.md FIXED rule must carry the Windows restrict-to-your-user step (icacls /inheritancelevel:r)'],
       [/let S2 carry the weight/, 'the lens-prompts.md FIXED rule must say, with no outside place, to say so and let S2 carry the weight'],
       [/cannot do S1, S2 or S5/, 'the lens-prompts.md FIXED rule must say a seat that cannot do S1, S2 or S5 does not run (NOT-CHECKED)'],
