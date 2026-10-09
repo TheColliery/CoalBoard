@@ -418,6 +418,7 @@ export function pointerCandidates(text) {
     if (/\s/.test(tok)) continue;          // a command or a table row, not a pointer
     if (/[<>]/.test(tok)) continue;        // <placeholder>
     if (GLOB.test(tok)) continue;          // a glob names a SET, not a file
+    if (/(^|\/)\.{3}(\/|$)/.test(tok)) continue; // an ellipsis segment (a directory then three dots) names a SET too (09a: the canon census comment)
     if (!tok.includes('/')) continue;      // a bare filename is the USER's repo's
     if (OUTSIDE.test(tok)) continue;       // absolute, home-relative, or a URL
     // A dot-dir is admitted here (CWK-077) -- checkPointers() decides root-by-root which

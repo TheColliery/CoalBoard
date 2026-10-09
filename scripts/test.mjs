@@ -24,6 +24,7 @@ const TESTS = [
   'scripts/lib/derive-roots.test.mjs',
   'scripts/lib/git-env.test.mjs',
   'scripts/lib/git-env-census.test.mjs',
+  'scripts/lib/git-spawn-room.test.mjs',
   'scripts/lib/node-options.test.mjs',
   'scripts/lib/clamp-prose.test.mjs',
   'scripts/lib/run-safety.test.mjs',
