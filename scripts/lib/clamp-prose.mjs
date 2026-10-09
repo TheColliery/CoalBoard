@@ -30,7 +30,8 @@ export function hookClampedDefaults(conductorText) {
   return Object.fromEntries([...block[1].matchAll(/^\s*([A-Za-z]\w*)\s*:\s*\{[^}]*default:\s*'([^']+)'/gm)].map((m) => [m[1], m[2]]));
 }
 
-// The ORDER the hook clamps by, per key: `order: ['off', 'remind', ...]` inside each SAFER_ENUM entry (PR 19 #17).
+// The ORDER the hook clamps by, per key: `order: ['off', 'remind', ...]` inside each SAFER_ENUM entry (PR 19 #17). NAMED LIMIT (t29 #2): the pattern stops at the first
+// closing brace, so an entry whose `order:` follows a nested `{...}` derives no order; checkClampProse then reports that key as a finding instead of skipping it.
 export function hookClampedOrders(conductorText) {
   const block = /const SAFER_ENUM = \{([\s\S]*?)\n\};/.exec(conductorText);
   if (!block) return {};
@@ -73,10 +74,15 @@ export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaul
     }
     // PR 19 #17: the ORDER, key by key (`key` ranks `a`<`b`<`c`), must equal the conductor's SAFER_ENUM order, because the order is what the clamp
     // compares: a project value above the global one in this order is clamped down to it.
-    if (clampedKeys.length && Object.keys(clampedOrders).length === 0) findings.push('no clamp order was derived from the conductor SAFER_ENUM: the stated order cannot be checked');
+    // t29 #2: a clamped key with no derived order is a finding, never a skip (a reversed statement for it would pass unseen). The all-missing case keeps its one finding.
+    const noOrders = clampedKeys.length > 0 && Object.keys(clampedOrders).length === 0;
+    if (noOrders) findings.push('no clamp order was derived from the conductor SAFER_ENUM: the stated order cannot be checked');
     for (const key of clampedKeys) {
       const want = clampedOrders[key];
-      if (!Array.isArray(want)) continue;
+      if (!Array.isArray(want)) {
+        if (!noOrders) findings.push(`no clamp order was derived for \`${key}\` from the conductor SAFER_ENUM: its stated order cannot be checked`);
+        continue;
+      }
       const m = new RegExp('`' + key + '`\\s+ranks\\s+((?:`[a-z]+`(?:<|(?![`a-z])))+)').exec(clause);
       if (!m) { findings.push(`the canonical clause does not state the clamp order of \`${key}\` (as: \`${key}\` ranks ${want.map((v) => `\`${v}\``).join('<')})`); continue; }
       const stated = [...m[1].matchAll(/`([a-z]+)`/g)].map((x) => x[1]);

@@ -129,3 +129,23 @@ test('a clause that states no order for a hook-clamped key is a finding', () => 
 test('no derivable orders is a finding, never a silent pass', () => {
   assert.ok(run(realFiles(), hookClampedKeys(conductor), hookClampedDefaults(conductor), {}).some((m) => /no clamp order was derived/.test(m)));
 });
+
+// t29 #2 (09a): a clamped key whose order was not derived used to be skipped with a bare `continue`, so a reversed statement for it passed. It is a finding now.
+test('RED-FIRST t29 #2: a clamped key with no derived order is a finding even when another key has one, and the stated order of that key is not silently unchecked', () => {
+  const REVERSED = '`updateMode` ranks `auto`<`ask`<`remind`<`off`';
+  const orders = hookClampedOrders(conductor);
+  const { updateMode, ...onlyBoard } = orders;
+  assert.ok(updateMode, 'precondition: the conductor derives an updateMode order');
+  const files = mutate(SKILL, UPDATE_ORDER, REVERSED);
+  const f = run(files, hookClampedKeys(conductor), hookClampedDefaults(conductor), onlyBoard);
+  assert.ok(f.some((m) => /no clamp order was derived for `updateMode`/.test(m)), f.join('\n'));
+  assert.ok(!f.some((m) => /no clamp order was derived from the conductor/.test(m)), 'one key missing is the per-key finding, not the all-missing one');
+});
+
+test('t29 #2: an order that SAFER_ENUM states after a nested brace is not derived (named limit), and the gate says so for that key instead of passing it', () => {
+  const nested = conductor.replace(/(updateMode\s*:\s*\{[^}]*?)(order:)/, "$1meta: { x: 1 }, $2");
+  assert.notEqual(nested, conductor, 'precondition: the mutation reached the updateMode entry');
+  assert.ok(!('updateMode' in hookClampedOrders(nested)), 'the pattern stops at the first closing brace');
+  const f = run(realFiles(), hookClampedKeys(nested), hookClampedDefaults(nested), hookClampedOrders(nested));
+  assert.ok(f.some((m) => /no clamp order was derived for `updateMode`/.test(m)), f.join('\n'));
+});
