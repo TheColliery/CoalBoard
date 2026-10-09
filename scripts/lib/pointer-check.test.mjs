@@ -719,3 +719,11 @@ test('collectSurfaces + checkPointers: a citation reachable ONLY through the scr
   assert.ok(!narrowedFindings.some((f) => f.msg.includes('ghost-target.md')),
     'the same citation that FAILed under the default plan must produce no finding at all under the narrowed one');
 });
+
+// 09a: the canon git-spawn census (adopted by blob id, never edited here) cites a directory as `scripts/lib/...` in a comment. An ellipsis segment stands for a SET, so
+// it is not a pointer; a real dangling citation beside it is still one.
+test('pointerCandidates: an ellipsis segment is a placeholder for a set, not a file, and a real path beside it is still a candidate', () => {
+  assert.deepEqual(pointerCandidates('the path (`scripts/lib/...`) and `.../x.mjs` and `a/.../b`.'), []);
+  assert.deepEqual(pointerCandidates('see `scripts/lib/...` and `scripts/lib/missing.mjs`.'), ['scripts/lib/missing.mjs']);
+  assert.deepEqual(pointerCandidates('a parent step `../x/y.md` is not an ellipsis.'), ['../x/y.md']);
+});

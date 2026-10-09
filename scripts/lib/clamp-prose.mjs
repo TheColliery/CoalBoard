@@ -30,10 +30,18 @@ export function hookClampedDefaults(conductorText) {
   return Object.fromEntries([...block[1].matchAll(/^\s*([A-Za-z]\w*)\s*:\s*\{[^}]*default:\s*'([^']+)'/gm)].map((m) => [m[1], m[2]]));
 }
 
+// The ORDER the hook clamps by, per key: `order: ['off', 'remind', ...]` inside each SAFER_ENUM entry (PR 19 #17). NAMED LIMIT (t29 #2): the pattern stops at the first
+// closing brace, so an entry whose `order:` follows a nested `{...}` derives no order; checkClampProse then reports that key as a finding instead of skipping it.
+export function hookClampedOrders(conductorText) {
+  const block = /const SAFER_ENUM = \{([\s\S]*?)\n\};/.exec(conductorText);
+  if (!block) return {};
+  return Object.fromEntries([...block[1].matchAll(/^\s*([A-Za-z]\w*)\s*:\s*\{[^}]*order:\s*\[([^\]]*)\]/gm)].map((m) => [m[1], [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1])]));
+}
+
 const isCanonical = (line) => /\bABSENT\b/.test(line) && /safer-value-wins/i.test(line);
 const wordRe = (key) => new RegExp(`(^|[^A-Za-z0-9_])${key}([^A-Za-z0-9_]|$)`);
 
-export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaults = {} }) {
+export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaults = {}, clampedOrders = {} }) {
   const findings = [];
   const keys = [...clampedKeys, ...AGENT_READ_CONSENT_KEYS];
   if (clampedKeys.length === 0) findings.push('no hook-clamped keys were derived (conductor SAFER_ENUM not found): the prose cannot be checked against the hook');
@@ -63,6 +71,22 @@ export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaul
       const extra = [...listed].filter((v) => !values.includes(v));
       if (missing.length) findings.push(`the canonical clause lists \`${key}\` without the schema value(s) ${missing.map((v) => `\`${v}\``).join(', ')}`);
       if (extra.length) findings.push(`the canonical clause lists \`${key}\` with value(s) the schema does not declare: ${extra.map((v) => `\`${v}\``).join(', ')}`);
+    }
+    // PR 19 #17: the ORDER, key by key (`key` ranks `a`<`b`<`c`), must equal the conductor's SAFER_ENUM order, because the order is what the clamp
+    // compares: a project value above the global one in this order is clamped down to it.
+    // t29 #2: a clamped key with no derived order is a finding, never a skip (a reversed statement for it would pass unseen). The all-missing case keeps its one finding.
+    const noOrders = clampedKeys.length > 0 && Object.keys(clampedOrders).length === 0;
+    if (noOrders) findings.push('no clamp order was derived from the conductor SAFER_ENUM: the stated order cannot be checked');
+    for (const key of clampedKeys) {
+      const want = clampedOrders[key];
+      if (!Array.isArray(want)) {
+        if (!noOrders) findings.push(`no clamp order was derived for \`${key}\` from the conductor SAFER_ENUM: its stated order cannot be checked`);
+        continue;
+      }
+      const m = new RegExp('`' + key + '`\\s+ranks\\s+((?:`[a-z]+`(?:<|(?![`a-z])))+)').exec(clause);
+      if (!m) { findings.push(`the canonical clause does not state the clamp order of \`${key}\` (as: \`${key}\` ranks ${want.map((v) => `\`${v}\``).join('<')})`); continue; }
+      const stated = [...m[1].matchAll(/`([a-z]+)`/g)].map((x) => x[1]);
+      if (stated.join('<') !== want.join('<')) findings.push(`the canonical clause states the clamp order of \`${key}\` as ${stated.join('<')}, but the conductor's SAFER_ENUM order is ${want.join('<')}`);
     }
   }
 

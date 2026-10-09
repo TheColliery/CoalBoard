@@ -533,21 +533,21 @@ check('factory config valid against schema', () => {
   return null;
 });
 
-// CWK-133 / CWK-136: the git-spawn census. Every git child under scripts/ and hooks/ takes its env from
-// gitEnv() ALONE (scripts/lib/git-env-census.mjs states the three refusals and what it cannot see). The
-// module is imported dynamically, inside this block (node/runtime.md section 1), so an absent lib is a
-// named FAIL here and never a link-time crash before the first check.
+// CWK-133 / CWK-136: the git-spawn census. Every git child under scripts/ and hooks/ takes its env from gitEnv() or a checked allowlist. The RULE is the canon's
+// (scripts/lib/git-env-census.mjs, adopted by blob id from .github, states the accepted shapes and its named ceilings); the room's file set and pins are
+// scripts/lib/git-spawn-room.mjs. The room module is imported dynamically, inside this block (node/runtime.md section 1), so an absent lib is a named FAIL here and
+// never a link-time crash before the first check.
 {
-  let census = null;
-  let censusLoadError = null;
-  try { census = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'git-env-census.mjs')).href); }
-  catch (e) { censusLoadError = e; }
-  if (censusLoadError) {
-    check('git spawn census: module loads', () => `scripts/lib/git-env-census.mjs failed to load: ${censusLoadError.message}`);
+  let room = null;
+  let roomLoadError = null;
+  try { room = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'git-spawn-room.mjs')).href); }
+  catch (e) { roomLoadError = e; }
+  if (roomLoadError) {
+    check('git spawn census: module loads', () => `scripts/lib/git-spawn-room.mjs (or the canon scripts/lib/git-env-census.mjs it reads) failed to load: ${roomLoadError.message}`);
   } else {
-    const report = census.censusGitSpawns(census.collectSources(root));
+    const report = room.roomCensus(root);
     if (report.findings.length === 0) {
-      check(`git spawn census: every one of ${report.spawns} git spawn(s) in ${report.files} source file(s) takes env from gitEnv() alone`, () => null);
+      check(`git spawn census: every one of ${report.calls} git spawn(s) in ${report.files} source file(s) takes env from gitEnv() or a checked allowlist (${report.exempted} blob-pinned file(s) skipped)`, () => null);
     } else {
       report.findings.forEach((m, i) => check(`git spawn census: finding ${i + 1}/${report.findings.length}`, () => m));
     }
@@ -573,7 +573,8 @@ check('factory config valid against schema', () => {
     const cpEnums = Object.fromEntries(CONFIG_SCHEMA.filter((sp) => sp.type === 'enum').map((sp) => [sp.key, sp.values]));
     const cpKeys = cp.hookClampedKeys(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
     const cpDefaults = cp.hookClampedDefaults(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
-    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys, clampedDefaults: cpDefaults });
+    const cpOrders = cp.hookClampedOrders(fs.readFileSync(path.join(root, 'hooks', 'coalboard-conductor.js'), 'utf8'));
+    const cpFindings = cp.checkClampProse({ files: cpFiles, schemaEnums: cpEnums, clampedKeys: cpKeys, clampedDefaults: cpDefaults, clampedOrders: cpOrders });
     if (cpFindings.length === 0) {
       check(`clamp prose: the canonical clause matches the schema and the hook (${cpKeys.join(', ')}), and every read site across ${cpFiles.length} skill file(s) says MERGED`, () => null);
     } else {

@@ -37,7 +37,8 @@ function decodeEntities(s) {
       return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
     const key = e.toLowerCase();
-    return Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key] : m;
+    // Object.hasOwn, not Object.prototype.hasOwnProperty.call: the canon git-spawn census reads any "Object.prototype." as a whole-process write and refuses this file's git env.
+    return Object.hasOwn(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key] : m;
   });
 }
 
