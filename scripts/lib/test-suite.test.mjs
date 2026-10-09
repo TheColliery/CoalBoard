@@ -12,8 +12,6 @@ const LIMITS = { heapMb: 512, fileTimeoutMs: 20000, deadlineMs: 60000 };
 const FILES = {
   'ok.test.mjs': "import { test } from 'node:test';\ntest('real check', () => {});\n",
   'bad.test.mjs': "import { test } from 'node:test'; import assert from 'node:assert/strict';\ntest('bad one', () => assert.equal(1, 2));\n",
-  // passes only when its process does NOT carry the stdout-sync preload wave-run puts on NODE_OPTIONS of every child (the canon wave-run.test.mjs has such a test)
-  'env.test.mjs': "import { test } from 'node:test'; import assert from 'node:assert/strict';\ntest('no stdout-sync preload on NODE_OPTIONS', () => assert.ok(!String(process.env.NODE_OPTIONS || '').includes('stdout-sync')));\n",
   // exits 0 before a test registers: the runner prints "# pass 1" and exits 0, byte for byte like a pass (Node 24.19, UMB2-026)
   'vacuous.test.mjs': "import { test } from 'node:test';\nprocess.exit(0);\ntest('never registered', () => {});\n",
 };
@@ -25,12 +23,10 @@ function repoWith(t, names, extraOnDisk = []) {
   for (const n of [...names, ...extraOnDisk]) fs.writeFileSync(path.join(repo, 'scripts', n), FILES[n.split('/').pop()] ?? FILES['ok.test.mjs']);
   return repo;
 }
-// The suite may itself run inside a wave, where wave-run has put its stdout-sync preload on NODE_OPTIONS; the fixture runs here must start from an env without it.
-const plainEnv = () => ({ ...process.env, NODE_OPTIONS: String(process.env.NODE_OPTIONS || '').replace(/\s*--import\s+\S*stdout-sync\.mjs/g, '').trim() });
-async function suite(repo, tests, solo = []) {
+async function suite(repo, tests) {
   const out = [];
   const err = [];
-  const code = await runSuite({ repo, tests, solo, limits: LIMITS, env: plainEnv(), serial: true, out: (s) => out.push(s), err: (s) => err.push(s) });
+  const code = await runSuite({ repo, tests, limits: LIMITS, serial: true, out: (s) => out.push(s), err: (s) => err.push(s) });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -70,27 +66,4 @@ test('drift is loud in BOTH directions and nothing runs: a listed file that is m
   assert.equal(orphan.code, 1);
   assert.match(orphan.err, /test runner: 1 on-disk test\(s\) NOT in the suite — scripts\/lib\/extra\.test\.mjs\. Add to scripts\/test\.mjs\./);
   assert.deepEqual(driftProblems(repo, ['scripts/ok.test.mjs', 'scripts/lib/extra.test.mjs']), []);
-});
-
-test('RED-FIRST 09a solo: a file that cannot run inside a wave (the preload on NODE_OPTIONS fails it) is FAIL there, and PASS when the roster lists it solo', async (t) => {
-  const repo = repoWith(t, ['ok.test.mjs', 'env.test.mjs']);
-  const tests = ['scripts/ok.test.mjs', 'scripts/env.test.mjs'];
-  const inWave = await suite(repo, tests);
-  assert.equal(inWave.code, 1, 'inside a wave the preload is on NODE_OPTIONS');
-  assert.match(inWave.out, /FAIL scripts\/env\.test\.mjs: not ok: no stdout-sync preload on NODE_OPTIONS/);
-  const solo = await suite(repo, tests, ['scripts/env.test.mjs']);
-  assert.equal(solo.code, 0, solo.out + solo.err);
-  assert.match(solo.out, /wave-run: 2 files · pass 2 · fail 0 .* reconciled 2 of 2 — GREEN/);
-});
-
-test('a solo file is judged by the TAP too: a vacuous solo file is VACUOUS and the suite is red; a solo file the roster does not list is refused', async (t) => {
-  const repo = repoWith(t, ['ok.test.mjs', 'vacuous.test.mjs']);
-  const tests = ['scripts/ok.test.mjs', 'scripts/vacuous.test.mjs'];
-  const r = await suite(repo, tests, ['scripts/vacuous.test.mjs']);
-  assert.equal(r.code, 1);
-  assert.match(r.out, /VACUOUS scripts\/vacuous\.test\.mjs: /);
-  assert.match(r.out, /2 files · pass 1 · fail 0 .* vacuous 1 \(scripts\/vacuous\.test\.mjs\) .* reconciled 2 of 2 — RED/);
-  const stray = await suite(repo, tests, ['scripts/elsewhere.test.mjs']);
-  assert.equal(stray.code, 1);
-  assert.match(stray.err, /solo file\(s\) not in the roster — scripts\/elsewhere\.test\.mjs/);
 });

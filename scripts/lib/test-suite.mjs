@@ -9,16 +9,15 @@
 // NAMED OPEN (wave-run.mjs states it): no per-file floor of expected tests is kept here, so a test that exits 0 AFTER another test already passed, from a timer the runner
 // never sees finish, reads as a PASS with the tests that completed; no TAP reader can see a test that vanished before it reported.
 //
-// SOLO FILES run one at a time AFTER the waves, outside wave-run, judged by the same TAP reader: wave-run puts the stdout-sync preload on the NODE_OPTIONS of every child it
-// starts, and a file whose own tests spawn a child that must NOT inherit that preload (the canon wave-run.test.mjs: its recorder has to load before the preload) fails
-// when run inside a wave (measured 2026-10-09, one test of 34). The room lists such a file in `solo`; the canon file is never edited.
+// EVERY ROSTER FILE RUNS IN A WAVE, under the whole-run deadline (09b): the canon wave-run.test.mjs used to fail inside a wave (its recorder child inherited the stdout-sync
+// preload) and the room ran it SOLO, one at a time after the waves and outside the deadline; the re-adopted canon (K3, .github aea4db7) passes under the runner, so the
+// solo path is gone and no file runs outside the deadline.
 //
 // DRIFT STAYS LOUD IN BOTH DIRECTIONS, before anything runs: a listed file that is missing (node --test would ignore it or fail late), and an on-disk *.test.mjs that the
 // roster does not list (it would silently never run). Node builtins plus ./wave-run.mjs only (Phoenix #2).
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runWaves, classifyFile, summarize, nodeOptionsWithHeap, STATUS } from './wave-run.mjs';
+import { runWaves, STATUS } from './wave-run.mjs';
 
 // The roster against the disk, both directions. Returns the problems (empty = in sync).
 export function driftProblems(repo, tests, dirs = ['scripts', 'scripts/lib']) {
@@ -36,48 +35,25 @@ export function driftProblems(repo, tests, dirs = ['scripts', 'scripts/lib']) {
   return problems;
 }
 
-// One file, alone, with the child env the caller gave (no preload added), judged by the canon TAP classifier. spawnSync kills the direct child at the file clock.
-export function runSolo({ repo, file, env, limits }) {
-  const childEnv = { ...env, NODE_OPTIONS: nodeOptionsWithHeap(env.NODE_OPTIONS, limits.heapMb) };
-  delete childEnv.NODE_TEST_CONTEXT; // a parent runner's variable switches a nested `node --test` to a binary format with no TAP
-  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${limits.fileTimeoutMs}`, '--test-force-exit', file], {
-    cwd: repo, env: childEnv, encoding: 'utf8', timeout: limits.fileClockMs ?? limits.deadlineMs, killSignal: 'SIGKILL', maxBuffer: 256 * 1024 * 1024, windowsHide: true,
-  });
-  const timedOut = r.error && r.error.code === 'ETIMEDOUT';
-  const res = r.error && !timedOut
-    ? { file, status: STATUS.FAIL, reason: `could not start: ${r.error.code ?? r.error.message}`, counts: null, failing: [] }
-    : classifyFile({ file, code: r.status, signal: r.signal, stdout: r.stdout ?? '', killedBy: timedOut ? `killed at the file clock (${limits.fileClockMs ?? limits.deadlineMs} ms)` : null });
-  res.name = file;
-  if (res.status === STATUS.FAIL || res.status === STATUS.VACUOUS) { res.stdout = r.stdout ?? ''; res.stderr = r.stderr ?? ''; }
-  return res;
-}
-
 // Run the roster. `limits` is { heapMb, fileTimeoutMs, deadlineMs, fileClockMs? }: the room's numbers, never defaulted here. Returns the exit code (0 green, 1 red).
-export async function runSuite({ repo, tests, limits, solo = [], env = process.env, serial = false, out = console.log, err = console.error }) {
+export async function runSuite({ repo, tests, limits, env = process.env, serial = false, out = console.log, err = console.error }) {
   const problems = driftProblems(repo, tests);
   if (problems.length) {
     for (const p of problems) err(`test runner: ${p}`);
     return 1;
   }
-  const notListed = solo.filter((f) => !tests.includes(f));
-  if (notListed.length) {
-    err(`test runner: solo file(s) not in the roster — ${notListed.join(', ')}`);
-    return 1;
-  }
   let run;
   try {
-    run = await runWaves({ files: tests.filter((f) => !solo.includes(f)), cwd: repo, env, serial, ...limits });
+    run = await runWaves({ files: tests, cwd: repo, env, serial, ...limits });
   } catch (e) {
     err(`test runner: the suite did not run — ${e && e.message ? e.message : 'error'}`);
     return 1;
   }
-  const results = [...run.results, ...solo.map((file) => runSolo({ repo, file, env, limits }))];
-  const summary = solo.length ? summarize(results, tests.length) : run.summary;
-  for (const r of results) {
+  for (const r of run.results) {
     if (r.status === STATUS.PASS || r.status === STATUS.SKIP) continue;
     out(`${r.status} ${r.name}: ${r.reason}`);
     if (r.stdout || r.stderr) err(`--- ${r.name} (${r.status}) ---\n${r.stdout ?? ''}${r.stderr ?? ''}`);
   }
-  out(summary.line);
-  return summary.red ? 1 : 0;
+  out(run.summary.line);
+  return run.exitCode;
 }
