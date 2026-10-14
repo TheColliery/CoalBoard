@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.3] - 2026-10-15
+
+A planted link can no longer make the hook read a config outside the project.
+
+### Security
+- BUILD-station stub so the version gate passes; the DOCS station replaces this entry before the tag. The conductor reads the project config only from inside the folder it expects, and the hooks use the exec form.
+
 ## [2.8.2] - 2026-10-09
 
 Board runs fall back to /tmp when TMPDIR sits in your home tree.
