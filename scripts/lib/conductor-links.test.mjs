@@ -242,6 +242,28 @@ test('a denied-realpath file whose directory also cannot be resolved is refused 
   assertRefused(start(s, { preload: pre }), path.join(phys(s.proj), '.claude', 'coal', 'coalboard.json'));
 });
 
+// MEDIUM-1 / M8: across drives path.relative returns an ABSOLUTE path, which the lexical prefix tests alone would accept. The leg needs no second
+// volume: a preload makes realpath.native answer an other-drive path for the candidate. Keyed on the CAPABILITY (this path module returns an absolute
+// path across two drive roots), never on process.platform; elsewhere it t.skips visibly.
+const CROSS_DRIVE = path.isAbsolute(path.relative('C:' + String.fromCharCode(92) + 'a', 'D:' + String.fromCharCode(92) + 'b'));
+test('a candidate whose realpath is on ANOTHER drive is refused (path.relative returns an absolute path)', { skip: CROSS_DRIVE ? false : 'path.relative does not return an absolute path across drive roots here' }, (t) => {
+  const s = sandbox(t);
+  fs.writeFileSync(path.join(s.outside, 'keep'), 'x');
+  write(path.join(s.proj, '.claude', 'coal', 'coalboard.json'), QUIET);
+  const pre = path.join(s.outside, 'pre-xvol.cjs');
+  fs.writeFileSync(pre, "const fs = require('fs'); const path = require('path'); const orig = fs.realpathSync.native; const here = path.parse(orig(process.cwd())).root.slice(0, 2).toUpperCase(); const other = here === 'D:' ? 'C:' : 'D:'; fs.realpathSync.native = function (p) { if (String(p).endsWith('coalboard.json')) return other + path.sep + 'cb-xvol' + path.sep + 'coalboard.json'; return orig.apply(this, arguments); };");
+  assertRefused(start(s, { preload: pre }), path.join(phys(s.proj), '.claude', 'coal', 'coalboard.json'));
+});
+
+// M7 / LOW-3: a junction AT the file name pointing to its OWN folder has rel === '' and is refused AS OUTSIDE (the reason text), not read as a directory.
+test('a junction AT the candidate name pointing at its own folder is refused as outside, with the reason text (rel is empty)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  fs.writeFileSync(path.join(s.outside, 'keep'), 'x');
+  fs.mkdirSync(path.join(s.proj, '.claude', 'coal'), { recursive: true });
+  link(path.join(s.proj, '.claude', 'coal'), path.join(s.proj, '.claude', 'coal', 'coalboard.json'), 'junction');
+  assertRefused(start(s), path.join(phys(s.proj), '.claude', 'coal', 'coalboard.json'));
+});
+
 // ---- controls (pass before and after): a real config in every read-order shape is still read ---------------------------------
 const SHAPES = [
   ['canonical .claude/coal/coalboard.json', ['.claude', 'coal', 'coalboard.json'], false],
@@ -267,9 +289,9 @@ for (const [name, rel, legacy] of SHAPES) {
 // ---- the prose half (SKILL.md's on-disk ledger): a MITIGATION the agent follows, anchored so deletion or drift fails loud.
 // An anchor catches deletion and reword, never reversal (verify.mjs / clamp-prose style); the rule's strength is prose, not a guarantee.
 for (const [label, rel] of [['source', ['skills', 'coalboard', 'SKILL.md']], ['dist', ['plugin', 'skills', 'coalboard', 'SKILL.md']]]) {
-  test(`SKILL.md (${label}) carries the link rule for .coalboard/ writes and the by-name memory delete`, () => {
+  test(`SKILL.md (${label}) carries the link rule for .coalboard/ reads, writes and deletes and the by-name memory cleanup`, () => {
     const body = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel), 'utf8');
-    for (const anchor of ['a mitigation you follow, never a guarantee', 'no junction or symlink sits on the path', 'hand-joined, never taken from the link', 'write NOTHING and tell the user', 'removes only the files THIS run created, by name, never a recursive remove']) {
+    for (const anchor of ['a mitigation you follow, never a guarantee', 'before the first read, write or delete under', 'resolve `<project root>` to its real path', 'AT or BELOW `<project root>/.coalboard`', 'never one taken from a link', 'touch NOTHING and tell the user', 'then `rmdir` (never recursive)', 'remove the files THIS run created there, by name, then `rmdir` the directory only if it is a real directory and not a link', 'never `rm -r`, never a trailing-slash or `*` remove', '(removed by name)']) {
       assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
     }
   });
