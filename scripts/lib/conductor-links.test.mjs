@@ -263,3 +263,14 @@ for (const [name, rel, legacy] of SHAPES) {
     assert.equal(r.stdout.includes('LEGACY config read'), legacy);
   });
 }
+
+// ---- the prose half (SKILL.md's on-disk ledger): a MITIGATION the agent follows, anchored so deletion or drift fails loud.
+// An anchor catches deletion and reword, never reversal (verify.mjs / clamp-prose style); the rule's strength is prose, not a guarantee.
+for (const [label, rel] of [['source', ['skills', 'coalboard', 'SKILL.md']], ['dist', ['plugin', 'skills', 'coalboard', 'SKILL.md']]]) {
+  test(`SKILL.md (${label}) carries the link rule for .coalboard/ writes and the by-name memory delete`, () => {
+    const body = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel), 'utf8');
+    for (const anchor of ['a mitigation you follow, never a guarantee', 'no junction or symlink sits on the path', 'hand-joined, never taken from the link', 'write NOTHING and tell the user', 'removes only the files THIS run created, by name, never a recursive remove']) {
+      assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
+    }
+  });
+}

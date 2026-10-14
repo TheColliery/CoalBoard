@@ -78,6 +78,7 @@ Every command a shell seat or main RUNS also carries `references/run-safety.md` 
 - `.coalboard/memory/<agent>.md` — the resume net, run-scoped, deleted at every end (P16).
 - The project config — ONE key only: GATE 2's `always-this-project` pick persists `fableConsent: "always"` (Step 1) to wherever it was found (Configure's read order; own-dir default if none exists anywhere, moving a legacy hit there in the same write); the board writes NOTHING else into any config.
 - The OPINION lane writes NO file. **`proposed/` disposition at GATE 3:** `apply` → consumed to live · `report-only` → the report AND `proposed/` both persist (the report names the staged patches) · `stop` → this run's staged files deleted, nothing written (P13).
+**Links (a mitigation you follow, never a guarantee):** before the first write under `.coalboard/` or to the project config, check no junction or symlink sits on the path: its real path must equal `<project root>/.coalboard` (and `/memory`, `/reports`, `/proposed` beneath it), hand-joined, never taken from the link; on a mismatch write NOTHING and tell the user. The `memory/` delete removes only the files THIS run created, by name, never a recursive remove.
 
 ### Fail routes — F1–F12 (the complete set)
 A recovery move inside a Step and not listed here is that step's mechanics, not an additional route.
