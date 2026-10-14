@@ -10,6 +10,12 @@ Report a security issue in this repo through GitHub's private vulnerability repo
 
 ---
 
+## 🩹 Fixed Security Issues
+
+* **v2.8.3 (2026-10-15): a planted link could make the hook read a config outside the project.** A junction or symlink in a cloned repository (at `.claude`, `.claude/coal`, `.agents`, the legacy config location, or the config file itself) could point the session hook at a file outside the project. The hook now reads the project config only after its real path is confirmed to sit inside the folder it expects, and reports a refusal on the session-start line. The skill also checks for a link before it writes under `.coalboard/` or to the project config, and its memory cleanup deletes only the files the run created, by name; that second half is an instruction the agent follows, a mitigation and not a guarantee. Verified on Windows 11 with directory junctions at `.claude`, `.claude/coal`, `.agents`, the legacy location and an in-project junction outside the expected folder; the file-symlink legs skip on a machine that cannot create a file symlink (this one) and run on the CI runners (Linux, macOS). See `CHANGELOG.md`, `### Security` under 2.8.3.
+
+---
+
 ## 🔑 Commit & Tag Signatures
 
 Every **release tag** and **maintainer commit** is SSH-signed (`gpg.format=ssh`); GitHub shows the Verified badge on them. Automated **Dependabot / CI** commits are not signed with the maintainer key (GitHub signs these with its own), so verify a signed **release tag** — the artifact a release consumer trusts:

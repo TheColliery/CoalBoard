@@ -4,10 +4,17 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.8.3] - 2026-10-15
 
-A planted link can no longer make the hook read a config outside the project.
+A planted link can no longer make the hook read outside the project.
 
 ### Security
-- BUILD-station stub so the version gate passes; the DOCS station replaces this entry before the tag. The conductor reads the project config only from inside the folder it expects, and the hooks use the exec form.
+- **The session hook reads the project config only from inside the folder it belongs to.** Before, a junction or symlink planted in a cloned repository (at `.claude`, `.claude/coal`, `.agents`, or at the config file itself) could point the hook at a config file outside the project. The hook now resolves the real path of the config it found and refuses one that lands outside its expected folder: it reads nothing from it, keeps the config it would have used otherwise, and reports it on the session-start line as `UNREADABLE: <path> exists but is not a readable config (resolves outside its folder)`. A config that cannot be read for another reason (for example a permission denial) is still reported as unreadable, not as outside. Hook-enforced: it holds on every run in which the hook runs. — test: `scripts/lib/conductor-links.test.mjs`
+- **The skill checks for a link before it writes under `.coalboard/` or to the project config, and its memory cleanup deletes only the files the run created, by name.** `skills/coalboard/SKILL.md` now tells the agent to stop and tell you when a junction or symlink sits on the path, or when the real path is not the `<project root>/.coalboard` folder (or the project config) it expects, and to remove the `memory/` scratch files it made one by one, never with a recursive remove. This half is an instruction the agent follows, not code that runs on every call: a mitigation, not a guarantee. — test: `scripts/lib/conductor-links.test.mjs` pins that the instruction is present, not that the agent obeys it.
+
+### Fixed
+- **Both hook entries use the exec form: `node` with the script path in `args`.** On Windows without Git for Windows, Claude Code 2.1.299 hands a shell-form hook to PowerShell, which expands `${CLAUDE_PLUGIN_ROOT}` to nothing, so the hook never found its script (measured by CoalWash in its own room). The exec form runs with no shell on every platform. It needs Claude Code 2.1.139 or later. — test: `scripts/hooks-exec-form.test.mjs`
+
+### Notes
+- The `skills/coalboard/SKILL.md` body is now 48,765 characters (48,303 before this release), against the last declared bound of 45,959 (`[2.3.1]`). The growth is the link rule above, a rail, not explanation; the body was already past the declared bound before this release, and a re-carve is open.
 
 ## [2.8.2] - 2026-10-09
 
