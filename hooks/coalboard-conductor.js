@@ -63,6 +63,33 @@ function readConfigFile(f) {
   return parseConfig(content);
 }
 
+// E2-4 CLASS (14a; hooks-safety.md section 6 row 10, node/runtime.md section 4): the PROJECT config is read from a folder the
+// repo owner controls, so a junction (Windows) or symlink (POSIX) planted at <dir>/.claude, <dir>/.claude/coal or at the file
+// itself would make the hook read a file OUTSIDE the project. A candidate is read only if its realpath sits INSIDE the folder
+// that candidate is expected to live in -- the EXPECTED folder is hand-joined from the walk's own real level dir (an OWNERSHIP
+// check: resolving that side too would let the link relocate the expectation), only the candidate is canonicalized, through
+// `.native` (CWK-125). Unresolvable = refused: nothing is read and the reason rides to SessionStart. KEPT, not in the class:
+// the existsSync stats in the walk and the stray sweep (a stat reads no content; only the path is printed), and the HOME-scoped
+// reads and writes (the global config, the update stamp under ~/.claude/coal/coalboard/): not a project-state folder.
+function insideFolder(file, folder) {
+  try {
+    let real;
+    try { real = fs.realpathSync.native(file); } catch (e) {
+      // A READ-DENIED file (an ACL gives EPERM/EACCES even to realpath) cannot be opened to be canonicalized, yet it must still
+      // reach readConfigFile to be REPORTED as unreadable (UMB-174). Resolve its DIRECTORY instead and demand the file itself be
+      // no link (lstat reads no content). Any other failure stays refused.
+      if (!e || (e.code !== 'EACCES' && e.code !== 'EPERM') || fs.lstatSync(file).isSymbolicLink()) return false;
+      real = path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file));
+    }
+    const rel = path.relative(folder, real);
+    return rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
+  } catch { return false; }
+}
+function readProjectConfig(file, folder) {
+  if (!insideFolder(file, folder)) return { cfg: {}, reason: 'resolves outside its folder' };
+  return readConfigFile(file);
+}
+
 // realpath a dir to its PHYSICAL path, falling back to a lexical resolve if realpath
 // throws (an absent dir has no realpath) — so the stop-at-home compare is like-for-like.
 // macOS's os.tmpdir() (and any symlinked HOME) is a symlink: process.cwd() returns the
@@ -164,13 +191,13 @@ function isCandidateElsewhere(p, dir) {
 // home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing above
 // your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
 // another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
-// Returns { file, legacyDir, ignored }: `file` = the config found (null if none); `legacyDir` = the
+// Returns { file, folder, legacyDir, ignored }: `file` = the config found (null if none); `folder` = the folder that file must resolve inside (see insideFolder); `legacyDir` = the
 // level whose LEGACY shape supplied it (null when a canonical path did, or nothing was found);
 // `ignored` = near-miss paths (strayCandidates) present at the levels visited, INCLUDING the level
 // that supplied the config, never above it (the walk returns there). `ignored` stays empty unless
 // `withStrays` (SessionStart only: the sweep's stats are pure cost on every other event).
 function findProjectCfg(withStrays) {
-  const out = { file: null, legacyDir: null, ignored: [] };
+  const out = { file: null, folder: null, legacyDir: null, ignored: [] };
   try {
     const home = physical(os.homedir());
     let dir = physical(process.cwd());
@@ -189,6 +216,8 @@ function findProjectCfg(withStrays) {
       const at = cands.findIndex((f) => fs.existsSync(f));
       if (at !== -1) {
         out.file = cands[at];
+        // the folder this candidate must resolve inside, hand-joined from the real level dir (never from the file's own realpath)
+        out.folder = at < AGENT_DIR_ORDER.length ? path.join(dir, AGENT_DIR_ORDER[at], 'coal') : at === AGENT_DIR_ORDER.length ? path.join(dir, '.claude') : dir;
         if (at >= AGENT_DIR_ORDER.length) out.legacyDir = dir; // past the canonical three = a deprecated legacy shape
         return out;
       }
@@ -286,7 +315,7 @@ function readCfg(withStrays) {
   const g = globalPath ? readConfigFile(globalPath) : { cfg: {}, reason: null };
   const global = g.cfg;
   const proj = findProjectCfg(withStrays); // found by walking UP (cwd may be a subdir)
-  const p = proj.file ? readConfigFile(proj.file) : { cfg: {}, reason: null };
+  const p = proj.file ? readProjectConfig(proj.file, proj.folder) : { cfg: {}, reason: null };
   const project = p.cfg;
   // UMB-174 (b): the reasons ride the walk's result to cfgNotices (SessionStart only prints them).
   proj.globalPath = globalPath; proj.globalReason = g.reason; proj.projectReason = p.reason;
