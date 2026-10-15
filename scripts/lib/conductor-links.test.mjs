@@ -59,7 +59,9 @@ const link = (target, at, type) => { fs.mkdirSync(path.dirname(at), { recursive:
 
 function run(event, cwd, home, extra = {}) {
   const input = event === 'SessionStart' ? { hook_event_name: 'SessionStart' } : { hook_event_name: 'UserPromptSubmit', prompt: extra.prompt || '' };
-  const env = { ...process.env, USERPROFILE: home, HOME: home };
+  // hooks-safety.md section 7: the host exports these to every hook process, so a value inherited from the real session must never reach the test
+  const env = { ...process.env, USERPROFILE: home, HOME: home, TEMP: home, TMP: home, TMPDIR: home };
+  delete env.CLAUDE_PROJECT_DIR; delete env.CLAUDE_PLUGIN_ROOT; delete env.CLAUDE_PLUGIN_DATA; delete env.NODE_TEST_CONTEXT;
   const args = extra.preload ? ['--require', extra.preload, HOOK] : [HOOK];
   return spawnSync(process.execPath, args, { input: JSON.stringify(input), cwd, env, encoding: 'utf8', timeout: 20000 });
 }
@@ -291,7 +293,7 @@ for (const [name, rel, legacy] of SHAPES) {
 for (const [label, rel] of [['source', ['skills', 'coalboard', 'SKILL.md']], ['dist', ['plugin', 'skills', 'coalboard', 'SKILL.md']]]) {
   test(`SKILL.md (${label}) carries the link rule for .coalboard/ reads, writes and deletes and the by-name memory cleanup`, () => {
     const body = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel), 'utf8');
-    for (const anchor of ['a mitigation you follow, never a guarantee', 'before the first read, write or delete under', 'resolve `<project root>` to its real path', 'AT or BELOW `<project root>/.coalboard`', 'never one taken from a link', 'touch NOTHING and tell the user', 'then `rmdir` (never recursive)', 'remove the files THIS run created there, by name, then `rmdir` the directory only if it is a real directory and not a link', 'never `rm -r`, never a trailing-slash or `*` remove', '(removed by name)']) {
+    for (const anchor of ['a mitigation you follow, never a guarantee', 'before the first read, write or delete under', 'resolve `<project root>` to its real path', 'AT or BELOW `<project root>/.coalboard`', 'never one taken from a link', 'touch NOTHING and tell the user', 'then `rmdir` (never recursive)', 'remove the files THIS run created there, by name, then `rmdir` the directory only if it is a real directory and not a link', 'never `rm -r`, never a trailing-slash or `*` remove', '(removed by name)', 'if `rmdir` refuses, leave the directory and say so', 'node scripts/apply-target.mjs <project root> <each target>', 'a REFUSE target (a link, outside the project, or unresolvable)', 'so "apply all" never covers it', 'write only OK targets', 'write NO live file and courier the fixes']) {
       assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
     }
   });

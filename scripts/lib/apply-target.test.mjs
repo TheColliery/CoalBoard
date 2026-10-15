@@ -1,0 +1,308 @@
+// Tests for the GATE 3 apply checker (15b5, CWK2-038): skills/coalboard/scripts/apply-target.mjs, run by the AGENT before every live write.
+// A target path in a cloned repo can itself be, or pass through, a planted symlink or junction, so an approved diff naming the LINK path would land on
+// the link's target outside the project. The checker refuses (never surface-and-apply) any target with a link AT or BELOW the project root, or whose real
+// path is not inside the real root; a link ABOVE the root is the user's layout. It is a CLI, so it fails LOUD (hooks-safety.md section 1.0): exit 0 every
+// target OK, 1 any refused, 2 a usage error. These tests SPAWN the real script (never an extracted import), sandbox HOME/USERPROFILE/TEMP/TMP/TMPDIR
+// (hooks-safety.md section 7), build fixtures under os.tmpdir() with registered teardown, and probe link capability (t.skip, one skippable leg per test).
+// Junction legs run on every platform; file-symlink legs skip visibly when the box cannot make one.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPT = path.join(HERE, '..', '..', 'skills', 'coalboard', 'scripts', 'apply-target.mjs');
+const DIST_SCRIPT = path.join(HERE, '..', '..', 'plugin', 'skills', 'coalboard', 'scripts', 'apply-target.mjs');
+
+const mk = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cb-apply-'));
+function canLink(kind) {
+  const d = mk();
+  try {
+    fs.mkdirSync(path.join(d, 'dir'));
+    fs.writeFileSync(path.join(d, 'file'), 'x');
+    if (kind === 'file') fs.symlinkSync(path.join(d, 'file'), path.join(d, 'l'), 'file');
+    else fs.symlinkSync(path.join(d, 'dir'), path.join(d, 'l'), 'junction');
+    return true;
+  } catch { return false; } finally { fs.rmSync(d, { recursive: true, force: true }); }
+}
+const SKIP_FILE = canLink('file') ? false : 'this box cannot create a file symlink (no privilege)';
+const SKIP_DIR = canLink('dir') ? false : 'this box cannot create a directory link';
+
+// base/proj is the project root; base2 is a separate OUTSIDE root. The teardown also proves no link was followed into the outside root.
+function sandbox(t) {
+  const base = mk();
+  const outside = mk();
+  const proj = path.join(base, 'proj');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.writeFileSync(path.join(outside, 'keep'), 'x');
+  t.after(() => {
+    fs.rmSync(base, { recursive: true, force: true });
+    const survived = fs.existsSync(path.join(outside, 'keep'));
+    fs.rmSync(outside, { recursive: true, force: true });
+    assert.ok(survived, 'cleanup of the sandbox removed the outside root content: a link was followed');
+  });
+  return { base, proj, outside, realProj: fs.realpathSync.native(proj), realOutside: fs.realpathSync.native(outside) };
+}
+const touch = (p, text = 'x') => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); };
+const link = (target, at, type) => { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.symlinkSync(target, at, type); };
+
+function run(s, args, extra = {}) {
+  const env = { ...process.env, HOME: s.base, USERPROFILE: s.base, TEMP: s.base, TMP: s.base, TMPDIR: s.base, CLAUDE_PROJECT_DIR: '', CLAUDE_PLUGIN_ROOT: '', CLAUDE_PLUGIN_DATA: '' };
+  delete env.NODE_TEST_CONTEXT;
+  const argv = extra.preload ? ['--require', extra.preload, extra.script || SCRIPT, ...args] : [extra.script || SCRIPT, ...args];
+  return spawnSync(process.execPath, argv, { cwd: s.base, env, encoding: 'utf8', timeout: 20000, killSignal: 'SIGKILL', windowsHide: true, shell: false });
+}
+const lines = (r) => r.stdout.split('\n').filter(Boolean);
+
+// ---- exit codes and the output line ------------------------------------------------------------------------------------------------
+test('exit 0 and one OK line when every target is a plain in-root file or a new in-root file', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'src', 'a.js'));
+  const r = run(s, [s.proj, 'src/a.js', 'src/new.js', 'deep/er/new.js']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.equal(r.stderr, '');
+  assert.deepEqual(lines(r), ['OK src/a.js', 'OK src/new.js', 'OK deep/er/new.js']);
+});
+
+test('exit 1 when any target is refused, with one line per target, the refused one naming its reason and real path', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'ok.js'));
+  link(s.outside, path.join(s.proj, 'ln'), 'junction');
+  const r = run(s, [s.proj, 'ok.js', 'ln/x.js']);
+  assert.equal(r.status, 1);
+  const l = lines(r);
+  assert.equal(l.length, 2);
+  assert.equal(l[0], 'OK ok.js');
+  assert.ok(l[1].startsWith('REFUSE ln/x.js link '), l[1]);
+  assert.ok(l[1].endsWith(s.realOutside), `the refusal names the link's real path: ${l[1]}`);
+});
+
+test('exit 2 on a usage error: no arguments, no target, an unresolvable root, an unknown flag', (t) => {
+  const s = sandbox(t);
+  for (const args of [[], [s.proj], [path.join(s.base, 'no-such-root'), 'a.js'], ['--bogus', s.proj, 'a.js']]) {
+    const r = run(s, args);
+    assert.equal(r.status, 2, `args ${JSON.stringify(args)}: ${r.stdout}${r.stderr}`);
+    assert.equal(r.stdout, '', 'a usage error prints nothing on stdout');
+    assert.ok(r.stderr.length > 0);
+  }
+});
+
+test('an unknown flag is a usage error even when a folder of that name exists (it is never taken as the root)', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.base, '-x'));
+  const r = run(s, ['-x', 'a.js']);
+  assert.equal(r.status, 2);
+  assert.equal(r.stdout, '');
+  assert.ok(r.stderr.includes('unknown flag'), r.stderr);
+});
+
+test('--help prints usage to stdout and exits 0', (t) => {
+  const s = sandbox(t);
+  const r = run(s, ['--help']);
+  assert.equal(r.status, 0);
+  assert.ok(r.stdout.includes('apply-target.mjs'));
+});
+
+test('a control character in a target never forges a second output line', (t) => {
+  const s = sandbox(t);
+  const r = run(s, [s.proj, 'a' + String.fromCharCode(10) + 'OK forged.js']);
+  assert.equal(lines(r).length, 1, r.stdout);
+});
+
+// ---- link refusals ---------------------------------------------------------------------------------------------------------------------
+test('a junction AS the target\'s directory, pointing outside the root, is refused as link', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  link(s.outside, path.join(s.proj, 'dir'), 'junction');
+  const r = run(s, [s.proj, 'dir/x.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE dir/x.js link '), r.stdout);
+});
+
+test('a junction in the MIDDLE of the path is refused as link', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'a'));
+  link(s.outside, path.join(s.proj, 'a', 'ln'), 'junction');
+  const r = run(s, [s.proj, 'a/ln/b/c.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE a/ln/b/c.js link '), r.stdout);
+});
+
+test('a junction to another folder INSIDE the root is refused as link, not accepted as inside', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'real', 'f.js'));
+  link(path.join(s.proj, 'real'), path.join(s.proj, 'alias'), 'junction');
+  const r = run(s, [s.proj, 'alias/f.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE alias/f.js link '), r.stdout);
+});
+
+test('a NEW file under a junction is refused as link (the missing tail does not hide the link)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  link(s.outside, path.join(s.proj, 'dir'), 'junction');
+  const r = run(s, [s.proj, 'dir/not-yet/new.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE dir/not-yet/new.js link '), r.stdout);
+  assert.ok(!fs.existsSync(path.join(s.outside, 'not-yet')), 'the checker writes nothing');
+});
+
+test('a junction AT the target name is refused as link', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  link(s.outside, path.join(s.proj, 'x.js'), 'junction');
+  const r = run(s, [s.proj, 'x.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE x.js link '), r.stdout);
+});
+
+test('a file symlink AT the target to an outside file is refused as link', { skip: SKIP_FILE }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.outside, 'victim.txt'));
+  link(path.join(s.outside, 'victim.txt'), path.join(s.proj, 'f.js'), 'file');
+  const r = run(s, [s.proj, 'f.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE f.js link '), r.stdout);
+});
+
+test('a file symlink AT the target to a file INSIDE the root is refused as link', { skip: SKIP_FILE }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'real.js'));
+  link(path.join(s.proj, 'real.js'), path.join(s.proj, 'f.js'), 'file');
+  const r = run(s, [s.proj, 'f.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE f.js link '), r.stdout);
+});
+
+// ---- outside ----------------------------------------------------------------------------------------------------------------------------
+test('a target with .. that leaves the root is refused as outside', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'a'));
+  const r = run(s, [s.proj, '../x.js', 'a/../../x.js']);
+  assert.equal(r.status, 1);
+  const l = lines(r);
+  assert.ok(l[0].startsWith('REFUSE ../x.js outside '), l[0]);
+  assert.ok(l[1].startsWith('REFUSE a/../../x.js outside '), l[1]);
+});
+
+test('a .. that stays inside the root is OK', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'a'));
+  touch(path.join(s.proj, 'b.js'));
+  const r = run(s, [s.proj, 'a/../b.js']);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), ['OK a/../b.js']);
+});
+
+test('a .. after a junction is judged by the REAL parent, not the lexical one (a/link/../b)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'a'));
+  link(s.outside, path.join(s.proj, 'a', 'ln'), 'junction');
+  const r = run(s, [s.proj, 'a/ln/../b.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE a/ln/../b.js link '), r.stdout);
+});
+
+test('an absolute target outside the root is refused as outside; an absolute target inside is OK', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'in.js'));
+  const r = run(s, [s.proj, path.join(s.outside, 'x.js'), path.join(s.proj, 'in.js')]);
+  assert.equal(r.status, 1);
+  const l = lines(r);
+  assert.ok(l[0].startsWith('REFUSE ') && l[0].includes(' outside '), l[0]);
+  assert.ok(l[1].startsWith('OK '), l[1]);
+});
+
+test('the project root itself is not a file target', (t) => {
+  const s = sandbox(t);
+  const r = run(s, [s.proj, '.']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE . unresolvable '), r.stdout);
+});
+
+// ---- the root reached through a link ABOVE it (the user's layout) -------------------------------------------------------------------------
+test('a root reached through a junction ABOVE it is OK, by its relative and its absolute spelling', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'f.js'));
+  const via = path.join(s.base, 'via');
+  link(s.proj, via, 'junction');
+  const r = run(s, [via, 'f.js', path.join(via, 'f.js'), 'new.js']);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), ['OK f.js', 'OK ' + path.join(via, 'f.js'), 'OK new.js']);
+});
+
+// ---- unresolvable = refused (fail closed) -----------------------------------------------------------------------------------------------
+const EACCES_REALPATH = "const fs = require('fs'); const orig = fs.realpathSync.native; fs.realpathSync.native = function (p) { if (String(p).endsWith('guarded.js')) { const e = new Error('denied'); e.code = 'EPERM'; throw e; } return orig.apply(this, arguments); };";
+test('a target whose realpath is denied (EPERM) is refused as unresolvable', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'guarded.js'));
+  const pre = path.join(s.outside, 'pre.cjs');
+  fs.writeFileSync(pre, EACCES_REALPATH);
+  const r = run(s, [s.proj, 'guarded.js'], { preload: pre });
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE guarded.js unresolvable '), r.stdout);
+});
+
+test('a component whose lstat is denied (EACCES) is refused as unresolvable', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'locked'));
+  const pre = path.join(s.outside, 'pre2.cjs');
+  fs.writeFileSync(pre, "const fs = require('fs'); const orig = fs.lstatSync; fs.lstatSync = function (p) { if (String(p).endsWith('locked')) { const e = new Error('denied'); e.code = 'EACCES'; throw e; } return orig.apply(this, arguments); };");
+  const r = run(s, [s.proj, 'locked/f.js'], { preload: pre });
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE locked/f.js unresolvable '), r.stdout);
+});
+
+test('a path through a plain FILE (ENOTDIR) is refused as unresolvable, not guessed', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'plain.txt'));
+  const r = run(s, [s.proj, 'plain.txt/x.js']);
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE plain.txt/x.js unresolvable '), r.stdout);
+});
+
+test('the final guard judges containment with path.relative, not a string prefix (a sibling folder sharing the root name)', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'f.js'));
+  const pre = path.join(s.outside, 'pre3.cjs');
+  fs.writeFileSync(pre, "const fs = require('fs'); const path = require('path'); const orig = fs.realpathSync.native; fs.realpathSync.native = function (p) { if (String(p).endsWith('f.js')) return orig.call(this, path.dirname(path.dirname(String(p)))) + path.sep + 'proj-evil' + path.sep + 'f.js'; return orig.apply(this, arguments); };");
+  const r = run(s, [s.proj, 'f.js'], { preload: pre });
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE f.js outside '), r.stdout);
+});
+
+function aclDenyWorks() {
+  const d = mk();
+  try {
+    const f = path.join(d, 'probe');
+    fs.writeFileSync(f, 'x');
+    const me = os.userInfo().username;
+    const r = spawnSync('icacls', [f, '/deny', me + ':(R)'], { encoding: 'utf8', timeout: 20000 });
+    if (r.error || r.status !== 0) return false;
+    try { fs.realpathSync.native(f); return false; } catch (e) { return !!e && (e.code === 'EPERM' || e.code === 'EACCES'); }
+  } catch { return false; } finally {
+    try { spawnSync('icacls', [path.join(d, 'probe'), '/reset'], { encoding: 'utf8', timeout: 20000 }); } catch {}
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+}
+const ACL = aclDenyWorks();
+test('a real ACL-denied file (icacls /deny R) is refused as unresolvable', { skip: ACL ? false : 'no read denial via icacls on this volume or OS (capability probe)' }, (t) => {
+  const s = sandbox(t);
+  const f = path.join(s.proj, 'acl.js');
+  touch(f);
+  spawnSync('icacls', [f, '/deny', os.userInfo().username + ':(R)'], { encoding: 'utf8', timeout: 20000 });
+  let r;
+  try { r = run(s, [s.proj, 'acl.js']); } finally { spawnSync('icacls', [f, '/reset'], { encoding: 'utf8', timeout: 20000 }); } // reset BEFORE the sandbox teardown runs
+  assert.equal(r.status, 1);
+  assert.ok(lines(r)[0].startsWith('REFUSE acl.js unresolvable '), r.stdout);
+});
+
+// ---- the dist copy is the same script (the agent reads it from the installed plugin) -------------------------------------------------------
+test('the dist copy answers the same as the source', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  const a = run(s, [s.proj, 'a.js', '../x.js']);
+  const b = run(s, [s.proj, 'a.js', '../x.js'], { script: DIST_SCRIPT });
+  assert.equal(b.status, a.status);
+  assert.equal(b.stdout, a.stdout);
+});
