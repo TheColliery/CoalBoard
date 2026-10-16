@@ -274,6 +274,23 @@ for (const [name, build, expect] of u2Anchors) {
   });
 }
 
+// T-16e-1 (16f item B, vehicle thread T11): before S2 restores a file the run changed, the post-run version is SAVED beside the report (never inside backup/, which S5
+// deletes), so an edit another process made during the run is never discarded. Both homes move together: the ledger row and the lens line a shell seat reads. One red mutant per anchor.
+const t161Anchors = [
+  ['S2 saves the post-run version', () => mutateCell('S2', SAFEGUARD, 'post-run version', 'result'), /S2 must say the post-run version of a changed real file is SAVED beside the report before the restore/],
+  ['S2 never inside backup/', () => mutateCell('S2', SAFEGUARD, 'never inside `backup/`', 'inside `backup/`'), /S2 must say the saved post-run version is never inside the backup folder, which S5 deletes/],
+  ['S2 proof says saved', () => mutateCell('S2', PROOF, '`saved`', '`kept`'), /S2 proof must state each changed file was `saved` before it was `restored`/],
+  ['S5 says the saved copies stay', () => mutateCell('S5', SAFEGUARD, 'and stay', 'and go'), /S5 must say the saved post-run versions sit outside the run directory and stay/],
+  ['lens: saves the post-run version', () => mutate(LENS, 'SAVE the post-run version', 'note the result'), /lens-prompts.md FIXED rule must SAVE the post-run version of a changed file before the restore/],
+  ['lens: never inside backup/', () => mutate(LENS, 'never inside `backup/`', 'inside `backup/`'), /lens-prompts.md FIXED rule must say the saved post-run version is never inside the backup folder, which S5 deletes/],
+];
+for (const [name, build, expect] of t161Anchors) {
+  test(`T-16e-1 red mutant: ${name}`, () => {
+    const f = checkRunSafety({ files: build() });
+    assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
+  });
+}
+
 test('u2 (R2-LOW-2): the icacls page is a WRAPPED link in S3 (angle brackets), still one whole link token', () => {
   const s3 = parseSafeguardLedger(refText()).S3.safeguard;
   assert.ok(s3.includes('(<' + LEARN + '>,'), 'the bare URL is wrapped as <...>');

@@ -22,6 +22,8 @@
 // place and secure the run directory (the ONE run directory, the real-path assert, the TMPDIR fallback to /tmp, the Windows restrict step,
 // the no-outside-place fallback) and that S4 clause, each anchored below, because a shell seat sees only that line; the RECOMMENDED roots
 // and the icacls documentation stay in the ledger, which the lens line points at;
+// (4d) T-16e-1 (16f, vehicle thread T11): before S2 restores a changed file it SAVES the post-run version beside the report (never inside backup/, which S5
+// deletes; S5 leaves the saved copies), so an edit another process made during the run is never discarded; the ledger row, its proof and the lens line carry it;
 // (5) the duty reaches the places a model reads at run time: every Bash-holding seat's FIXED rules in lens-prompts.md
 // (naming the ledger, all five ids, the never-outside-a-box class and the removal proof), and Step 4.2's isolation
 // line in SKILL.md; (6) the references table lists the file as MANDATORY. The no-new-right half (run safety adds a
@@ -113,6 +115,10 @@ export function checkRunSafety({ files }) {
     ['S4', [/with a box the probe passes, run it inside that box/], 'S4 must say that with a box the probe passes the non-file class runs inside that box'],
     ['S5', [/together with its backup/], 'S5 must remove the backup together with the clone'],
     ['S5', [/AFTER S2's restore/], 'S5 must run AFTER S2\'s restore (the restore needs the backup)'],
+    // T-16e-1 (16f, vehicle thread T11): the restore must not discard an edit another process legitimately made during the run.
+    ['S2', [/\bSAVE\b[^|]*post-run version/, /beside the run's report/], 'S2 must say the post-run version of a changed real file is SAVED beside the report before the restore'],
+    ['S2', [/never inside `backup\/`/, /S5 deletes that/], 'S2 must say the saved post-run version is never inside the backup folder, which S5 deletes'],
+    ['S5', [/outside the run directory, and stay/], 'S5 must say the saved post-run versions sit outside the run directory and stay'],
   ];
   // the return must state these (the proof column is what the return carries)
   const PROOF = [
@@ -121,6 +127,7 @@ export function checkRunSafety({ files }) {
     ['S5', /\bgone\b/, 'S5 proof must state the path is gone (a re-check that it no longer exists)'],
     ['S5', /the clone and the backup are gone/, 'S5 proof must state the backup is gone too'],
     ['S5', /run directory/, 'S5 proof must name the run directory path'],
+    ['S2', /`saved`[^|]*`restored`/, 'S2 proof must state each changed file was `saved` before it was `restored`'],
   ];
   for (const [id, re, msg] of PROOF) if (rows[id] && !re.test(rows[id].proof)) findings.push(msg);
   if (rows.S3 && /off the drive root/.test(rows.S3.safeguard)) findings.push('S3 must not tell Windows to use a directory off the drive root: no standard names such a folder, and the owner ruled the clone may live anywhere');
@@ -160,6 +167,8 @@ export function checkRunSafety({ files }) {
       [/let S2 carry the weight/, 'the lens-prompts.md FIXED rule must say, with no outside place, to say so and let S2 carry the weight'],
       [/cannot do S1, S2 or S5/, 'the lens-prompts.md FIXED rule must say a seat that cannot do S1, S2 or S5 does not run (NOT-CHECKED)'],
       [/with a box the probe passes, run it inside that box/, 'the lens-prompts.md FIXED rule must say that with a box the probe passes the non-file class runs inside that box'],
+      [/SAVE the post-run version beside your report/, 'the lens-prompts.md FIXED rule must SAVE the post-run version of a changed file before the restore'],
+      [/never inside `backup\/`, which the cleanup deletes/, 'the lens-prompts.md FIXED rule must say the saved post-run version is never inside the backup folder, which S5 deletes'],
     ]) if (!re.test(lensLine)) findings.push(msg);
   }
   const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));
