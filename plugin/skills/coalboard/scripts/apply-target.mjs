@@ -35,17 +35,31 @@ function realOf(p) {
   return null;
 }
 
+// The textual segment strip, shared by BOTH spellings of a target (R2 HIGH-1): an absolute target must NOT go through path.resolve / path.relative, which collapse a
+// `..` lexically before any lstat, so a link before the `..` is never walked. On POSIX the kernel resolves the link first and then `..`, so a/ln/../b is outside the
+// project while a lexical collapse reads inside it. Strip the root prefix as TEXT, keep every `..`, and let the one lstat walk below judge it. Segments are compared with
+// the platform's own path.relative, so case folds exactly where the platform's does (win32), and not elsewhere.
+const segEq = (a, b) => a === b || path.relative(a, b) === '';
+function splitAbs(p) {
+  const { root } = path.parse(p);
+  return { root, segs: p.slice(root.length).split(SPLIT).filter((x) => x && x !== '.') };
+}
+function belowRoot(target, rootSpelling) {
+  const t = splitAbs(target);
+  const r = splitAbs(rootSpelling);
+  if (!segEq(t.root, r.root) || t.segs.length < r.segs.length) return null;
+  for (let i = 0; i < r.segs.length; i++) if (!segEq(t.segs[i], r.segs[i])) return null;
+  return t.segs.slice(r.segs.length);
+}
+
 // Walk the target's components below the root with lstat. Every verified component is a real non-link directory, so a `..` step is the true parent.
 function check(root, rootLexical, target) {
   let segs;
   let cur = root;
   if (path.isAbsolute(target)) {
-    const abs = path.resolve(target);
-    const relReal = path.relative(root, abs);
-    const relLex = path.relative(rootLexical, abs);
-    const rel = insideRel(relReal) || relReal === '' ? relReal : (insideRel(relLex) || relLex === '' ? relLex : null);
-    if (rel === null) return refuse('outside', realOf(abs));
-    segs = rel.split(SPLIT).filter(Boolean);
+    const below = belowRoot(target, root) ?? belowRoot(target, rootLexical);
+    if (below === null) return refuse('outside', realOf(path.resolve(target))); // not under the root's spelling (over-refuses a collapsible path that only reaches it through ..: the safe direction)
+    segs = below;
   } else {
     segs = target.split(SPLIT).filter((s) => s && s !== '.');
   }

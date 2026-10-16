@@ -271,6 +271,41 @@ test('the final guard judges containment with path.relative, not a string prefix
   assert.ok(lines(r)[0].startsWith('REFUSE f.js outside '), r.stdout);
 });
 
+// path.join would collapse the .. itself, so the absolute spelling under test is built by hand
+const dotdot = (base, through, file) => [base, through, '..', file].join(path.sep);
+// R2 HIGH-1: the ABSOLUTE spelling must not collapse .. before the walk. On POSIX the kernel resolves the link first and then .., so a/ln/../b is outside the
+// project while a lexical collapse reads inside it. Both branches now go through one textual segment strip and one lstat walk.
+test('an ABSOLUTE target with a .. after a junction is judged by the real parent, like the relative spelling (<root>/ln/../x.js)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  link(s.outside, path.join(s.proj, 'ln'), 'junction');
+  const rel = run(s, [s.proj, 'ln/../x.js']);
+  const abs = run(s, [s.proj, dotdot(s.realProj, 'ln', 'x.js')]);
+  assert.equal(rel.status, 1);
+  assert.equal(abs.status, 1, abs.stdout);
+  assert.ok(lines(abs)[0].includes(' link '), abs.stdout);
+});
+
+test('an ABSOLUTE .. after a junction is refused through the lexical spelling of the root too (a root reached through a junction above it)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  const via = path.join(s.base, 'via');
+  link(s.proj, via, 'junction');
+  link(s.outside, path.join(s.proj, 'ln'), 'junction');
+  const r = run(s, [via, dotdot(via, 'ln', 'x.js')]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].includes(' link '), r.stdout);
+});
+
+// R2 LOW-1 / M5: where this platform's own path.relative folds case (win32), a case-variant absolute target is the SAME file and is OK; a string-prefix test would refuse it.
+const CASE_FOLDS = path.relative('a', 'A') === '';
+test('a case-variant ABSOLUTE target is OK where path.relative folds case (C:/PROJ/F.JS for root C:/proj)', { skip: CASE_FOLDS ? false : 'path.relative does not fold case on this platform' }, (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'f.js'));
+  const variant = path.join(s.realProj, 'f.js').toUpperCase();
+  const r = run(s, [s.proj, variant]);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), ['OK ' + variant]);
+});
+
 function aclDenyWorks() {
   const d = mk();
   try {
