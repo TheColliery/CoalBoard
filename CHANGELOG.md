@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.4] - 2026-10-16
+
+An approved fix can no longer be written through a planted link.
+
+### Security
+- BUILD-station stub so the version gate passes; the DOCS station replaces this entry before the tag. GATE 3 runs a shipped checker, skills/coalboard/scripts/apply-target.mjs, on every apply target and writes only the targets it passes.
+
 ## [2.8.3] - 2026-10-15
 
 A planted link can no longer make the hook read outside the project.
