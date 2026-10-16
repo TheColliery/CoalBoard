@@ -9,6 +9,7 @@
 ![version](https://img.shields.io/github/v/tag/TheColliery/CoalBoard?label=version&color=blue)
 ![license](https://img.shields.io/badge/license-Apache_2.0-blue)
 ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/TheColliery/CoalBoard?utm_source=oss&utm_medium=github&utm_campaign=TheColliery%2FCoalBoard&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-validated-brightgreen)
 ![Antigravity](https://img.shields.io/badge/Antigravity-validated-brightgreen)
