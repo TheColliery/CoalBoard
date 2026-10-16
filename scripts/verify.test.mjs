@@ -23,6 +23,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deriveRootSets } from './lib/derive-roots.mjs';
 import { gitEnv } from './lib/git-env.mjs';
+import { removeTree } from './lib/test-teardown.mjs';
 import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -97,7 +98,7 @@ test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still
     assert.equal(findings.length, 1);
     assert.match(findings[0].msg, /gitignored `ignored-dir\//);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTree(dir);
   }
 });
 
@@ -167,7 +168,7 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
     assert.match(findA.msg, /gitignored/, 'plant A must now FAIL -- it was never exempt from the check, only from discovering its own root');
     assert.match(findB.msg, /gitignored/, 'plant B, the citation that discovered the root, must FAIL too');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTree(dir);
   }
 });
 
@@ -238,7 +239,7 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
     assert.doesNotMatch(r.stdout, /totally-fake-root/,
       'the real gate must never false-FAIL the absent, un-patterned root under the lone-CR fixture');
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 
@@ -259,14 +260,14 @@ function censusTree(plant) {
 }
 test('CWK-136 RED-FIRST: planting env: process.env on a git spawn makes the verify gate FAIL, naming the file', (t) => {
   const tmp = censusTree(true);
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  t.after(() => removeTree(tmp));
   const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
   assert.match(r.stdout, /FAIL git spawn census: finding 1\/1: scripts\/lib\/zz-planted\.mjs:1 .*process\.env/);
   assert.notEqual(r.status, 0, 'a refused spawn fails the gate');
 });
 test('CWK-136 control: the same tree with nothing planted passes the census line', (t) => {
   const tmp = censusTree(false);
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  t.after(() => removeTree(tmp));
   const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
   assert.match(r.stdout, /ok {3}git spawn census: every one of \d+ git spawn\(s\)/);
   assert.doesNotMatch(r.stdout, /FAIL git spawn census/);

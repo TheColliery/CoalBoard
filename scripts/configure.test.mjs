@@ -40,6 +40,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
+import { removeTree } from './lib/test-teardown.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '..');
@@ -55,7 +56,7 @@ function sandbox() {
   fs.mkdirSync(proj, { recursive: true });
   return { home, proj };
 }
-function clean({ home }) { fs.rmSync(home, { recursive: true, force: true }); }
+function clean({ home }) { removeTree(home); }
 
 function run(args, { home, proj }) {
   return spawnSync(process.execPath, [CLI, ...args], {

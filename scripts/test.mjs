@@ -37,6 +37,7 @@ const TESTS = [
   'scripts/lib/release-shape.test.mjs',
   'scripts/lib/wave-run.test.mjs',
   'scripts/lib/test-suite.test.mjs',
+  'scripts/lib/test-teardown.test.mjs',
   'scripts/secret-scan.test.mjs',
   'scripts/secret-gate.test.mjs',
   'scripts/release-notes.test.mjs',
