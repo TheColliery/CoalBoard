@@ -2,6 +2,17 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The config tool keeps a legacy file when git cannot vouch for it.
+
+### Fixed
+- **`scripts/configure.mjs` keeps a legacy config file whenever a repository surrounds it and git cannot say whether it tracks the file, including when no git is on PATH.** It deletes the legacy file when git answers that the file is not tracked, or when no `.git` entry exists in its directory or any ancestor; any other answer inside a repository (a tracked file, no git on PATH, an unreadable index, a timeout) keeps it and prints why. This corrects `[2.8.2]`, which deleted the file when no git was on PATH. Not shipped in the plugin. — test: `scripts/configure.test.mjs`
+- **`scripts/configure.mjs` refuses a config that removes both human gates.** Each flag was checked alone, so `--coalboardMode auto --applyConsent false` was written as a gateless auto-apply pair; the cross-key check now runs on the final object before any write, and a refusal exits 1 and writes nothing. A pair split across the global and the project file is not visible to this check; the skill refuses it at run time. Not shipped in the plugin. — test: `scripts/configure.test.mjs`
+
+### Changed
+- **Two workflow comments and one script are re-synced from the org canon; not shipped in the plugin.** `.github/workflows/coverage.yml` carries the canon's gate comment, `.github/workflows/dependabot-auto-merge.yml` the canon's allowlist condition (patch and minor only), and `scripts/verify-release-shape.mjs` the canon's blob, which adds object and string checks on the published Release JSON. The room keeps its own job timeouts.
+
 ## [2.8.4] - 2026-10-16
 
 An approved fix can no longer be written through a planted link.
