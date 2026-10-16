@@ -42,6 +42,7 @@ const TESTS = [
   'scripts/secret-gate.test.mjs',
   'scripts/release-notes.test.mjs',
   'scripts/verify-release-shape.test.mjs',
+  'scripts/front-door-links.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/verify.test.mjs',
 ];
