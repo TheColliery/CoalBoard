@@ -13,11 +13,11 @@ permissions:
 # verify/test run. Space-separated shell globs; an adopting room edits this line only.
 # NOTE the asymmetry with codeql.yml on purpose -- a SHIPPED markdown artifact
 # (skills/**/SKILL.md, commands/*.md) MUST run CI, because verify.mjs checks dist-sync.
-# Only these NON-shipped root docs are exempt. (NOTICE is deliberately NOT in this list --
-# that widening is CWK-065 DRIFT row 5.6, a separate ticket; this unit changes no room-specific
-# data beyond porting the existing paths-ignore list.)
+# Only these NON-shipped root docs are exempt. NOTICE joined the list in 17a (UMB3-038): it was
+# held out as CWK-065 DRIFT row 5.6 only because the canon's paths-ignore did not carry it yet;
+# the canon now does, and NOTICE is a legal text outside plugin/, never a shipped artifact.
 env:
-  DOCS_GLOBS: "README.md CHANGELOG.md CONTRIBUTING.md PRIVACY.md SECURITY.md LICENSE"
+  DOCS_GLOBS: "README.md CHANGELOG.md CONTRIBUTING.md PRIVACY.md SECURITY.md LICENSE NOTICE"
 
 # cancel-in-progress: TRUE -- ci.yml only reads, tests and compares; it publishes nothing and
 # touches no external state, so a superseded run has nothing to leave half-done.
