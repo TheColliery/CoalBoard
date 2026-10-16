@@ -53,6 +53,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
+import { ConfigWriteRefused, mkdirRepoParents, refuseLinkedTarget } from './lib/repo-fs.mjs';
 
 // True when a .git entry (a directory, or the file of a linked worktree) sits in the file's directory or any directory above it.
 function insideRepoTree(file) {
@@ -287,6 +288,18 @@ function main() {
     process.exit(1);
   }
 
+  // 16f wave 2 (CWK2-042): the parent folder is made only after the chain from the project root is judged (a link or junction at any component is refused wherever it points), and
+  // the target file is never written through a link; both run BEFORE the malformed-config backup so a refusal leaves nothing behind (R16e L1). The project root is the folder that
+  // owns the agent dir: a project write is always <root>/<agent dir>/coal/coalboard.json (a legacy hit migrates to the own-dir default at cwd), so it is three levels up.
+  // The global config has no project root (null: the plain recursive make, a dotfile manager may link ~/.claude).
+  try {
+    mkdirRepoParents(path.dirname(writePath), isGlobal ? null : path.dirname(path.dirname(path.dirname(writePath))));
+    refuseLinkedTarget(writePath);
+  } catch (e) {
+    if (e instanceof ConfigWriteRefused) { console.error(`Error: ${e.message}`); process.exit(1); }
+    throw e;
+  }
+
   if (malformed) {
     process.exitCode = 1;
     try {
@@ -298,7 +311,6 @@ function main() {
   }
 
   try {
-    fs.mkdirSync(path.dirname(writePath), { recursive: true });
     fs.writeFileSync(writePath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
     // Move-on-CONFIG-WRITE-only (no-old-version-leftover): the legacy file is
     // removed only AFTER the new-home write above succeeded, and only when this

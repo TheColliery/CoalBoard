@@ -504,3 +504,101 @@ test('configure (t29 #1): the repository may sit ABOVE the file (an ancestor .gi
     assert.ok(fs.existsSync(legacy), 'an ancestor .git entry counts');
   } finally { clean(sb); }
 });
+
+// ---- 16f wave 2 (CWK2-042, the mkdir-before-guard class; found by CoalLedger): configure.mjs made the parent folder with a recursive mkdir BEFORE anything judged
+// the path, so a .claude junction (Windows) or symlink (POSIX) planted by a cloned repo got a folder made OUTSIDE the project and the config written there too, and
+// the target file itself was written through a link. Every link-capable leg probes its capability and skips visibly (t.skip, one leg per test); they run on CI.
+const probeLink = (kind) => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-probe-'));
+  try {
+    if (kind === 'dir') { fs.mkdirSync(path.join(d, 'a')); fs.symlinkSync(path.join(d, 'a'), path.join(d, 'b'), 'junction'); }
+    else { fs.writeFileSync(path.join(d, 'a'), 'x'); fs.symlinkSync(path.join(d, 'a'), path.join(d, 'b'), 'file'); }
+    return true;
+  } catch { return false; } finally { removeTree(d); }
+};
+const CAN_DIR_LINK = probeLink('dir');
+const CAN_FILE_LINK = probeLink('file');
+const SKIP_DIR = CAN_DIR_LINK ? false : 'this box cannot create a directory link (capability probe)';
+const SKIP_FILE = CAN_FILE_LINK ? false : 'this box cannot create a file symlink (capability probe, no privilege)';
+const refusal = (r) => { assert.strictEqual(r.status, 1, 'exit 1: ' + r.stdout + r.stderr); assert.ok(/^Error: .*(refus|link|junction)/mi.test(r.stderr), 'an Error line names the refusal: ' + r.stderr); };
+
+test('configure (CWK2-042): a .claude JUNCTION to a folder outside the project is refused: exit 1, nothing made outside, nothing written anywhere', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(outside);
+    fs.symlinkSync(outside, path.join(sb.proj, '.claude'), 'junction');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.deepStrictEqual(fs.readdirSync(outside), [], 'no folder and no file appears outside the project');
+  } finally { clean(sb); }
+});
+
+test('configure (CWK2-042): a junction AT .claude/coal is refused the same way', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(outside);
+    fs.mkdirSync(path.join(sb.proj, '.claude'));
+    fs.symlinkSync(outside, path.join(sb.proj, '.claude', 'coal'), 'junction');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.deepStrictEqual(fs.readdirSync(outside), [], 'nothing is written through the link');
+  } finally { clean(sb); }
+});
+
+test('configure (CWK2-042): a link AT the target file is refused and the file it points to stays byte-equal', { skip: SKIP_FILE }, () => {
+  const sb = sandbox();
+  try {
+    const victim = path.join(sb.home, 'victim.json');
+    const before = JSON.stringify({ updateCheckDays: 30 }) + '\n';
+    fs.writeFileSync(victim, before);
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+    fs.symlinkSync(victim, PROJECT_TARGET(sb.proj), 'file');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.strictEqual(fs.readFileSync(victim, 'utf8'), before, 'the write did not follow the link');
+  } finally { clean(sb); }
+});
+
+test('configure (CWK2-042): the plain case, a missing .claude and a missing coal folder inside the project, still write', () => {
+  const a = sandbox();
+  const b = sandbox();
+  try {
+    assert.strictEqual(run(['--language', 'en'], a).status, 0);
+    assert.ok(fs.existsSync(PROJECT_TARGET(a.proj)), 'both folders are made inside the project');
+    fs.mkdirSync(path.join(b.proj, '.claude'));
+    assert.strictEqual(run(['--language', 'en'], b).status, 0);
+    assert.ok(fs.existsSync(PROJECT_TARGET(b.proj)), 'the missing coal folder is made inside the existing .claude');
+  } finally { clean(a); clean(b); }
+});
+
+test('configure (CWK2-042): the global config (no project root) still makes ~/.claude and writes, and a ~/.claude that is itself a link (a dotfile manager) still works', { skip: SKIP_DIR }, () => {
+  const a = sandbox();
+  const b = sandbox();
+  try {
+    assert.strictEqual(run(['--global', '--language', 'en'], a).status, 0);
+    assert.ok(fs.existsSync(GLOBAL_TARGET(a.home)), 'the global folder is made and the file written');
+    const managed = path.join(b.home, 'dotfiles');
+    fs.mkdirSync(managed);
+    fs.symlinkSync(managed, path.join(b.home, '.claude'), 'junction');
+    const r = run(['--global', '--language', 'en'], b);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.ok(fs.existsSync(path.join(managed, '.coalboard.json')), 'the write lands in the managed folder, as before');
+  } finally { clean(a); clean(b); }
+});
+
+test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .bak (the guard runs before the backup)', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(path.join(outside, 'coal'), { recursive: true });
+    const malformed = '{ "language": ';
+    fs.writeFileSync(path.join(outside, 'coal', 'coalboard.json'), malformed);
+    fs.symlinkSync(outside, path.join(sb.proj, '.claude'), 'junction');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.deepStrictEqual(fs.readdirSync(path.join(outside, 'coal')), ['coalboard.json'], 'no .bak and nothing else appears beside the malformed file');
+    assert.strictEqual(fs.readFileSync(path.join(outside, 'coal', 'coalboard.json'), 'utf8'), malformed, 'the file behind the link is untouched');
+  } finally { clean(sb); }
+});
