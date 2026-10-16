@@ -64,6 +64,7 @@ export const BLIND_KEYS = {
 
 export const NOT_CONFIG = {
   agentId: 'the Claude Code platform worker identifier for a spawned lens/sub, named throughout SKILL.md and references/failure-modes.md, references/opinion-board.md, references/platform-cc.md — never a .coalboard.json key',
+  insideFolder: 'a function in hooks/coalboard-conductor.js (the contained project-config read, 2.8.3), named in SECURITY.md by the SkillSpector Last-scan paragraph the deputy supplies — never a .coalboard.json key.',
 };
 
 // SURFACES — chosen by MEASUREMENT, each in/out with its reason.

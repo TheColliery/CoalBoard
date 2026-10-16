@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { gitEnv } from './git-env.mjs';
+import { removeTree } from './test-teardown.mjs';
 import {
   checkPointers, pointerCandidates, looksPathShaped,
   classifyCheckIgnoreResult, applyCheckIgnoreProbe,
@@ -528,7 +529,7 @@ test('classifyCheckIgnoreResult: a REAL git check-ignore --stdin exit other than
     assertPreFixFailedOpen(ci);
     assertFailClosedVerdict(ci); // the naturally racy run: either shape is legitimate, both are asserted
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 
@@ -544,7 +545,7 @@ test('classifyCheckIgnoreResult: FORCED status-only shape (stdin not connected) 
     const verdict = assertFailClosedVerdict(ci);
     assert.match(verdict.message, /exited 129/);
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 
@@ -560,7 +561,7 @@ test('classifyCheckIgnoreResult: FORCED error-set shape (input far past the pipe
     assert.ok(ci.error, 'fixture precondition: a 4 MB write to a git that exited without reading must surface as a spawn error');
     assertFailClosedVerdict(ci);
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 
@@ -574,7 +575,7 @@ test('classifyCheckIgnoreResult: a REAL exit 0 (a fed path IS ignored) succeeds,
     assert.equal(verdict.ok, true);
     assert.match(verdict.stdout, /ignored-dir/);
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 
@@ -588,7 +589,7 @@ test('classifyCheckIgnoreResult: a REAL exit 1 (nothing fed is ignored) succeeds
     assert.equal(verdict.ok, true);
     assert.equal(verdict.stdout.trim(), '');
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    removeTree(tmp);
   }
 });
 

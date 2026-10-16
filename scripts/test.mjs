@@ -18,6 +18,9 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TESTS = [
   'scripts/lib/lib.test.mjs',
   'scripts/lib/conductor.test.mjs',
+  'scripts/lib/conductor-links.test.mjs',
+  'scripts/lib/apply-target.test.mjs',
+  'scripts/hooks-exec-form.test.mjs',
   'scripts/lib/ladder.test.mjs',
   'scripts/lib/dist-compare.test.mjs',
   'scripts/lib/config-keys.test.mjs',
@@ -34,10 +37,12 @@ const TESTS = [
   'scripts/lib/release-shape.test.mjs',
   'scripts/lib/wave-run.test.mjs',
   'scripts/lib/test-suite.test.mjs',
+  'scripts/lib/test-teardown.test.mjs',
   'scripts/secret-scan.test.mjs',
   'scripts/secret-gate.test.mjs',
   'scripts/release-notes.test.mjs',
   'scripts/verify-release-shape.test.mjs',
+  'scripts/front-door-links.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/verify.test.mjs',
 ];

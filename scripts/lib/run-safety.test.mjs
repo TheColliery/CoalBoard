@@ -190,7 +190,7 @@ const newAnchors = [
   ['S2 inside the run directory', () => mutateCell('S2', SAFEGUARD, 'inside the run directory', 'somewhere the run cannot reach'), /S2 must put the backup inside the run directory/],
   ['S2 SIBLING of the clone', () => mutateCell('S2', SAFEGUARD, 'SIBLING of the clone', 'child of the clone'), /S2 must put the backup beside the clone as a SIBLING/],
   ['S2 never an ancestor', () => mutateCell('S2', SAFEGUARD, 'never an ancestor of the clone', 'sometimes above the clone'), /S2 must say the backup is never an ancestor of the clone/],
-  ['S2 manifest.txt', () => mutateCell('S2', SAFEGUARD, 'manifest.txt', 'notes'), /S2 must name backup files by SHA-256 and keep the original paths in one manifest\.txt/],
+  ['S2 manifest.txt', () => mutateCell('S2', SAFEGUARD, 'manifest.txt', 'notes', true), /S2 must name backup files by SHA-256 and keep the original paths in one manifest\.txt/],
   ['S3 RUN DIRECTORY', () => mutateCell('S3', SAFEGUARD, 'RUN DIRECTORY', 'folder'), /S3 must name the RUN DIRECTORY/],
   ['S3 restrict to the current user', () => mutateCell('S3', SAFEGUARD, 'restrict the run directory to the current user', 'leave the run directory as it is'), /S3 must advise restricting the run directory to the current user/],
   ['S3 icacls', () => mutateCell('S3', SAFEGUARD, 'icacls', 'attrib', true), /S3 must give the icacls form/],
@@ -269,6 +269,45 @@ const u2Anchors = [
 ];
 for (const [name, build, expect] of u2Anchors) {
   test(`u2 red mutant: ${name}`, () => {
+    const f = checkRunSafety({ files: build() });
+    assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
+  });
+}
+
+// T-16e-1 (16f item B, vehicle thread T11; round 2 after INSPECT H1, M1, M2): before S2 restores a file the run changed, the post-run version is SAVED into a private
+// POST-RUN FOLDER, <run-id>.post-run/, a sibling of the run directory under the lab root (never in the run directory, the project or .coalboard/), restricted to the
+// user, copies named by SHA-256 with one manifest.txt, kept by S5, naming only the folder path because it may hold a secret. Both homes move together (the ledger row
+// and the lens line a shell seat reads) and SKILL.md's On-disk ledger carries the one-line note. One red mutant per anchor.
+const SKILLREL = 'skills/coalboard/SKILL.md';
+const t161Anchors = [
+  ['S2 saves the post-run version', () => mutateCell('S2', SAFEGUARD, 'post-run version', 'result'), /S2 must SAVE the post-run version of a changed real file before the restore/],
+  ['S2 the post-run folder is a sibling of the run directory', () => mutateCell('S2', SAFEGUARD, 'a private sibling of the run directory under the same lab root', 'somewhere'), /S2 must put the post-run folder in a private sibling of the run directory under the lab root/],
+  ['S2 the post-run folder name', () => mutateCell('S2', SAFEGUARD, 'POST-RUN FOLDER', 'copy'), /S2 must name the POST-RUN FOLDER/],
+  ['S2 never in the run directory', () => mutateCell('S2', SAFEGUARD, 'never in the run directory', 'sometimes in the run directory'), /S2 must keep the post-run folder out of the run directory, which S5 deletes/],
+  ['S2 never in the project', () => mutateCell('S2', SAFEGUARD, 'never inside the project', 'sometimes inside the project'), /S2 must keep the post-run folder out of the project and the board folder/],
+  ['S2 restricted to the user before writing', () => mutateCell('S2', SAFEGUARD, 'Restrict the folder to the current user BEFORE writing into it', 'Leave the folder as it is'), /S2 must restrict the post-run folder to the current user before writing into it/],
+  ['S2 SHA-256 names and a manifest', () => mutateCell('S2', SAFEGUARD, 'Name each copy by its SHA-256', 'Name each copy by its original name'), /S2 must name each post-run copy by its SHA-256 and keep one manifest/],
+  ['S2 may contain a secret', () => mutateCell('S2', SAFEGUARD, 'MAY CONTAIN A SECRET', 'is harmless'), /S2 must say the post-run folder may contain a secret/],
+  ['S2 names only the folder path', () => mutateCell('S2', SAFEGUARD, 'name only the folder path, never the content', 'quote the content'), /S2 must say the finding and the report name only the folder path, never the content/],
+  ['S2 no place outside the home tree', () => mutateCell('S2', SAFEGUARD, 'beside the run directory wherever that is', 'in the home tree'), /S2 must say what the post-run folder does when S3 found no place outside the home tree/],
+  ['S2 proof says saved', () => mutateCell('S2', PROOF, '`saved`', '`kept`'), /S2 proof must state each changed file was `saved` before it was `restored`/],
+  ['S5 keeps the post-run folder', () => mutateCell('S5', SAFEGUARD, 'is NOT part of this delete, and stays for the user to reconcile and delete', 'goes with the rest'), /S5 must keep the post-run folder: not part of the delete, left for the user to reconcile and delete/],
+  ['lens: saves the post-run version into the sibling folder', () => mutate(LENS, 'SAVE its post-run version into', 'note its result in'), /lens-prompts\.md FIXED rule must SAVE the post-run version into the post-run folder before the restore/],
+  ['lens: a private sibling of the run directory', () => mutate(LENS, 'a private sibling folder of your run directory', 'a folder'), /lens-prompts\.md FIXED rule must put the post-run folder in a private sibling of the run directory/],
+  ['lens: never in the run directory or the project', () => mutate(LENS, 'never in the run directory or the project', 'anywhere'), /lens-prompts\.md FIXED rule must keep the post-run folder out of the run directory and the project/],
+  ['lens: locked to your user', () => mutate(LENS, 'lock it to your user before writing into it', 'leave it open'), /lens-prompts\.md FIXED rule must lock the post-run folder to your user before writing into it/],
+  ['lens: SHA-256 names and a manifest', () => mutate(LENS, 'name each copy by its SHA-256 beside one `manifest.txt`', 'name each copy as you like'), /lens-prompts\.md FIXED rule must name each post-run copy by its SHA-256 beside one manifest/],
+  ['lens: may hold a secret, name only the folder path', () => mutate(LENS, 'it may hold a secret so name only the folder path', 'quote what it holds'), /lens-prompts\.md FIXED rule must say the post-run folder may hold a secret and the report names only its path/],
+  ['lens: not removed with the clone', () => mutate(LENS, 'it is NOT removed with the clone', 'it goes with the clone'), /lens-prompts\.md FIXED rule must say the post-run folder is not removed with the clone/],
+  ['SKILL.md ledger: the private post-run folder note', () => mutate(SKILLREL, 'may keep ONE private post-run folder under the lab root', 'writes nothing else'), /SKILL\.md On-disk ledger must note that run safety may keep one private post-run folder under the lab root/],
+  ['SKILL.md ledger: not one of the 5 writes, not a work product', () => mutate(SKILLREL, 'not one of the 5 writes and not a work product', 'one more write'), /SKILL\.md On-disk ledger must say the post-run folder is not one of the 5 writes and not a work product/],
+  ['S2 POSIX form of the user restriction', () => mutateCell('S2', SAFEGUARD, 'on POSIX create it with `mkdir -m 700`, or `mktemp -d`', 'on POSIX create it however you like'), /S2 must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d, before anything is written/],
+  ['lens: POSIX form of the user restriction', () => mutate(LENS, 'on POSIX create it with `mkdir -m 700` or `mktemp -d`', 'on POSIX create it however you like'), /lens-prompts\.md FIXED rule must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d/],
+  ['SKILL.md ledger heading points at the post-run folder', () => mutate(SKILLREL, 'everything else is chat, bar the post-run folder the last bullet names', 'everything else is chat'), /SKILL\.md On-disk ledger heading must point at the post-run folder its last bullet names/],
+  ['SKILL.md ledger: a stop does not remove it', () => mutate(SKILLREL, 'the one thing a `stop` does not remove', 'removed by a `stop`'), /SKILL\.md On-disk ledger must say a stop does not remove the post-run folder/],
+];
+for (const [name, build, expect] of t161Anchors) {
+  test(`T-16e-1 red mutant: ${name}`, () => {
     const f = checkRunSafety({ files: build() });
     assert.ok(f.some((m) => expect.test(m)), `${name}: ${f.join(' | ')}`);
   });

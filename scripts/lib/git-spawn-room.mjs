@@ -1,5 +1,5 @@
 // The room's half of the canon git-spawn census (09a). scripts/lib/git-env-census.mjs (+ .vectors.mjs, .test.mjs) is the CANON, adopted by blob id from
-// .github templates/overlay-coal-skill/ and never edited here: it holds the rule, the lexer and the 188-row witness list. This room adds only what the canon cannot
+// .github templates/overlay-coal-skill/ and never edited here: it holds the rule, the lexer and the witness list. This room adds only what the canon cannot
 // know: WHICH files it reads (scripts/**/*.mjs through the canon walk, plus hooks/*.js, a wider census than the canon's, a named divergence) and the PINS.
 //
 // A pin is { rel, blob, why }: the census skips that file only while its git blob id equals `blob`, so the first edited byte (or a re-sync of the source it copies)

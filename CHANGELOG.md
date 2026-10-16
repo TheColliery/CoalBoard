@@ -2,6 +2,53 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.5] - 2026-10-16
+
+A board run no longer discards an edit made to a real file.
+
+### Fixed
+- **A board run that restores a real file it changed first saves the version it found.** When a run that executes a command against your target changes a real file in the tool's reach, run safety restores the file from its backup and reports the change. If another process legitimately edited that file while the run was going, the restore used to overwrite that edit, and the backup is deleted at the end of the run, so nothing kept it. Now, before it restores, run safety saves the file's post-run version into a private folder, `<run-id>.post-run/`, that sits beside the run directory under the lab root: never inside the run directory (the cleanup deletes that), never inside your project or `.coalboard/`. The folder is restricted to your user (the same two `icacls` steps as the run directory on Windows, `mkdir -m 700` on POSIX), each copy is named by its SHA-256, and a `manifest.txt` maps each copy to its original path. It holds copies of real configs and may contain a secret, so the report names only the folder path, never the content. The cleanup keeps the folder so you can reconcile the saved copy with the restored file and then delete the folder yourself; a `stop` does not remove it. Changes `references/run-safety.md` (S2 and S5), the matching clause in `references/lens-prompts.md` and one sentence in the on-disk ledger of `SKILL.md`, so the seats read the same rule. — test: `scripts/lib/run-safety.test.mjs`
+- **`scripts/configure.mjs` keeps a legacy config file whenever a repository surrounds it and git cannot say whether it tracks the file, including when no git is on PATH.** It deletes the legacy file when git answers that the file is not tracked, or when no `.git` entry exists in its directory or any ancestor; any other answer inside a repository (a tracked file, no git on PATH, an unreadable index, a timeout) keeps it and prints why. This corrects `[2.8.2]`, which deleted the file when no git was on PATH. Not shipped in the plugin. — test: `scripts/configure.test.mjs`
+- **`scripts/configure.mjs` refuses a config that removes both human gates.** Each flag was checked alone, so `--coalboardMode auto --applyConsent false` was written as a gateless auto-apply pair; the cross-key check now runs on the final object before any write, and a refusal exits 1 and writes nothing. A pair split across the global and the project file is not visible to this check; the skill refuses it at run time. Not shipped in the plugin. — test: `scripts/configure.test.mjs`
+
+### Changed
+- **The org canon's front-door links check is adopted by blob; not shipped in the plugin.** `.github/workflows/front-door-links.yml` (`7c582bd7`, first adopted at `db4173d4`), `scripts/front-door-links.mjs` (`3793a056`), `scripts/lib/front-door-links.mjs` (`7df59db6`) and `scripts/front-door-links.test.mjs` (`3cff2b30`) are copied from the canon (`.github` at `bea2b3d`) and the test is listed in `scripts/test.mjs`. The workflow was re-copied at `7c582bd7` (the canon moved to setup-node v7.1.0), so its first blob above (`db4173d4`) is superseded; the other three are unchanged. — test: `scripts/front-door-links.test.mjs`
+- **`scripts/verify-release-shape.mjs` is re-copied from the canon at `270e43d1` (it now trims trailing whitespace before it compares, and the room's test pins the leading-whitespace case); not shipped in the plugin.** — test: `scripts/verify-release-shape.test.mjs`
+- **The teardown test is stricter and no longer depends on the wall clock; not shipped in the plugin.** `scripts/lib/test-teardown.mjs` takes an injected clock and wait, so the budget is asserted by call count instead of elapsed time, and the held-folder leg now probes whether a plain removal is blocked on the volume and skips visibly where it is not. — test: `scripts/lib/test-teardown.test.mjs`
+- **Two workflow comments and one script are re-synced from the org canon; not shipped in the plugin.** `.github/workflows/coverage.yml` carries the canon's gate comment, `.github/workflows/dependabot-auto-merge.yml` the canon's allowlist condition (patch and minor only), and `scripts/verify-release-shape.mjs` the canon's blob, which adds object and string checks on the published Release JSON. The room keeps its own job timeouts.
+
+### Notes
+- The `skills/coalboard/SKILL.md` body is now 50,159 characters (49,796 in 2.8.4), against the last declared bound of 45,959 (`[2.3.1]`). The growth is one on-disk ledger sentence for the post-run folder, a rail, not explanation; the body was already past the declared bound before this release, and a re-carve is open.
+
+## [2.8.4] - 2026-10-16
+
+An approved fix can no longer be written through a planted link.
+
+### Security
+- **Applying an approved fix no longer writes through a planted link.** When you approve fixes at the final consent step (GATE 3), the board used to name each target by its path in the digest and then write to it. If that path was, or passed through, a symlink or junction planted in a cloned repository, the write landed on the link's target, which could be a file outside the project. The skill now runs a shipped checker, `skills/coalboard/scripts/apply-target.mjs`, on every apply target before the digest and again immediately before each live write. It refuses a target when a link sits at or below the project root (a link above the root is your own layout and is allowed), when the target's real path leaves the root, or when the path cannot be resolved (fail closed). It walks an absolute target's `..` steps against the real parent before it judges the target, so `<root>/ln/../x.js` is judged by where the link really points. A refused target is never written: the digest and the report name it with its real path as not applicable, so "apply all" never covers it, and you can apply that fix by hand. The checker writes nothing and reads only path metadata. — test: `scripts/lib/apply-target.test.mjs`
+- **Be exact about what is enforced.** That the agent runs the checker is an instruction in `SKILL.md` the agent follows, so it is a mitigation and not a guarantee. Once the checker runs its verdict is exact, because it is code. One residue remains: a window between the last check and the write, which a local process that plants a link in that gap could use; the check does not stop it. If the checker cannot run (no shell, no Node), the skill writes no live file and hands you the fixes instead. `scripts/lib/conductor-links.test.mjs` pins that the instruction is present, not that the agent obeys it.
+
+### Fixed
+- **The memory cleanup says what to do when `rmdir` refuses.** After removing the files the run created, by name, the skill removes `memory/` with a non-recursive `rmdir`; if `rmdir` refuses, it leaves the directory and says so (never `rm -r`, never a trailing-slash or `*` remove). — test: `scripts/lib/conductor-links.test.mjs`
+- **The hook tests no longer read your real environment.** The test sandbox now points `TEMP`, `TMP` and `TMPDIR` at its throwaway folder and clears `CLAUDE_PROJECT_DIR`, `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA`, so a value inherited from a real session can no longer reach a test. Not shipped in the plugin.
+
+### Notes
+- The `skills/coalboard/SKILL.md` body is now 49,796 characters (49,085 in 2.8.3), against the last declared bound of 45,959 (`[2.3.1]`). The growth is the apply-target rule, a rail, not explanation; the body was already past the declared bound before this release, and a re-carve is open.
+
+## [2.8.3] - 2026-10-15
+
+A planted link can no longer make the hook read outside the project.
+
+### Security
+- **The session hook reads the project config only from inside the folder it belongs to.** Before, a junction or symlink planted in a cloned repository (at `.claude`, `.claude/coal`, `.agents`, or at the config file itself) could point the hook at a config file outside the project. The hook now resolves the real path of the config it found and refuses one that lands outside its expected folder: it reads nothing from it, uses no project config for that run (the global config and defaults still apply), and reports it on the session-start line as `UNREADABLE: <path> exists but is not a readable config (resolves outside its folder)`. A config that cannot be read for another reason (for example a permission denial) is still reported as unreadable, not as outside. Hook-enforced: it holds on every run in which the hook runs. — test: `scripts/lib/conductor-links.test.mjs`
+- **The skill checks for a link before it reads, writes or deletes under `.coalboard/` (or writes the project config), and its memory cleanup removes only the files the run created, by name.** `skills/coalboard/SKILL.md` now tells the agent to resolve the project root to its real path, to touch nothing and tell you when a junction or symlink sits at or below `<project root>/.coalboard` (or when the real path is not the hand-joined one it expects), and to remove the `memory/` scratch files it made one by one, then run a non-recursive `rmdir` on `memory/` only if it is a real directory and not a link. This half is an instruction the agent follows, not code that runs on every call: a mitigation, not a guarantee. — test: `scripts/lib/conductor-links.test.mjs` pins that the instruction is present, not that the agent obeys it.
+
+### Fixed
+- **Both hook entries use the exec form: `node` with the script path in `args`.** On Windows without Git for Windows, Claude Code runs a shell-form hook under PowerShell, where `${CLAUDE_PLUGIN_ROOT}` expands to nothing, so the hook never found its script (CoalWash's probe of PowerShell's expansion; Claude Code's own no-Git fallback was not run). The exec form runs with no shell on every platform. It needs Claude Code 2.1.139 or later. — test: `scripts/hooks-exec-form.test.mjs`
+
+### Notes
+- The `skills/coalboard/SKILL.md` body is now 49,085 characters (48,303 before this release), against the last declared bound of 45,959 (`[2.3.1]`). The growth is the link rule above, a rail, not explanation; the body was already past the declared bound before this release, and a re-carve is open.
+
 ## [2.8.2] - 2026-10-09
 
 Board runs fall back to /tmp when TMPDIR sits in your home tree.
