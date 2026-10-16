@@ -123,6 +123,7 @@ export function checkRunSafety({ files }) {
     ['S2', [/never in the run directory \(S5 deletes that\)/], 'S2 must keep the post-run folder out of the run directory, which S5 deletes'],
     ['S2', [/never inside the project or `\.coalboard\/`/], 'S2 must keep the post-run folder out of the project and the board folder'],
     ['S2', [/Restrict the folder to the current user BEFORE writing into it/], 'S2 must restrict the post-run folder to the current user before writing into it'],
+    ['S2', [/on POSIX create it with `mkdir -m 700`, or `mktemp -d`/], 'S2 must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d, before anything is written'],
     ['S2', [/Name each copy by its SHA-256 and keep one `manifest\.txt`/], 'S2 must name each post-run copy by its SHA-256 and keep one manifest'],
     ['S2', [/MAY CONTAIN A SECRET/], 'S2 must say the post-run folder may contain a secret'],
     ['S2', [/name only the folder path, never the content/], 'S2 must say the finding and the report name only the folder path, never the content'],
@@ -179,6 +180,7 @@ export function checkRunSafety({ files }) {
       [/SAVE its post-run version into `<run-id>\.post-run\/`/, 'the lens-prompts.md FIXED rule must SAVE the post-run version into the post-run folder before the restore'],
       [/a private sibling folder of your run directory/, 'the lens-prompts.md FIXED rule must put the post-run folder in a private sibling of the run directory'],
       [/never in the run directory or the project/, 'the lens-prompts.md FIXED rule must keep the post-run folder out of the run directory and the project'],
+      [/on POSIX create it with `mkdir -m 700` or `mktemp -d`/, 'the lens-prompts.md FIXED rule must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d'],
       [/lock it to your user before writing into it/, 'the lens-prompts.md FIXED rule must lock the post-run folder to your user before writing into it'],
       [/name each copy by its SHA-256 beside one `manifest\.txt`/, 'the lens-prompts.md FIXED rule must name each post-run copy by its SHA-256 beside one manifest'],
       [/it may hold a secret so name only the folder path/, 'the lens-prompts.md FIXED rule must say the post-run folder may hold a secret and the report names only its path'],
@@ -189,6 +191,7 @@ export function checkRunSafety({ files }) {
   for (const [re, msg] of [
     [/may keep ONE private post-run folder under the lab root/, "SKILL.md On-disk ledger must note that run safety may keep one private post-run folder under the lab root"],
     [/not one of the 5 writes and not a work product/, 'SKILL.md On-disk ledger must say the post-run folder is not one of the 5 writes and not a work product'],
+    [/everything else is chat, bar the post-run folder the last bullet names/, 'SKILL.md On-disk ledger heading must point at the post-run folder its last bullet names'],
     [/the one thing a `stop` does not remove/, 'SKILL.md On-disk ledger must say a stop does not remove the post-run folder'],
   ]) if (!re.test(skill.text)) findings.push(msg);
   const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));

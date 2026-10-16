@@ -71,7 +71,7 @@ A "never" inside a Step and not listed here is that step's sequencing mechanics,
 
 Every command a shell seat or main RUNS also carries `references/run-safety.md` S1-S5 (a duty, never a right; the seat's own prompt states it). The OPINION lane's four seats carry their own rights column in `references/opinion-board.md` — never re-derived here. The JUDGE is main, not a spawned seat: every ground-truth RUN is main's (Steps 2 · 4.2).
 
-### On-disk output — the complete set (5 writes below; a 6th bullet is a disposition NOTE, never a write; everything else is chat)
+### On-disk output — the complete set (5 writes below; a 6th bullet is a disposition NOTE, never a write; everything else is chat, bar the post-run folder the last bullet names)
 - `stagingDir` (def `.coalboard/proposed/`) — staged fix-changes ONLY, never the report.
 - `.coalboard/reports/<name>-<timestamp>.md` — the report, written only after GATE 3 (P13). **`<name>` = the run's kind:** an audit run takes `references/audit.md`'s fuller shape `audit-YYYY-MM-DD-HHMMSS[-vX.Y.Z].md` (a reference's MORE-SPECIFIC filename rule WINS over this generic one); any other run = a short kebab label of the task (e.g. `fix-authcheck`).
 - `.coalboard/reports/post_mortem-<timestamp>.md` — the fail-escape hand-off (F6).

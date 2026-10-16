@@ -301,6 +301,9 @@ const t161Anchors = [
   ['lens: not removed with the clone', () => mutate(LENS, 'it is NOT removed with the clone', 'it goes with the clone'), /lens-prompts\.md FIXED rule must say the post-run folder is not removed with the clone/],
   ['SKILL.md ledger: the private post-run folder note', () => mutate(SKILLREL, 'may keep ONE private post-run folder under the lab root', 'writes nothing else'), /SKILL\.md On-disk ledger must note that run safety may keep one private post-run folder under the lab root/],
   ['SKILL.md ledger: not one of the 5 writes, not a work product', () => mutate(SKILLREL, 'not one of the 5 writes and not a work product', 'one more write'), /SKILL\.md On-disk ledger must say the post-run folder is not one of the 5 writes and not a work product/],
+  ['S2 POSIX form of the user restriction', () => mutateCell('S2', SAFEGUARD, 'on POSIX create it with `mkdir -m 700`, or `mktemp -d`', 'on POSIX create it however you like'), /S2 must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d, before anything is written/],
+  ['lens: POSIX form of the user restriction', () => mutate(LENS, 'on POSIX create it with `mkdir -m 700` or `mktemp -d`', 'on POSIX create it however you like'), /lens-prompts\.md FIXED rule must name the POSIX form of the user restriction: mkdir -m 700 or mktemp -d/],
+  ['SKILL.md ledger heading points at the post-run folder', () => mutate(SKILLREL, 'everything else is chat, bar the post-run folder the last bullet names', 'everything else is chat'), /SKILL\.md On-disk ledger heading must point at the post-run folder its last bullet names/],
   ['SKILL.md ledger: a stop does not remove it', () => mutate(SKILLREL, 'the one thing a `stop` does not remove', 'removed by a `stop`'), /SKILL\.md On-disk ledger must say a stop does not remove the post-run folder/],
 ];
 for (const [name, build, expect] of t161Anchors) {
