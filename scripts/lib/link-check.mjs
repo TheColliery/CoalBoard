@@ -37,7 +37,7 @@ function decodeEntities(s) {
       return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
     const key = e.toLowerCase();
-    // Object.hasOwn, not Object.prototype.hasOwnProperty.call: the canon git-spawn census reads any "Object.prototype." as a whole-process write and refuses this file's git env.
+    // Object.hasOwn is the direct own-key test: the key is entity text from a document, so a name such as "constructor" or "toString" must not resolve through the prototype chain.
     return Object.hasOwn(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key] : m;
   });
 }

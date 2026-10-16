@@ -51,7 +51,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
-import { CONFIG_SCHEMA, validateValue } from './lib/config-schema.mjs';
+import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
 
 // True when a .git entry (a directory, or the file of a linked worktree) sits in the file's directory or any directory above it.
@@ -62,13 +62,12 @@ function insideRepoTree(file) {
   }
 }
 
-// PR 19 #15, t29 #1: true when the migration must KEEP `file`. git is OPTIONAL (no-external-assumption), so only two answers let the delete run: no git on
-// PATH (ENOENT), and status 1 (a repository answered: not tracked). Status 0 is tracked. Anything else (128 for a corrupt index, dubious ownership or a
-// broken .git file, a timeout, another error) leaves git unable to say, so the file is kept wherever a repository exists around it (fail closed); with no
-// repository at all it is deleted as before. The spawn takes gitEnv() (census).
+// PR 19 #15, t29 #1, R16e T7: true when the migration must KEEP `file`. git is OPTIONAL (no-external-assumption), so only one answer lets the delete run
+// wherever a repository exists: status 1 (a repository answered: not tracked). Status 0 is tracked. Anything else (no git on PATH, 128 for a corrupt index, dubious
+// ownership or a broken .git file, a timeout, another error) leaves git unable to say, so the file is kept wherever a .git entry exists around it (fail closed;
+// insideRepoTree is a filesystem walk and needs no git); with no repository at all it is deleted as before. The spawn takes gitEnv() (census).
 function gitMayTrack(file) {
   const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', path.basename(file)], { cwd: path.dirname(file), stdio: 'ignore', timeout: 20000, env: gitEnv() });
-  if (r.error && r.error.code === 'ENOENT') return false;
   if (!r.error && r.status === 1) return false;
   if (!r.error && r.status === 0) return true;
   return insideRepoTree(file);
@@ -282,6 +281,14 @@ function main() {
       process.exit(1);
     }
     cfg[spec.key] = parsed.value;
+  }
+
+  // R16e T3: each flag passed validateValue alone, but a PAIR can still remove both human gates (coalboardMode auto + applyConsent false). The cross-key check runs on the
+  // final object before any write; a refusal writes nothing and leaves an existing file byte-equal. A pair split across the global and project files is not visible here.
+  const crossErr = validateConfig(cfg);
+  if (crossErr) {
+    console.error(`Error: ${crossErr}`);
+    process.exit(1);
   }
 
   try {

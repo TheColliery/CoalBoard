@@ -81,6 +81,31 @@ test('configure: a valid write lands at the own-dir project path (.claude/coal/c
   } finally { clean(sb); }
 });
 
+// R16e T3 (vehicle thread, Copilot): the per-key check passes each of these two values alone; the PAIR is gateless auto-apply (both human gates removed). The CLI runs the
+// schema's cross-key validateConfig on the final object BEFORE any write and refuses with a non-zero exit, so no file is created and an existing one stays byte-equal.
+test('configure (R16e T3): coalboardMode auto with applyConsent false is refused: non-zero exit, no file created', () => {
+  const sb = sandbox();
+  try {
+    const r = run(['--global', '--coalboardMode', 'auto', '--applyConsent', 'false'], sb);
+    assert.notStrictEqual(r.status, 0, 'the gateless combination must exit non-zero: ' + r.stdout);
+    assert.ok(/gateless/.test(r.stderr), 'the refusal names the problem: ' + r.stderr);
+    assert.strictEqual(fs.existsSync(GLOBAL_TARGET(sb.home)), false, 'nothing is written');
+  } finally { clean(sb); }
+});
+test('configure (R16e T3): the same refusal leaves an EXISTING config byte-equal, and a cross-layer-free pair still writes', () => {
+  const sb = sandbox();
+  try {
+    fs.mkdirSync(path.dirname(GLOBAL_TARGET(sb.home)), { recursive: true });
+    const before = JSON.stringify({ updateMode: 'ask' }, null, 2) + '\n';
+    fs.writeFileSync(GLOBAL_TARGET(sb.home), before);
+    const bad = run(['--global', '--coalboardMode', 'auto', '--applyConsent', 'false'], sb);
+    assert.notStrictEqual(bad.status, 0);
+    assert.strictEqual(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8'), before, 'an existing config must be byte-equal after a refused write');
+    const ok = run(['--global', '--coalboardMode', 'auto', '--applyConsent', 'true'], sb);
+    assert.strictEqual(ok.status, 0, ok.stderr);
+    assert.strictEqual(JSON.parse(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8')).applyConsent, true);
+  } finally { clean(sb); }
+});
 test('configure: --global writes .claude/.coalboard.json under HOME, not the project own-dir path', () => {
   const sb = sandbox();
   try {
@@ -388,17 +413,34 @@ test('configure (PR 19 #15): an UNTRACKED legacy config inside a git repository 
     assert.ok(r.stdout.includes('Migrated the project config'));
   } finally { clean(sb); }
 });
-test('configure (PR 19 #15): with no git on PATH the migration is unchanged (a tracked file is removed; git is optional)', () => {
+// R16e T7 (vehicle thread, the head ruled FIXED; reverses the PR 19 #15 pin that deleted here): with no git on PATH, git cannot say whether it tracks the file, the same
+// unknown answer as status 128, so the file is KEPT wherever a .git entry surrounds it (insideRepoTree is a filesystem walk and needs no git). Only with no repository at all does the delete run.
+const noGitEnv = (sb) => {
+  const emptyBin = path.join(sb.home, 'empty-bin');
+  fs.mkdirSync(emptyBin, { recursive: true });
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^path$/i.test(k)));
+  return { ...env, PATH: emptyBin, HOME: sb.home, USERPROFILE: sb.home };
+};
+test('configure (R16e T7): with no git on PATH a legacy config inside a repository tree is KEPT, with the note (git cannot say, so the delete does not run)', () => {
   const sb = sandbox();
   try {
     const legacy = legacyRepo(sb, ['.coalboard.json']);
     assert.strictEqual(gitIn(sb.proj, 'add', '--', '.coalboard.json').status, 0);
-    const emptyBin = path.join(sb.home, 'empty-bin');
-    fs.mkdirSync(emptyBin);
-    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^path$/i.test(k)));
-    const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: { ...env, PATH: emptyBin, HOME: sb.home, USERPROFILE: sb.home }, timeout: 20000 });
+    const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: noGitEnv(sb), timeout: 20000 });
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.strictEqual(fs.existsSync(legacy), false, 'with no git the legacy file is removed exactly as before');
+    assert.ok(fs.existsSync(legacy), 'with no git on PATH and a .git around it the legacy file must survive');
+    assert.ok(/git tracks it \(or could not say\)/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+    assert.ok(fs.existsSync(PROJECT_TARGET(sb.proj)), 'the migration still writes the new config');
+  } finally { clean(sb); }
+});
+test('configure (R16e T7): with no git on PATH and NO repository anywhere above, the legacy config is still removed by the migration', () => {
+  const sb = sandbox();
+  try {
+    const legacy = path.join(sb.proj, '.coalboard.json');
+    fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
+    const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: noGitEnv(sb), timeout: 20000 });
+    assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
+    assert.strictEqual(fs.existsSync(legacy), false, 'with no git and no .git anywhere the legacy file is removed as before');
     assert.ok(r.stdout.includes('Migrated the project config'));
   } finally { clean(sb); }
 });
