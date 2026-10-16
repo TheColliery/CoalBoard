@@ -7,7 +7,8 @@
 //   stdout: one line per target, "OK <target>" or "REFUSE <target> <reason> <real path or ->"   reason: link | outside | unresolvable
 //   exit: 0 every target OK, 1 any target refused, 2 usage error
 // Only links AT or BELOW the root are refused (the hook's own split: the root is resolved first, then joined); a link ABOVE the root is the user's layout.
-// A refused target is never written; the caller lists it as not applicable. Case-folding is never a correctness key here.
+// A refused target is never written; the caller lists it as not applicable. Segments are compared with path.relative (segEq), which folds case exactly where the platform does;
+// case-folding is never a containment key of its own.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +83,8 @@ function check(root, rootLexical, target) {
     if (i < segs.length - 1 && !st.isDirectory()) return refuse('unresolvable', '-'); // a path through a plain file
     cur = next;
   }
+  // a missing tail is forward-only: after the first missing component nothing is left to lstat, so a later `..` could step back onto a link further along the path
+  if (missingAt !== -1 && segs.slice(missingAt).includes('..')) return refuse('unresolvable', '-');
   // a missing tail holds no links: apply it lexically to the existing real directory `cur`, and judge the real path of that join
   let finalPath = cur;
   if (missingAt !== -1) {

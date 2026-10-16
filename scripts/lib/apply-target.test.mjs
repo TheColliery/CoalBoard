@@ -295,6 +295,37 @@ test('an ABSOLUTE .. after a junction is refused through the lexical spelling of
   assert.ok(lines(r)[0].includes(' link '), r.stdout);
 });
 
+// R3 MEDIUM-1: a missing component is forward-only. After it the lstat walk has nothing to judge, so a later .. would let the lexical join step back onto a link
+// further along the path (nope/../lnk/x.txt) and answer OK for a path that is REFUSE link when spelled lnk/x.txt. Fail closed as unresolvable.
+test('a missing component followed by .. that then passes an in-project junction is refused (relative spelling nope/../lnk/canary.txt)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'inproj'));
+  link(path.join(s.proj, 'inproj'), path.join(s.proj, 'lnk'), 'junction');
+  const direct = run(s, [s.proj, 'lnk/canary.txt']);
+  const r = run(s, [s.proj, 'nope/../lnk/canary.txt']);
+  assert.ok(lines(direct)[0].startsWith('REFUSE lnk/canary.txt link '), direct.stdout);
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].startsWith('REFUSE nope/../lnk/canary.txt unresolvable '), r.stdout);
+});
+
+test('a missing component followed by .. that then passes an in-project junction is refused (ABSOLUTE spelling <root>/nope/../lnk/canary.txt)', { skip: SKIP_DIR }, (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'inproj'));
+  link(path.join(s.proj, 'inproj'), path.join(s.proj, 'lnk'), 'junction');
+  const r = run(s, [s.proj, dotdot(s.realProj, 'nope', 'lnk' + path.sep + 'canary.txt')]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].includes(' unresolvable '), r.stdout);
+});
+
+test('a missing component followed by .. is refused even with no link anywhere (forward-only tail), and a plain missing tail stays OK', (t) => {
+  const s = sandbox(t);
+  const bad = run(s, [s.proj, 'nope/../x.js']);
+  const ok = run(s, [s.proj, 'nope/x.js']);
+  assert.equal(bad.status, 1, bad.stdout);
+  assert.ok(lines(bad)[0].startsWith('REFUSE nope/../x.js unresolvable '), bad.stdout);
+  assert.equal(ok.status, 0, ok.stdout);
+});
+
 // R2 LOW-1 / M5: where this platform's own path.relative folds case (win32), a case-variant absolute target is the SAME file and is OK; a string-prefix test would refuse it.
 const CASE_FOLDS = path.relative('a', 'A') === '';
 test('a case-variant ABSOLUTE target is OK where path.relative folds case (C:/PROJ/F.JS for root C:/proj)', { skip: CASE_FOLDS ? false : 'path.relative does not fold case on this platform' }, (t) => {
