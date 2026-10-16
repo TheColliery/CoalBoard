@@ -236,6 +236,7 @@ function main() {
 
   let cfg = {};
   let hadComments = false;
+  let malformed = false;
   // Read once via try/catch (no existsSync precheck) so there is no check-to-use gap.
   let rawConfig = null;
   try { rawConfig = fs.readFileSync(readPath, 'utf8').replace(/^\uFEFF/, ''); } catch {}
@@ -246,14 +247,9 @@ function main() {
     } catch (e) {
       // Fail loud (scripts-quality §1): a malformed config we silently overwrite is a
       // partial failure the user must notice -- flag the non-zero exit even though the
-      // run continues from defaults (the old config is backed up where possible).
-      process.exitCode = 1;
-      try {
-        fs.copyFileSync(readPath, readPath + '.bak');
-        console.warn(`Warning: existing config is malformed — backed it up to ${readPath}.bak and rebuilding.`);
-      } catch {
-        console.warn('Warning: existing config is malformed. Overwriting.');
-      }
+      // run continues from defaults. The backup waits until the cross-key check below has
+      // passed (R16e L1): a refused write must leave no .bak behind.
+      malformed = true;
     }
   }
 
@@ -289,6 +285,16 @@ function main() {
   if (crossErr) {
     console.error(`Error: ${crossErr}`);
     process.exit(1);
+  }
+
+  if (malformed) {
+    process.exitCode = 1;
+    try {
+      fs.copyFileSync(readPath, readPath + '.bak');
+      console.warn(`Warning: existing config is malformed — backed it up to ${readPath}.bak and rebuilding.`);
+    } catch {
+      console.warn('Warning: existing config is malformed. Overwriting.');
+    }
   }
 
   try {

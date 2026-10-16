@@ -4,6 +4,7 @@
 // the CoalWash room, CWK2-020 item 1). Exec form has no shell; on Windows `command` must be a real executable, so `node`, never
 // a shim (hooks-safety.md section 3). Shape follows CoalWash's scripts/hooks-exec-form.test.mjs; this room's manifest has two
 // entries (SessionStart, UserPromptSubmit), no matcher, no PreToolUse.
+// Named divergence (R16e N1): the canon SKILL-REPO-PATTERN.md hook-wiring bullet says verify.mjs checks this wiring; this room checks the same wiring HERE, in a test the commit gate and CI both run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

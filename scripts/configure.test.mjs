@@ -106,6 +106,19 @@ test('configure (R16e T3): the same refusal leaves an EXISTING config byte-equal
     assert.strictEqual(JSON.parse(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8')).applyConsent, true);
   } finally { clean(sb); }
 });
+// R16e L1: the cross-key refusal comes BEFORE the malformed-config backup, so a refused write over a malformed config creates no .bak (a refusal writes nothing at all).
+test('configure (R16e L1): a refused gateless write over a MALFORMED config creates no .bak and leaves the original untouched', () => {
+  const sb = sandbox();
+  try {
+    fs.mkdirSync(path.dirname(GLOBAL_TARGET(sb.home)), { recursive: true });
+    const before = '{ "coalboardMode": ';
+    fs.writeFileSync(GLOBAL_TARGET(sb.home), before);
+    const r = run(['--global', '--coalboardMode', 'auto', '--applyConsent', 'false'], sb);
+    assert.strictEqual(r.status, 1, 'the refusal exits 1: ' + r.stdout + r.stderr);
+    assert.strictEqual(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8'), before, 'the malformed original is untouched');
+    assert.strictEqual(fs.existsSync(GLOBAL_TARGET(sb.home) + '.bak'), false, 'a refused write creates no .bak');
+  } finally { clean(sb); }
+});
 test('configure: --global writes .claude/.coalboard.json under HOME, not the project own-dir path', () => {
   const sb = sandbox();
   try {
@@ -433,9 +446,13 @@ test('configure (R16e T7): with no git on PATH a legacy config inside a reposito
     assert.ok(fs.existsSync(PROJECT_TARGET(sb.proj)), 'the migration still writes the new config');
   } finally { clean(sb); }
 });
-test('configure (R16e T7): with no git on PATH and NO repository anywhere above, the legacy config is still removed by the migration', () => {
+// R16e L4: insideRepoTree walks to the drive root, and os.tmpdir() sits under the home folder on Windows, so a machine whose home (or any parent of the temp dir) is a git
+// repository would fail this leg for a reason that is not the code's. Probe for a .git ancestor of the sandbox first and skip visibly (one skippable leg).
+const hasGitAncestor = (dir) => { for (let d = dir; ; d = path.dirname(d)) { if (fs.existsSync(path.join(d, '.git'))) return true; if (path.dirname(d) === d) return false; } };
+test('configure (R16e T7): with no git on PATH and NO repository anywhere above, the legacy config is still removed by the migration', (t) => {
   const sb = sandbox();
   try {
+    if (hasGitAncestor(sb.proj)) { t.skip('a .git sits above the temp dir on this machine (capability probe), so the no-repository case cannot be built here'); return; }
     const legacy = path.join(sb.proj, '.coalboard.json');
     fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
     const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: noGitEnv(sb), timeout: 20000 });
@@ -446,9 +463,9 @@ test('configure (R16e T7): with no git on PATH and NO repository anywhere above,
 });
 
 // ---- t29 #1 (09a): git is asked about the file, and an answer that is neither "tracked" nor "not tracked" keeps it where a repository exists.
-// Only status 1 (a repository answered: not tracked) or no git at all (ENOENT) lets the migration delete. A corrupt index, a repository git refuses
-// (dubious ownership, a broken .git file) and a timeout all answer something else, so the file stays when a .git entry (file or directory) sits in its
-// directory or above it. No git and no repository at all still delete (the legs above and the nested-legacy migration legs).
+// Only status 1 (a repository answered: not tracked) lets the migration delete where a repository exists. A corrupt index, a repository git refuses
+// (dubious ownership, a broken .git file), a timeout and, since R16e T7, no git on PATH all answer something else, so the file stays when a .git entry (file or
+// directory) sits in its directory or above it. No git at all deletes the file only when no .git surrounds it (the R16e T7 legs above and the nested-legacy migration legs).
 test('configure (t29 #1): a legacy config committed to a repository whose index is CORRUPT survives the migration, with the note', () => {
   const sb = sandbox();
   try {
