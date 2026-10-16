@@ -16,13 +16,15 @@ export const TEARDOWN_BUDGET_MS = 30000; // about 4x the longest linger CoalWash
 export const TEARDOWN_POLL_MS = 100;
 const HELD = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
 
-// rm is injectable so the budget and the code split are testable on every platform; the real call is the default.
-export function removeTree(dir, { budgetMs = TEARDOWN_BUDGET_MS, pollMs = TEARDOWN_POLL_MS, rm = fs.rmSync } = {}) {
-  const until = Date.now() + budgetMs;
+// rm, now and wait are injectable so the budget and the code split are testable on every platform with no wall time (T-16e-2); the defaults are the real call, the
+// real clock and a real synchronous wait, so the helper behaves as before.
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); // a synchronous wait: teardowns run in finally blocks and t.after alike
+export function removeTree(dir, { budgetMs = TEARDOWN_BUDGET_MS, pollMs = TEARDOWN_POLL_MS, rm = fs.rmSync, now = Date.now, wait = sleepSync } = {}) {
+  const until = now() + budgetMs;
   for (;;) {
     try { rm(dir, { recursive: true, force: true }); return; } catch (e) {
-      if (!(e && HELD.has(e.code)) || Date.now() >= until) throw e; // another code is a real error at once; a hold past the budget is a real leak
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pollMs); // a synchronous wait: teardowns run in finally blocks and t.after alike
+      if (!(e && HELD.has(e.code)) || now() >= until) throw e; // another code is a real error at once; a hold past the budget is a real leak
+      wait(pollMs);
     }
   }
 }
