@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [Unreleased]
+
+The config tool refuses to write through a link or junction.
+
+### Security
+- **`scripts/configure.mjs` no longer makes a folder, or writes a config, through a link or junction.** Before, a junction or symlink planted at `.claude` or `.claude/coal` in a cloned project made the tool create the config folder at the link's target, outside the project, and write the config there. It now checks the config folder's path first, one component at a time and before it makes any folder: a link or junction on the path is refused wherever it points (even into the project), nothing is made beyond the last checked component, and the tool prints the refusal with a fix (make the path a real folder inside the project, or remove the link) and exits 1. It also refuses to write when the config file itself is a symlink, and a refusal leaves no `.bak` behind. A linked `~/.claude` folder still works for `--global`; a symlink at the global config file itself is refused. Limits, stated openly: a link swapped in between the last check and the write is not caught, and the `<config>.bak` copy made for a malformed config still follows a link planted at that name. Not shipped in the plugin. — test: `scripts/configure.test.mjs`, `scripts/lib/repo-fs.test.mjs`
+
 ## [2.8.5] - 2026-10-16
 
 A board run no longer discards an edit made to a real file.
