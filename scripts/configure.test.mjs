@@ -602,3 +602,101 @@ test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .b
     assert.strictEqual(fs.readFileSync(path.join(outside, 'coal', 'coalboard.json'), 'utf8'), malformed, 'the file behind the link is untouched');
   } finally { clean(sb); }
 });
+
+// ---- 17a (INSPECT round 1 of wave 2): the guard also covers the two other names the run reads or writes through: the .bak copy's destination (H1) and a legacy read source (M1).
+const runAt = (args, { home }, cwd) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home }, timeout: 20000 });
+const MALFORMED = '{ "language": ';
+const malformedProject = (sb) => { fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true }); fs.writeFileSync(PROJECT_TARGET(sb.proj), MALFORMED); };
+
+test('configure (H1): a FILE symlink at <config>.bak is refused and the file it points to stays byte-equal', { skip: SKIP_FILE }, () => {
+  const sb = sandbox();
+  try {
+    const victim = path.join(sb.home, 'victim.txt');
+    fs.writeFileSync(victim, 'keep');
+    malformedProject(sb);
+    fs.symlinkSync(victim, PROJECT_TARGET(sb.proj) + '.bak', 'file');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.strictEqual(fs.readFileSync(victim, 'utf8'), 'keep', 'the backup did not write through the link');
+    assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), MALFORMED, 'the config is untouched');
+  } finally { clean(sb); }
+});
+
+test('configure (H1): a JUNCTION at <config>.bak is refused before anything is rewritten', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(outside);
+    malformedProject(sb);
+    fs.symlinkSync(outside, PROJECT_TARGET(sb.proj) + '.bak', 'junction');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), MALFORMED, 'a refused run rewrites nothing');
+    assert.deepStrictEqual(fs.readdirSync(outside), [], 'nothing lands behind the link');
+  } finally { clean(sb); }
+});
+
+test('configure (M1): a legacy <cwd>/.coalboard.json that is a FILE symlink is refused: its target is never read into the project', { skip: SKIP_FILE }, () => {
+  const sb = sandbox();
+  try {
+    const victim = path.join(sb.home, 'secret.json');
+    const before = JSON.stringify({ auths: { x: { auth: 'c2VjcmV0' } } });
+    fs.writeFileSync(victim, before);
+    fs.symlinkSync(victim, path.join(sb.proj, '.coalboard.json'), 'file');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.ok(!fs.existsSync(PROJECT_TARGET(sb.proj)), 'no config is written from the linked source');
+    assert.strictEqual(fs.readFileSync(victim, 'utf8'), before);
+  } finally { clean(sb); }
+});
+
+test('configure (M1): a legacy <cwd>/.coalboard.json that is a JUNCTION is refused, nothing is migrated', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(outside);
+    fs.symlinkSync(outside, path.join(sb.proj, '.coalboard.json'), 'junction');
+    const r = run(['--language', 'en'], sb);
+    refusal(r);
+    assert.ok(!fs.existsSync(PROJECT_TARGET(sb.proj)), 'no config is written');
+    assert.deepStrictEqual(fs.readdirSync(outside), []);
+  } finally { clean(sb); }
+});
+
+test('configure (L1): a legacy config found at an ANCESTOR folder is updated in place, and a .claude junction above cwd still refuses', { skip: SKIP_DIR }, () => {
+  const a = sandbox();
+  const b = sandbox();
+  try {
+    const sub = path.join(a.proj, 'sub');
+    fs.mkdirSync(sub);
+    fs.writeFileSync(path.join(a.proj, '.coalboard.json'), JSON.stringify({ updateCheckDays: 30 }));
+    const r = runAt(['--language', 'en'], a, sub);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(a.proj, '.coalboard.json'), 'utf8')).language, 'en', 'written in place at the ancestor');
+    assert.ok(!fs.existsSync(path.join(sub, '.claude')), 'nothing is made at cwd');
+
+    const outside = path.join(b.home, 'outside');
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, '.coalboard.json'), JSON.stringify({ updateCheckDays: 30 }));
+    fs.symlinkSync(outside, path.join(b.proj, '.claude'), 'junction');
+    fs.mkdirSync(path.join(b.proj, 'sub'));
+    const r2 = runAt(['--language', 'en'], b, path.join(b.proj, 'sub'));
+    refusal(r2);
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(outside, '.coalboard.json'), 'utf8')).language, undefined, 'the file behind the link is unchanged');
+  } finally { clean(a); clean(b); }
+});
+
+test('configure (H1): the .bak name is judged only when a backup will be made, so a link there does not block a write over a VALID config', { skip: SKIP_DIR }, () => {
+  const sb = sandbox();
+  try {
+    const outside = path.join(sb.home, 'outside');
+    fs.mkdirSync(outside);
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+    fs.writeFileSync(PROJECT_TARGET(sb.proj), JSON.stringify({ updateCheckDays: 30 }));
+    fs.symlinkSync(outside, PROJECT_TARGET(sb.proj) + '.bak', 'junction');
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).language, 'en');
+    assert.deepStrictEqual(fs.readdirSync(outside), []);
+  } finally { clean(sb); }
+});

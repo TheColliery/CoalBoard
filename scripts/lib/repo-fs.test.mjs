@@ -114,3 +114,10 @@ test('refuseLinkedTarget: a symlink at the target is refused, wherever it points
   fs.symlinkSync(path.join(outside, 'victim.json'), path.join(proj, 'cfg.json'), 'file');
   refused(() => refuseLinkedTarget(path.join(proj, 'cfg.json')));
 });
+
+test('refuseLinkedTarget: a junction at the target (or at a <config>.bak name) is refused too', { skip: SKIP_DIR }, (t) => {
+  const { proj, outside } = fixture(t);
+  fs.symlinkSync(outside, path.join(proj, 'cfg.json.bak'), 'junction');
+  refused(() => refuseLinkedTarget(path.join(proj, 'cfg.json.bak')));
+  assert.deepEqual(fs.readdirSync(outside), []);
+});

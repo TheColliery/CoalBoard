@@ -289,12 +289,24 @@ function main() {
   }
 
   // 16f wave 2 (CWK2-042): the parent folder is made only after the chain from the project root is judged (a link or junction at any component is refused wherever it points), and
-  // the target file is never written through a link; both run BEFORE the malformed-config backup so a refusal leaves nothing behind (R16e L1). The project root is the folder that
-  // owns the agent dir: a project write is always <root>/<agent dir>/coal/coalboard.json (a legacy hit migrates to the own-dir default at cwd), so it is three levels up.
+  // the target file is never written through a link; both run BEFORE the malformed-config backup so a refusal leaves nothing behind (R16e L1). The project root is the folder whose
+  // candidate list holds writePath (projectCandidates, walked from cwd exactly as findProjectCfg walks it), so it is right for a write at cwd, for a canonical config found above cwd
+  // and for a LEGACY config found above cwd (written in place: .claude/.coalboard.json or .coalboard.json, one or two levels from its root, not three; 17a L1).
   // The global config has no project root (null: the plain recursive make, a dotfile manager may link ~/.claude).
+  // The three file-level checks go beyond the exemplar (CoalLedger's mkdirRepoParents + writeRepoFile): its write is a contained temp-then-rename and ours is a plain writeFileSync,
+  // so refusing a link at the config file stands in for that containment. They cover every name the run reads or writes through: the write target, the read source (a legacy file
+  // that is a link would be read into the project, 17a M1) and the .bak copy's destination (copyFileSync follows a link there, 17a H1).
+  const projectRootOf = (file) => {
+    for (let d = cwd; ; d = path.dirname(d)) {
+      if (projectCandidates(d).includes(file)) return d;
+      if (path.dirname(d) === d) return cwd; // not found: cwd, so a path outside it is refused (fail closed)
+    }
+  };
   try {
-    mkdirRepoParents(path.dirname(writePath), isGlobal ? null : path.dirname(path.dirname(path.dirname(writePath))));
+    mkdirRepoParents(path.dirname(writePath), isGlobal ? null : projectRootOf(writePath));
     refuseLinkedTarget(writePath);
+    refuseLinkedTarget(readPath);
+    if (malformed) refuseLinkedTarget(readPath + '.bak'); // only a malformed config is copied
   } catch (e) {
     if (e instanceof ConfigWriteRefused) { console.error(`Error: ${e.message}`); process.exit(1); }
     throw e;
