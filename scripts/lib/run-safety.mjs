@@ -22,8 +22,9 @@
 // place and secure the run directory (the ONE run directory, the real-path assert, the TMPDIR fallback to /tmp, the Windows restrict step,
 // the no-outside-place fallback) and that S4 clause, each anchored below, because a shell seat sees only that line; the RECOMMENDED roots
 // and the icacls documentation stay in the ledger, which the lens line points at;
-// (4d) T-16e-1 (16f, vehicle thread T11): before S2 restores a changed file it SAVES the post-run version beside the report (never inside backup/, which S5
-// deletes; S5 leaves the saved copies), so an edit another process made during the run is never discarded; the ledger row, its proof and the lens line carry it;
+// (4d) T-16e-1 (16f, vehicle thread T11; round 2, INSPECT H1, M1, M2): before S2 restores a changed file it SAVES the post-run version into a private POST-RUN FOLDER,
+// <run-id>.post-run/, a sibling of the run directory under the lab root (never in the run directory, the project or .coalboard/), restricted to the user, copies named by SHA-256
+// with one manifest.txt, kept by S5, naming only the folder path because it may hold a secret; the ledger row, its proof, the lens line and SKILL.md's On-disk ledger carry it;
 // (5) the duty reaches the places a model reads at run time: every Bash-holding seat's FIXED rules in lens-prompts.md
 // (naming the ledger, all five ids, the never-outside-a-box class and the removal proof), and Step 4.2's isolation
 // line in SKILL.md; (6) the references table lists the file as MANDATORY. The no-new-right half (run safety adds a
@@ -115,10 +116,18 @@ export function checkRunSafety({ files }) {
     ['S4', [/with a box the probe passes, run it inside that box/], 'S4 must say that with a box the probe passes the non-file class runs inside that box'],
     ['S5', [/together with its backup/], 'S5 must remove the backup together with the clone'],
     ['S5', [/AFTER S2's restore/], 'S5 must run AFTER S2\'s restore (the restore needs the backup)'],
-    // T-16e-1 (16f, vehicle thread T11): the restore must not discard an edit another process legitimately made during the run.
-    ['S2', [/\bSAVE\b[^|]*post-run version/, /beside the run's report/], 'S2 must say the post-run version of a changed real file is SAVED beside the report before the restore'],
-    ['S2', [/never inside `backup\/`/, /S5 deletes that/], 'S2 must say the saved post-run version is never inside the backup folder, which S5 deletes'],
-    ['S5', [/outside the run directory, and stay/], 'S5 must say the saved post-run versions sit outside the run directory and stay'],
+    // T-16e-1 (16f, vehicle thread T11; round 2): the restore must not discard an edit another process legitimately made during the run, and the saved copy must not leak.
+    ['S2', [/\bSAVE\b[^|]*post-run version/], 'S2 must SAVE the post-run version of a changed real file before the restore'],
+    ['S2', [/`<run-id>\.post-run\/`/, /a private sibling of the run directory under the same lab root/], 'S2 must put the post-run folder in a private sibling of the run directory under the lab root'],
+    ['S2', [/POST-RUN FOLDER/], 'S2 must name the POST-RUN FOLDER'],
+    ['S2', [/never in the run directory \(S5 deletes that\)/], 'S2 must keep the post-run folder out of the run directory, which S5 deletes'],
+    ['S2', [/never inside the project or `\.coalboard\/`/], 'S2 must keep the post-run folder out of the project and the board folder'],
+    ['S2', [/Restrict the folder to the current user BEFORE writing into it/], 'S2 must restrict the post-run folder to the current user before writing into it'],
+    ['S2', [/Name each copy by its SHA-256 and keep one `manifest\.txt`/], 'S2 must name each post-run copy by its SHA-256 and keep one manifest'],
+    ['S2', [/MAY CONTAIN A SECRET/], 'S2 must say the post-run folder may contain a secret'],
+    ['S2', [/name only the folder path, never the content/], 'S2 must say the finding and the report name only the folder path, never the content'],
+    ['S2', [/beside the run directory wherever that is/], 'S2 must say what the post-run folder does when S3 found no place outside the home tree'],
+    ['S5', [/is NOT part of this delete, and stays for the user to reconcile and delete/], 'S5 must keep the post-run folder: not part of the delete, left for the user to reconcile and delete'],
   ];
   // the return must state these (the proof column is what the return carries)
   const PROOF = [
@@ -167,10 +176,21 @@ export function checkRunSafety({ files }) {
       [/let S2 carry the weight/, 'the lens-prompts.md FIXED rule must say, with no outside place, to say so and let S2 carry the weight'],
       [/cannot do S1, S2 or S5/, 'the lens-prompts.md FIXED rule must say a seat that cannot do S1, S2 or S5 does not run (NOT-CHECKED)'],
       [/with a box the probe passes, run it inside that box/, 'the lens-prompts.md FIXED rule must say that with a box the probe passes the non-file class runs inside that box'],
-      [/SAVE the post-run version beside your report/, 'the lens-prompts.md FIXED rule must SAVE the post-run version of a changed file before the restore'],
-      [/never inside `backup\/`, which the cleanup deletes/, 'the lens-prompts.md FIXED rule must say the saved post-run version is never inside the backup folder, which S5 deletes'],
+      [/SAVE its post-run version into `<run-id>\.post-run\/`/, 'the lens-prompts.md FIXED rule must SAVE the post-run version into the post-run folder before the restore'],
+      [/a private sibling folder of your run directory/, 'the lens-prompts.md FIXED rule must put the post-run folder in a private sibling of the run directory'],
+      [/never in the run directory or the project/, 'the lens-prompts.md FIXED rule must keep the post-run folder out of the run directory and the project'],
+      [/lock it to your user before writing into it/, 'the lens-prompts.md FIXED rule must lock the post-run folder to your user before writing into it'],
+      [/name each copy by its SHA-256 beside one `manifest\.txt`/, 'the lens-prompts.md FIXED rule must name each post-run copy by its SHA-256 beside one manifest'],
+      [/it may hold a secret so name only the folder path/, 'the lens-prompts.md FIXED rule must say the post-run folder may hold a secret and the report names only its path'],
+      [/it is NOT removed with the clone/, 'the lens-prompts.md FIXED rule must say the post-run folder is not removed with the clone'],
     ]) if (!re.test(lensLine)) findings.push(msg);
   }
+  // T-16e-1 round 2 (INSPECT M2): the post-run folder is a write that is not one of the 5, so SKILL.md's On-disk ledger names it and why a stop leaves it.
+  for (const [re, msg] of [
+    [/may keep ONE private post-run folder under the lab root/, "SKILL.md On-disk ledger must note that run safety may keep one private post-run folder under the lab root"],
+    [/not one of the 5 writes and not a work product/, 'SKILL.md On-disk ledger must say the post-run folder is not one of the 5 writes and not a work product'],
+    [/the one thing a `stop` does not remove/, 'SKILL.md On-disk ledger must say a stop does not remove the post-run folder'],
+  ]) if (!re.test(skill.text)) findings.push(msg);
   const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));
   if (!step42) findings.push('SKILL.md Step 4.2 (the verify line) was not found');
   else needs(step42, 'SKILL.md Step 4.2', true); // main reads the reference, so `S1-S5` names the range
