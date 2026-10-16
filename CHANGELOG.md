@@ -7,7 +7,15 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 An approved fix can no longer be written through a planted link.
 
 ### Security
-- BUILD-station stub so the version gate passes; the DOCS station replaces this entry before the tag. GATE 3 runs a shipped checker, skills/coalboard/scripts/apply-target.mjs, on every apply target and writes only the targets it passes.
+- **Applying an approved fix no longer writes through a planted link.** When you approve fixes at the final consent step (GATE 3), the board used to name each target by its path in the digest and then write to it. If that path was, or passed through, a symlink or junction planted in a cloned repository, the write landed on the link's target, which could be a file outside the project. The skill now runs a shipped checker, `skills/coalboard/scripts/apply-target.mjs`, on every apply target before the digest and again immediately before each live write. It refuses a target when a link sits at or below the project root (a link above the root is your own layout and is allowed), when the target's real path leaves the root, or when the path cannot be resolved (fail closed). A refused target is never written: the digest and the report name it with its real path as not applicable, so "apply all" never covers it, and you can apply that fix by hand. The checker writes nothing and reads only path metadata. — test: `scripts/lib/apply-target.test.mjs`
+- **Be exact about what is enforced.** That the agent runs the checker is an instruction in `SKILL.md` the agent follows, so it is a mitigation and not a guarantee. Once the checker runs its verdict is exact, because it is code. If the checker cannot run (no shell, no Node), the skill writes no live file and hands you the fixes instead. `scripts/lib/conductor-links.test.mjs` pins that the instruction is present, not that the agent obeys it.
+
+### Fixed
+- **The memory cleanup says what to do when `rmdir` refuses.** After removing the files the run created, by name, the skill removes `memory/` with a non-recursive `rmdir`; if `rmdir` refuses, it leaves the directory and says so (never `rm -r`, never a trailing-slash or `*` remove). — test: `scripts/lib/conductor-links.test.mjs`
+- **The hook tests no longer read your real environment.** The test sandbox now points `TEMP`, `TMP` and `TMPDIR` at its throwaway folder and clears `CLAUDE_PROJECT_DIR`, `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA`, so a value inherited from a real session can no longer reach a test. Not shipped in the plugin.
+
+### Notes
+- The `skills/coalboard/SKILL.md` body is now 49,657 characters (49,085 in 2.8.3), against the last declared bound of 45,959 (`[2.3.1]`). The growth is the apply-target rule, a rail, not explanation; the body was already past the declared bound before this release, and a re-carve is open.
 
 ## [2.8.3] - 2026-10-15
 
