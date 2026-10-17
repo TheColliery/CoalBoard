@@ -136,22 +136,24 @@ function ownDirDefault(cwd) {
   return path.join(cwd, dir, 'coal', 'coalboard.json');
 }
 
-// 17c (T-16f-1): temp opened O_EXCL in the target's own folder (rename is same-device only), then renamed over the target; any failure leaves the old file untouched, deletes the
-// temp (only one this run created: a file already at that name is refused by 'wx' and left alone), and surfaces the error. Never an in-place fallback. COALBOARD_TEST_STEP is a test seam read only here (a dev-only script; the env is the caller's, never a clone's):
-// 'fail' throws between the temp write and the rename, 'plant:<victim>' plants a file symlink at the target name there (POSIX legs; the rename must replace it).
+// 17c (T-16f-1), 17e: the config is written to a temp opened O_EXCL in the target's own folder (rename is same-device only), then renamed over the target. A rename replaces the
+// file's inode, so the temp is created with the existing target's permission bits (statSync, not lstat: a linked target is refused before this point) and fchmod'ed to them, because
+// the umask narrows a mode passed to open; with no target the default stays. A PROCESS crash leaves the old file or the new one, never a torn one (power loss is not covered: no
+// fsync, node/runtime.md section 5). Any failure leaves the old file untouched, deletes the temp (only one this run created: a file already at that name is refused by 'wx' and
+// left alone), and surfaces the error. Never an in-place fallback.
 function writeConfigAtomic(target, text) {
   const tmp = `${target}.${process.pid}.tmp`;
+  let mode;
+  try { mode = fs.statSync(target).mode & 0o777; } catch { /* no target yet: the first write takes the default mode */ }
   let fd = null;
   let created = false; // the finally removes the temp only when this run made it: an EEXIST from 'wx' means the file is someone else's
   try {
-    fd = fs.openSync(tmp, 'wx');
+    fd = mode === undefined ? fs.openSync(tmp, 'wx') : fs.openSync(tmp, 'wx', mode);
     created = true;
+    if (mode !== undefined) fs.fchmodSync(fd, mode);
     fs.writeFileSync(fd, text, 'utf8');
     fs.closeSync(fd);
     fd = null;
-    const step = process.env.COALBOARD_TEST_STEP || '';
-    if (step === 'fail') throw new Error('injected failure between the temp write and the rename');
-    if (step.startsWith('plant:')) fs.symlinkSync(step.slice(6), target, 'file');
     fs.renameSync(tmp, target);
   } finally {
     if (fd !== null) { try { fs.closeSync(fd); } catch {} }

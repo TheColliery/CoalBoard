@@ -701,8 +701,30 @@ test('configure (H1): the .bak name is judged only when a backup will be made, s
   } finally { clean(sb); }
 });
 
-// ---- 17c (T-16f-1): the config write is temp-then-rename in the target's own folder (node/runtime.md section 5). COALBOARD_TEST_STEP is the script's test seam.
-const runStep = (args, sb, step) => spawnSync(process.execPath, [CLI, ...args], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home, COALBOARD_TEST_STEP: step }, timeout: 20000 });
+// ---- 17c (T-16f-1): the config write is temp-then-rename in the target's own folder (node/runtime.md section 5). 17e (L2): the injected steps live HERE, in an --import preload that
+// patches fs in the child only, so the product file carries no test branch. CB_STEP: 'fail' throws in renameSync, 'plant:<victim>' plants a file symlink at the target name there,
+// 'spy:<file>' records the flags and mode of every temp open.
+const PRELOAD = [
+  "import fs from 'node:fs';",
+  "const step = process.env.CB_STEP || '';",
+  "const realRename = fs.renameSync;",
+  "fs.renameSync = (a, b) => {",
+  "  if (step === 'fail') throw new Error('injected failure between the temp write and the rename');",
+  "  if (step.startsWith('plant:')) fs.symlinkSync(step.slice(6), b, 'file');",
+  "  return realRename(a, b);",
+  "};",
+  "const realOpen = fs.openSync;",
+  "let busy = false;",
+  "fs.openSync = (p, flags, mode) => {",
+  "  if (step.startsWith('spy:') && !busy && String(p).endsWith('.tmp')) { busy = true; try { fs.appendFileSync(step.slice(4), JSON.stringify({ flags, mode }) + String.fromCharCode(10)); } finally { busy = false; } }",
+  "  return realOpen(p, flags, mode);",
+  "};",
+].join(String.fromCharCode(10));
+const runStep = (args, sb, step) => {
+  const pre = path.join(sb.home, 'cb-preload.mjs');
+  fs.writeFileSync(pre, PRELOAD);
+  return spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, ...args], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home, CB_STEP: step }, timeout: 20000 });
+};
 const tmpsBeside = (file) => fs.readdirSync(path.dirname(file)).filter((n) => n.endsWith('.tmp'));
 
 test('configure (17c): a failure between the temp write and the rename leaves the old config byte-equal, no .tmp beside it, and a non-zero exit', () => {
@@ -756,7 +778,14 @@ test('configure (17c): the happy path writes the same bytes as before and leaves
   } finally { clean(sb); }
 });
 
-test('configure (17c): a HARD link at the target (no privilege needed, every OS) is replaced by the rename, never written through', () => {
+// 17e (t160 #4): the hard-link leg probes its capability like the link legs do, and skips visibly where linkSync is refused (some CI file systems).
+const probeHardLink = () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-hl-'));
+  try { fs.writeFileSync(path.join(d, 'a'), 'x'); fs.linkSync(path.join(d, 'a'), path.join(d, 'b')); return true; } catch { return false; } finally { removeTree(d); }
+};
+const SKIP_HARD = probeHardLink() ? false : 'this box cannot create a hard link (capability probe)';
+
+test('configure (17c): a HARD link at the target is replaced by the rename, never written through', { skip: SKIP_HARD }, () => {
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'victim.json');
@@ -791,4 +820,49 @@ test('configure (17c L1+L3): a file already at the temp name is refused (wx), su
     assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), old, 'the old config is byte-equal');
     assert.strictEqual(fs.readFileSync(planted, 'utf8'), 'NOT OURS', 'the file the run did not create survives with its content');
   } finally { clean(sb); }
+});
+
+// 17e (t160 #2, #5): a rename replaces the file's inode, so the temp must carry the old file's permission bits or a 0600 config comes back 0644. The spy leg runs on every OS (it reads
+// what the temp open was asked for); the chmod leg needs real POSIX modes (Windows reports 0666 whatever was set) and is CI's.
+test('configure (17e): the temp is opened with the existing target permission bits, and with none when there is no target', () => {
+  const a = sandbox();
+  const b = sandbox();
+  try {
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(a.proj)), { recursive: true });
+    fs.writeFileSync(PROJECT_TARGET(a.proj), JSON.stringify({ updateCheckDays: 30 }) + '\n');
+    const want = fs.statSync(PROJECT_TARGET(a.proj)).mode & 0o777;
+    const logA = path.join(a.home, 'spy.log');
+    assert.strictEqual(runStep(['--language', 'en'], a, 'spy:' + logA).status, 0);
+    const opensA = fs.readFileSync(logA, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepStrictEqual(opensA, [{ flags: 'wx', mode: want }], 'one exclusive open, carrying the existing mode');
+    const logB = path.join(b.home, 'spy.log');
+    assert.strictEqual(runStep(['--language', 'en'], b, 'spy:' + logB).status, 0);
+    const opensB = fs.readFileSync(logB, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepStrictEqual(opensB, [{ flags: 'wx' }], 'a first write passes no mode (the default)');
+  } finally { clean(a); clean(b); }
+});
+
+const probeModes = () => {
+  if (process.platform === 'win32') return false;
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-mode-'));
+  try { const f = path.join(d, 'a'); fs.writeFileSync(f, 'x'); fs.chmodSync(f, 0o600); return (fs.statSync(f).mode & 0o777) === 0o600; } catch { return false; } finally { removeTree(d); }
+};
+const SKIP_MODES = probeModes() ? false : 'POSIX permission bits are not meaningful on this box (capability probe) -- a CI leg';
+
+test('configure (17e): a rewritten config keeps its permission bits, 0600 and 0664 alike (a umask must not narrow it) (POSIX leg, CI)', { skip: SKIP_MODES }, () => {
+  for (const mode of [0o600, 0o664]) {
+    const sb = sandbox();
+    try {
+      fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+      fs.writeFileSync(PROJECT_TARGET(sb.proj), JSON.stringify({ updateCheckDays: 30 }) + '\n');
+      fs.chmodSync(PROJECT_TARGET(sb.proj), mode);
+      const r = run(['--language', 'en'], sb);
+      assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+      assert.strictEqual((fs.statSync(PROJECT_TARGET(sb.proj)).mode & 0o777).toString(8), mode.toString(8));
+    } finally { clean(sb); }
+  }
+});
+
+test('configure (17e): the product file carries no test seam', () => {
+  assert.doesNotMatch(fs.readFileSync(CLI, 'utf8'), /COALBOARD_TEST_STEP|process.env.CB_STEP/, 'the injected steps live in the test preload, not in configure.mjs');
 });
