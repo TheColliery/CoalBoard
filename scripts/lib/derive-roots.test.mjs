@@ -9,14 +9,27 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { deriveRootSets } from './derive-roots.mjs';
 import { gitEnv } from './git-env.mjs';
+import { removeTree } from './test-teardown.mjs';
 
 // testing.md MUST: every spawn in a test has a finite clock.
 const CALL_TIMEOUT_MS = 30000; // measured 2026-10-17 on this box: git init max 215 ms, git add max 216 ms, git commit max 429 ms, the link-check engine on one file max 167 ms (n=5 each); ~70x the slowest call, ~180x the engine
 const CALL_KILL = 'SIGKILL';
 
+// hooks-safety.md section 7 (t170 #1): a git child gets HOME/USERPROFILE/TMPDIR/TMP/TEMP inside the test's own sandbox root; gitEnv() keeps its GIT_* cleanup and ceiling.
+function sandboxVars(root) {
+  const home = path.join(root, 'home');
+  const tmp = path.join(root, 'tmp');
+  fs.mkdirSync(home, { recursive: true });
+  fs.mkdirSync(tmp, { recursive: true });
+  return { HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+}
+
+// The fixture repo is root/repo; root also holds the sandbox home and tmp, so a teardown removes the whole root.
 function makeRepo() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-'));
-  execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)), timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-'));
+  const dir = path.join(root, 'repo');
+  fs.mkdirSync(dir);
+  execFileSync('git', ['init', '--quiet'], { cwd: dir, env: { ...gitEnv(root), ...sandboxVars(root) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored-dir/\nignored-file.txt\n');
   fs.mkdirSync(path.join(dir, 'ignored-dir'));
   fs.writeFileSync(path.join(dir, 'ignored-file.txt'), 'x');
@@ -35,8 +48,8 @@ function makeRepo() {
 // S's config must be byte-identical while the fixture gets its OWN .git.
 test('CWK-133: a planted ABSOLUTE GIT_DIR / GIT_INDEX_FILE never redirects the fixture init onto another repo', (t) => {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk133-sandbox-'));
-  t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }));
-  execFileSync('git', ['init', '--quiet'], { cwd: sandbox, env: gitEnv(path.dirname(sandbox)), timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  t.after(() => removeTree(sandbox));
+  execFileSync('git', ['init', '--quiet'], { cwd: sandbox, env: { ...gitEnv(path.dirname(sandbox)), ...sandboxVars(sandbox) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   const cfg = path.join(sandbox, '.git', 'config');
   assert.ok(fs.existsSync(cfg), 'fixture precondition: the sandbox repo exists');
   const before = fs.readFileSync(cfg, 'utf8');
@@ -47,7 +60,7 @@ test('CWK-133: a planted ABSOLUTE GIT_DIR / GIT_INDEX_FILE never redirects the f
   try { fixture = makeRepo(); } finally {
     for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
-  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  t.after(() => removeTree(path.dirname(fixture)));
   assert.equal(fs.readFileSync(cfg, 'utf8'), before, 'the sandbox repo (the stand-in for the REAL enclosing repo) must be untouched');
   assert.ok(fs.existsSync(path.join(fixture, '.git')), 'the fixture must get its OWN .git, not re-init the planted one');
 });
@@ -62,7 +75,7 @@ test('deriveRootSets: a hidden-but-not-ignored dir (the .github shape) never ent
     assert.ok(r.ourRoots.has('tracked-dir'));
     assert.ok(r.ourRoots.has('README.md'));
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTree(path.dirname(dir));
   }
 });
 
@@ -75,7 +88,7 @@ test('deriveRootSets: a non-hidden gitignored directory AND a gitignored file bo
     assert.equal(r.ignoredCount, 2);
     assert.ok(!r.ourRoots.has('ignored-dir'), 'an ignored entry must never also appear in ourRoots');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTree(path.dirname(dir));
   }
 });
 
@@ -90,6 +103,6 @@ test('deriveRootSets: fed counts entries actually visited, not the directory siz
     assert.equal(r.ok, false);
     assert.equal(r.fed, 1, 'must report the ONE entry it actually tried, never the full 2-entry directory');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTree(dir);
   }
 });

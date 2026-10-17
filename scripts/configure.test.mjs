@@ -438,8 +438,9 @@ test('configure (PR 19 #15): an UNTRACKED legacy config inside a git repository 
 const noGitEnv = (sb) => {
   const emptyBin = path.join(sb.home, 'empty-bin');
   fs.mkdirSync(emptyBin, { recursive: true });
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^path$/i.test(k)));
-  return { ...env, PATH: emptyBin, HOME: sb.home, USERPROFILE: sb.home };
+  // 18a (F1): built on childEnv so the sandbox TMPDIR/TMP/TEMP hold here too, then PATH is replaced (every case of the name, a Windows env is case-insensitive).
+  const env = Object.fromEntries(Object.entries(childEnv(sb.home)).filter(([k]) => !/^path$/i.test(k)));
+  return { ...env, PATH: emptyBin };
 };
 test('configure (R16e T7): with no git on PATH a legacy config inside a repository tree is KEPT, with the note (git cannot say, so the delete does not run)', () => {
   const sb = sandbox();
@@ -611,7 +612,7 @@ test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .b
 });
 
 // ---- 17a (INSPECT round 1 of wave 2): the guard also covers the two other names the run reads or writes through: the .bak copy's destination (H1) and a legacy read source (M1).
-const runAt = (args, { home }, cwd) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home }, timeout: 20000 });
+const runAt = (args, { home }, cwd) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: childEnv(home), timeout: 20000 });
 const MALFORMED = '{ "language": ';
 const malformedProject = (sb) => { fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true }); fs.writeFileSync(PROJECT_TARGET(sb.proj), MALFORMED); };
 
@@ -716,6 +717,17 @@ const PRELOAD = [
   "const step = process.env.CB_STEP || '';",
   "if (process.env.CB_UMASK) process.umask(parseInt(process.env.CB_UMASK, 8));",
   "if (step.startsWith('env:')) fs.writeFileSync(step.slice(4), JSON.stringify({ HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, TMPDIR: process.env.TMPDIR, TMP: process.env.TMP, TEMP: process.env.TEMP }));",
+  "import cp from 'node:child_process';",
+  "import { syncBuiltinESMExports } from 'node:module';",
+  "if (step.startsWith('spawnenv:')) {",
+  "  const realSpawn = cp.spawnSync;",
+  "  cp.spawnSync = (cmd, args, opts) => {",
+  "    const e = opts && opts.env;",
+  "    fs.appendFileSync(step.slice(9), JSON.stringify({ cmd, env: e ? { HOME: e.HOME, USERPROFILE: e.USERPROFILE, TMPDIR: e.TMPDIR, TMP: e.TMP, TEMP: e.TEMP } : null }) + String.fromCharCode(10));",
+  "    return realSpawn(cmd, args, opts);",
+  "  };",
+  "  syncBuiltinESMExports();",
+  "}",
   "const realRename = fs.renameSync;",
   "fs.renameSync = (a, b) => {",
   "  if (step === 'fail') throw new Error('injected failure between the temp write and the rename');",
@@ -823,7 +835,7 @@ test('configure (17c L1+L3): a file already at the temp name is refused (wx), su
     fs.writeFileSync(PROJECT_TARGET(sb.proj), old);
     const planted = `${PROJECT_TARGET(sb.proj)}.${PID}.tmp`;
     fs.writeFileSync(planted, 'NOT OURS');
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home }, timeout: 20000 });
+    const r = spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: childEnv(sb.home), timeout: 20000 });
     assert.strictEqual(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stderr, /Failed to write to config file/);
     assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), old, 'the old config is byte-equal');
@@ -877,7 +889,7 @@ test('configure (17e): the product file carries no test seam', () => {
   assert.doesNotMatch(fs.readFileSync(CLI, 'utf8'), /COALBOARD_TEST_STEP|process.env.CB_STEP/, 'the injected steps live in the test preload, not in configure.mjs');
 });
 
-test('configure (17e2): the child runs with HOME, USERPROFILE, TMPDIR, TMP and TEMP all under the sandbox (hooks-safety.md section 7)', () => {
+test('configure (17e2): the test helper childEnv puts HOME, USERPROFILE, TMPDIR, TMP and TEMP under the sandbox (this pins the HELPER as the CLI process sees it; the CLI-side witness is the next leg)', () => {
   const sb = sandbox();
   try {
     const log = path.join(sb.home, 'env.json');
@@ -886,6 +898,28 @@ test('configure (17e2): the child runs with HOME, USERPROFILE, TMPDIR, TMP and T
     const seen = JSON.parse(fs.readFileSync(log, 'utf8'));
     for (const k of ['HOME', 'USERPROFILE', 'TMPDIR', 'TMP', 'TEMP']) {
       assert.ok(seen[k] && path.relative(sb.home, seen[k]).split(path.sep)[0] !== '..' && !path.isAbsolute(path.relative(sb.home, seen[k])), k + ' must sit under the sandbox, got ' + seen[k]);
+    }
+  } finally { clean(sb); }
+});
+
+// 18a (t168): the witness on the CLI side. A legacy config inside a repository makes the CLI spawn git; the preload logs the env the CLI passed, so the leg goes red if the CLI
+// ever rebuilds or clears the sandbox variables for its child.
+test('configure (18a): the git child the CLI spawns receives HOME, USERPROFILE, TMPDIR, TMP and TEMP under the sandbox', () => {
+  const sb = sandbox();
+  try {
+    legacyRepo(sb, ['.coalboard.json']);
+    const log = path.join(sb.home, 'spawnenv.log');
+    const r = runStep(['--language', 'en'], sb, 'spawnenv:' + log);
+    assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+    const calls = fs.readFileSync(log, 'utf8').trim().split(String.fromCharCode(10)).map((l) => JSON.parse(l));
+    const gits = calls.filter((c) => c.cmd === 'git');
+    assert.ok(gits.length >= 1, 'the legacy migration must have made the CLI spawn git: ' + JSON.stringify(calls));
+    for (const c of gits) {
+      assert.ok(c.env, 'the git child must be given an explicit env');
+      for (const k of ['HOME', 'USERPROFILE', 'TMPDIR', 'TMP', 'TEMP']) {
+        const rel = c.env[k] ? path.relative(sb.home, c.env[k]) : null;
+        assert.ok(rel !== null && rel.split(path.sep)[0] !== '..' && !path.isAbsolute(rel), k + ' must sit under the sandbox for the git child, got ' + c.env[k]);
+      }
     }
   } finally { clean(sb); }
 });

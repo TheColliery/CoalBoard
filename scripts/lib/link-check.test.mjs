@@ -4,7 +4,7 @@
 // where a literal character risks silent mis-transcription).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, mkdirSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -15,6 +15,7 @@ const CALL_KILL = 'SIGKILL';
 import { fileURLToPath } from 'node:url';
 import { slug, renderInline, anchorsFor, checkFile, Anchorer } from './link-check.mjs';
 import { gitEnv } from './git-env.mjs';
+import { removeTree } from './test-teardown.mjs';
 
 // CWK-120 row 5 (CodeRabbit 4045387921): a numeric entity above 0x10FFFF must not crash the
 // gate with a RangeError -- it must fall through unchanged (the same "m" fallback the
@@ -31,6 +32,30 @@ const ENGINE = path.resolve(REPO_ROOT, 'scripts/lib/link-check.mjs');
 // inherit GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE from whatever invoked "node --test" --
 // e.g. these tests running inside the repo's own pre-commit hook, which sets all three.
 const GIT_ENV_CLEAN = gitEnv();
+
+// hooks-safety.md section 7 (t170 #2): every child -- the engine and the git it is set up with -- gets HOME/USERPROFILE/TMPDIR/TMP/TEMP inside a sandbox folder that is removed
+// with the test. The folder is separate from the test's own repo, so the repo's tracked-file list is unchanged.
+// Memoised per test, so a test that spawns several children shares one sandbox. sandboxVars() returns an object literal of named keys over names declared once, which is the shape
+// the git spawn census reads whole (verify.mjs).
+const SANDBOXES = new WeakMap();
+function boxFor(t) {
+  if (!SANDBOXES.has(t)) {
+    const root = mkdtempSync(path.join(tmpdir(), 'link-check-env-'));
+    t.after(() => removeTree(root));
+    const homeDir = path.join(root, 'home');
+    const tmpDir = path.join(root, 'tmp');
+    mkdirSync(homeDir, { recursive: true });
+    mkdirSync(tmpDir, { recursive: true });
+    SANDBOXES.set(t, { home: homeDir, tmp: tmpDir });
+  }
+  return SANDBOXES.get(t);
+}
+function sandboxVars(t) {
+  const box = boxFor(t);
+  const home = box.home;
+  const tmp = box.tmp;
+  return { HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+}
 
 // The 39 canonical vectors (10 census, 29 probe), from slug-oracle-2026-09.test-vectors.json.
 const VECTORS = [
@@ -122,7 +147,7 @@ test('anchorsFor: a heading-looking line inside a fenced code block is not a hea
 
 test('checkFile: a broken-looking link inside a fenced code block is not checked', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-fence-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => removeTree(dir));
   writeFileSync(path.join(dir, 'doc.md'), '# Doc\n\n```\n[bad](./nope.md)\n```\n');
   assert.deepEqual(checkFile('doc.md', dir), []);
 });
@@ -143,8 +168,8 @@ test('checkFile: the broken fixture reports both planted defects', () => {
 // mechanism, so exit code is asserted, not the exported functions. The exit-1 case below
 // needs no companion state assertion: a no-op main() (prints nothing, exits 0) cannot
 // produce exit 1, so that assertion alone is already unsatisfiable by a silent gate.
-test('CLI: exits 1 on a broken fixture (real spawned process)', () => {
-  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+test('CLI: exits 1 on a broken fixture (real spawned process)', (t) => {
+  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1);
 });
 
@@ -152,21 +177,21 @@ test('CLI: exits 1 on a broken fixture (real spawned process)', () => {
 // here -- a no-op main() (if (true) return; prints nothing, scans nothing) still exits 0, so
 // `assert.equal(res.status, 0)` alone passed against a gate that did nothing at all. Assert
 // the positive state effect the gate actually produces, matching every other spawning test.
-test('CLI: exits 0 on a clean fixture (real spawned process)', () => {
-  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/clean.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+test('CLI: exits 0 on a clean fixture (real spawned process)', (t) => {
+  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/clean.md'], { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 0);
   assert.ok(res.stdout.includes('0 finding(s) across 1 file(s)'), `must report it actually scanned the file -- got: ${res.stdout}`);
 });
 
 test('CLI: exits 1 on a genuinely empty tracked-.md list -- CoalTipple HIGH-1 lesson (git init, no commits, no walk-exclusion involved)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-empty-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  t.after(() => removeTree(dir));
+  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: { ...gitEnv(), ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(init.status, 0);
   // Dispatch-transport.md's fixture-safety rule: assert the fixture's OWN .git exists
   // before trusting anything about it (here: before running git ls-files against it).
   assert.ok(existsSync(path.join(dir, '.git')), 'git init must have created .git first');
-  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1);
   assert.ok(res.stdout.includes('0 file(s) to scan'));
 });
@@ -226,7 +251,7 @@ test('.github/workflows/link-check.yml: the engine step is real, unquoted-arg-fr
 // the admin/dev-mode requirement a Windows symlink to a FILE would need.
 test('CLI: the main-module guard survives being invoked through a symlink/junction (MEDIUM-1)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-link-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => removeTree(dir));
   const linkDir = path.join(dir, 'lib-link');
   try {
     symlinkSync(path.resolve(REPO_ROOT, 'scripts/lib'), linkDir, 'junction');
@@ -235,7 +260,7 @@ test('CLI: the main-module guard survives being invoked through a symlink/juncti
     return;
   }
   const linkedEngine = path.join(linkDir, 'link-check.mjs');
-  const res = spawnSync(process.execPath, [linkedEngine, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  const res = spawnSync(process.execPath, [linkedEngine, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1, `expected exit 1 through the link, got ${res.status} stdout=${JSON.stringify(res.stdout)}`);
 });
 
@@ -245,14 +270,16 @@ test('CLI: the main-module guard survives being invoked through a symlink/juncti
 // leaked through GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE inherited from the caller's env --
 // exactly the environment a git pre-commit/pre-push hook sets (.githooks/pre-commit runs
 // "node scripts/test.mjs" as a git hook, so this is a real, not hypothetical, caller shape).
-test('CLI: a polluted GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE env does not redirect the scan to another repo', () => {
+test('CLI: a polluted GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE env does not redirect the scan to another repo', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-envpollute-'));
-  spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  t.after(() => removeTree(dir));
+  spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: { ...gitEnv(), ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   writeFileSync(path.join(dir, 'unique-row6-marker.md'), '# marker\n\nno links here.\n');
-  spawnSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
-  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  spawnSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8', env: { ...gitEnv(), ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir, encoding: 'utf8', env: { ...gitEnv(), ...sandboxVars(t) }, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   const pollutedEnv = {
     ...process.env,
+    ...sandboxVars(t),
     GIT_DIR: path.join(REPO_ROOT, '.git'),
     GIT_WORK_TREE: REPO_ROOT,
     GIT_INDEX_FILE: path.join(REPO_ROOT, '.git', 'index'),
@@ -262,12 +289,11 @@ test('CLI: a polluted GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE env does not redirect
     res.stdout.includes('0 finding(s) across 1 file(s)'),
     `must scan exactly the temp repo's own 1 tracked file, not the real repo's -- got: ${res.stdout || res.stderr}`
   );
-  rmSync(dir, { recursive: true, force: true });
 });
 
 test('checkFile: a malformed percent-encoded anchor is a finding, never a crash (LOW-3)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-malformed-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => removeTree(dir));
   writeFileSync(path.join(dir, 'doc.md'), '# Doc\n\n[bad](#%zz)\n');
   const findings = checkFile('doc.md', dir);
   assert.equal(findings.length, 1);
