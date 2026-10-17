@@ -58,11 +58,18 @@ function sandbox() {
 }
 function clean({ home }) { removeTree(home); }
 
+// hooks-safety.md section 7: the child's HOME/USERPROFILE and its TMPDIR/TMP/TEMP all point under the sandbox, so nothing the CLI (or the git it may spawn) writes can leave it.
+function childEnv(home, extra = {}) {
+  const tmp = path.join(home, 'tmp');
+  fs.mkdirSync(tmp, { recursive: true });
+  return { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, ...extra };
+}
+
 function run(args, { home, proj }) {
   return spawnSync(process.execPath, [CLI, ...args], {
     cwd: proj,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, USERPROFILE: home },
+    env: childEnv(home),
     timeout: 20000,
   });
 }
@@ -707,6 +714,8 @@ test('configure (H1): the .bak name is judged only when a backup will be made, s
 const PRELOAD = [
   "import fs from 'node:fs';",
   "const step = process.env.CB_STEP || '';",
+  "if (process.env.CB_UMASK) process.umask(parseInt(process.env.CB_UMASK, 8));",
+  "if (step.startsWith('env:')) fs.writeFileSync(step.slice(4), JSON.stringify({ HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, TMPDIR: process.env.TMPDIR, TMP: process.env.TMP, TEMP: process.env.TEMP }));",
   "const realRename = fs.renameSync;",
   "fs.renameSync = (a, b) => {",
   "  if (step === 'fail') throw new Error('injected failure between the temp write and the rename');",
@@ -720,10 +729,10 @@ const PRELOAD = [
   "  return realOpen(p, flags, mode);",
   "};",
 ].join(String.fromCharCode(10));
-const runStep = (args, sb, step) => {
+const runStep = (args, sb, step, extraEnv = {}) => {
   const pre = path.join(sb.home, 'cb-preload.mjs');
   fs.writeFileSync(pre, PRELOAD);
-  return spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, ...args], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home, CB_STEP: step }, timeout: 20000 });
+  return spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, ...args], { cwd: sb.proj, encoding: 'utf8', env: childEnv(sb.home, { CB_STEP: step, ...extraEnv }), timeout: 20000 });
 };
 const tmpsBeside = (file) => fs.readdirSync(path.dirname(file)).filter((n) => n.endsWith('.tmp'));
 
@@ -843,20 +852,21 @@ test('configure (17e): the temp is opened with the existing target permission bi
 });
 
 const probeModes = () => {
-  if (process.platform === 'win32') return false;
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-mode-'));
   try { const f = path.join(d, 'a'); fs.writeFileSync(f, 'x'); fs.chmodSync(f, 0o600); return (fs.statSync(f).mode & 0o777) === 0o600; } catch { return false; } finally { removeTree(d); }
 };
 const SKIP_MODES = probeModes() ? false : 'POSIX permission bits are not meaningful on this box (capability probe) -- a CI leg';
 
-test('configure (17e): a rewritten config keeps its permission bits, 0600 and 0664 alike (a umask must not narrow it) (POSIX leg, CI)', { skip: SKIP_MODES }, () => {
+// 17e2 (L1): the child's umask is pinned to 077 by the preload. Under it a mode passed to open(2) is narrowed (0664 would open as 0600), so a 0664 config comes back 0664 ONLY through
+// the fchmodSync: dropping it (mutant M1b) fails this leg on any POSIX runner whatever that runner's own umask is. 0600 is the control: it survives the umask with or without the fchmod.
+test('configure (17e2): a rewritten config keeps its permission bits under a pinned umask 077, 0600 and 0664 alike (POSIX leg, CI)', { skip: SKIP_MODES }, () => {
   for (const mode of [0o600, 0o664]) {
     const sb = sandbox();
     try {
       fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
       fs.writeFileSync(PROJECT_TARGET(sb.proj), JSON.stringify({ updateCheckDays: 30 }) + '\n');
       fs.chmodSync(PROJECT_TARGET(sb.proj), mode);
-      const r = run(['--language', 'en'], sb);
+      const r = runStep(['--language', 'en'], sb, '', { CB_UMASK: '077' });
       assert.strictEqual(r.status, 0, r.stdout + r.stderr);
       assert.strictEqual((fs.statSync(PROJECT_TARGET(sb.proj)).mode & 0o777).toString(8), mode.toString(8));
     } finally { clean(sb); }
@@ -865,4 +875,17 @@ test('configure (17e): a rewritten config keeps its permission bits, 0600 and 06
 
 test('configure (17e): the product file carries no test seam', () => {
   assert.doesNotMatch(fs.readFileSync(CLI, 'utf8'), /COALBOARD_TEST_STEP|process.env.CB_STEP/, 'the injected steps live in the test preload, not in configure.mjs');
+});
+
+test('configure (17e2): the child runs with HOME, USERPROFILE, TMPDIR, TMP and TEMP all under the sandbox (hooks-safety.md section 7)', () => {
+  const sb = sandbox();
+  try {
+    const log = path.join(sb.home, 'env.json');
+    const r = runStep(['--language', 'en'], sb, 'env:' + log);
+    assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+    const seen = JSON.parse(fs.readFileSync(log, 'utf8'));
+    for (const k of ['HOME', 'USERPROFILE', 'TMPDIR', 'TMP', 'TEMP']) {
+      assert.ok(seen[k] && path.relative(sb.home, seen[k]).split(path.sep)[0] !== '..' && !path.isAbsolute(path.relative(sb.home, seen[k])), k + ' must sit under the sandbox, got ' + seen[k]);
+    }
+  } finally { clean(sb); }
 });
