@@ -10,9 +10,13 @@ import { execFileSync } from 'node:child_process';
 import { deriveRootSets } from './derive-roots.mjs';
 import { gitEnv } from './git-env.mjs';
 
+// testing.md MUST: every spawn in a test has a finite clock.
+const CALL_TIMEOUT_MS = 30000; // measured 2026-10-17 on this box: git init max 215 ms, git add max 216 ms, git commit max 429 ms, the link-check engine on one file max 167 ms (n=5 each); ~70x the slowest call, ~180x the engine
+const CALL_KILL = 'SIGKILL';
+
 function makeRepo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-'));
-  execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)) });
+  execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)), timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored-dir/\nignored-file.txt\n');
   fs.mkdirSync(path.join(dir, 'ignored-dir'));
   fs.writeFileSync(path.join(dir, 'ignored-file.txt'), 'x');
@@ -32,7 +36,7 @@ function makeRepo() {
 test('CWK-133: a planted ABSOLUTE GIT_DIR / GIT_INDEX_FILE never redirects the fixture init onto another repo', (t) => {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk133-sandbox-'));
   t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }));
-  execFileSync('git', ['init', '--quiet'], { cwd: sandbox, env: gitEnv(path.dirname(sandbox)) });
+  execFileSync('git', ['init', '--quiet'], { cwd: sandbox, env: gitEnv(path.dirname(sandbox)), timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   const cfg = path.join(sandbox, '.git', 'config');
   assert.ok(fs.existsSync(cfg), 'fixture precondition: the sandbox repo exists');
   const before = fs.readFileSync(cfg, 'utf8');

@@ -8,6 +8,10 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync, existsSync, symlinkSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+
+// testing.md MUST: every spawn in a test has a finite clock.
+const CALL_TIMEOUT_MS = 30000; // measured 2026-10-17 on this box: git init max 215 ms, git add max 216 ms, git commit max 429 ms, the link-check engine on one file max 167 ms (n=5 each); ~70x the slowest call, ~180x the engine
+const CALL_KILL = 'SIGKILL';
 import { fileURLToPath } from 'node:url';
 import { slug, renderInline, anchorsFor, checkFile, Anchorer } from './link-check.mjs';
 import { gitEnv } from './git-env.mjs';
@@ -140,7 +144,7 @@ test('checkFile: the broken fixture reports both planted defects', () => {
 // needs no companion state assertion: a no-op main() (prints nothing, exits 0) cannot
 // produce exit 1, so that assertion alone is already unsatisfiable by a silent gate.
 test('CLI: exits 1 on a broken fixture (real spawned process)', () => {
-  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8' });
+  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1);
 });
 
@@ -149,7 +153,7 @@ test('CLI: exits 1 on a broken fixture (real spawned process)', () => {
 // `assert.equal(res.status, 0)` alone passed against a gate that did nothing at all. Assert
 // the positive state effect the gate actually produces, matching every other spawning test.
 test('CLI: exits 0 on a clean fixture (real spawned process)', () => {
-  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/clean.md'], { cwd: REPO_ROOT, encoding: 'utf8' });
+  const res = spawnSync(process.execPath, [ENGINE, 'scripts/fixtures/link-check/clean.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 0);
   assert.ok(res.stdout.includes('0 finding(s) across 1 file(s)'), `must report it actually scanned the file -- got: ${res.stdout}`);
 });
@@ -157,12 +161,12 @@ test('CLI: exits 0 on a clean fixture (real spawned process)', () => {
 test('CLI: exits 1 on a genuinely empty tracked-.md list -- CoalTipple HIGH-1 lesson (git init, no commits, no walk-exclusion involved)', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-empty-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  const init = spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(init.status, 0);
   // Dispatch-transport.md's fixture-safety rule: assert the fixture's OWN .git exists
   // before trusting anything about it (here: before running git ls-files against it).
   assert.ok(existsSync(path.join(dir, '.git')), 'git init must have created .git first');
-  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8' });
+  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1);
   assert.ok(res.stdout.includes('0 file(s) to scan'));
 });
@@ -231,7 +235,7 @@ test('CLI: the main-module guard survives being invoked through a symlink/juncti
     return;
   }
   const linkedEngine = path.join(linkDir, 'link-check.mjs');
-  const res = spawnSync(process.execPath, [linkedEngine, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8' });
+  const res = spawnSync(process.execPath, [linkedEngine, 'scripts/fixtures/link-check/broken.md'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(res.status, 1, `expected exit 1 through the link, got ${res.status} stdout=${JSON.stringify(res.stdout)}`);
 });
 
@@ -243,17 +247,17 @@ test('CLI: the main-module guard survives being invoked through a symlink/juncti
 // "node scripts/test.mjs" as a git hook, so this is a real, not hypothetical, caller shape).
 test('CLI: a polluted GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE env does not redirect the scan to another repo', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'link-check-envpollute-'));
-  spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   writeFileSync(path.join(dir, 'unique-row6-marker.md'), '# marker\n\nno links here.\n');
-  spawnSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
-  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN });
+  spawnSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir, encoding: 'utf8', env: GIT_ENV_CLEAN, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   const pollutedEnv = {
     ...process.env,
     GIT_DIR: path.join(REPO_ROOT, '.git'),
     GIT_WORK_TREE: REPO_ROOT,
     GIT_INDEX_FILE: path.join(REPO_ROOT, '.git', 'index'),
   };
-  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', env: pollutedEnv });
+  const res = spawnSync(process.execPath, [ENGINE], { cwd: dir, encoding: 'utf8', env: pollutedEnv, timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.ok(
     res.stdout.includes('0 finding(s) across 1 file(s)'),
     `must scan exactly the temp repo's own 1 tracked file, not the real repo's -- got: ${res.stdout || res.stderr}`
