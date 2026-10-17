@@ -37,7 +37,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONFIG_SCHEMA } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
 import { removeTree } from './lib/test-teardown.mjs';
@@ -769,5 +769,26 @@ test('configure (17c): a HARD link at the target (no privilege needed, every OS)
     assert.strictEqual(fs.readFileSync(victim, 'utf8'), before, 'the other name of the file is untouched');
     assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).language, 'en');
     assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the existing keys were read and kept');
+  } finally { clean(sb); }
+});
+
+// 17c round 2 (L1 + L3): the temp is opened O_EXCL, so a file already at <target>.<pid>.tmp is refused, and the run never deletes a temp it did not create. The pid is pinned by a
+// preload so the temp name is known ahead of time (process.pid is redefined in the child only).
+test('configure (17c L1+L3): a file already at the temp name is refused (wx), survives with its content, nothing is written through and the old config is byte-equal, on every OS', () => {
+  const sb = sandbox();
+  try {
+    const PID = 424242;
+    const pre = path.join(sb.home, 'pid.mjs');
+    fs.writeFileSync(pre, `Object.defineProperty(process,'pid',{value:${PID},configurable:true});`);
+    const old = JSON.stringify({ updateCheckDays: 30 }) + '\n';
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+    fs.writeFileSync(PROJECT_TARGET(sb.proj), old);
+    const planted = `${PROJECT_TARGET(sb.proj)}.${PID}.tmp`;
+    fs.writeFileSync(planted, 'NOT OURS');
+    const r = spawnSync(process.execPath, ['--import', pathToFileURL(pre).href, CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home }, timeout: 20000 });
+    assert.strictEqual(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /Failed to write to config file/);
+    assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), old, 'the old config is byte-equal');
+    assert.strictEqual(fs.readFileSync(planted, 'utf8'), 'NOT OURS', 'the file the run did not create survives with its content');
   } finally { clean(sb); }
 });

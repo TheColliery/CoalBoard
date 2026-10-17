@@ -137,13 +137,15 @@ function ownDirDefault(cwd) {
 }
 
 // 17c (T-16f-1): temp opened O_EXCL in the target's own folder (rename is same-device only), then renamed over the target; any failure leaves the old file untouched, deletes the
-// temp, and surfaces the error. Never an in-place fallback. COALBOARD_TEST_STEP is a test seam read only here (a dev-only script; the env is the caller's, never a clone's):
+// temp (only one this run created: a file already at that name is refused by 'wx' and left alone), and surfaces the error. Never an in-place fallback. COALBOARD_TEST_STEP is a test seam read only here (a dev-only script; the env is the caller's, never a clone's):
 // 'fail' throws between the temp write and the rename, 'plant:<victim>' plants a file symlink at the target name there (POSIX legs; the rename must replace it).
 function writeConfigAtomic(target, text) {
   const tmp = `${target}.${process.pid}.tmp`;
   let fd = null;
+  let created = false; // the finally removes the temp only when this run made it: an EEXIST from 'wx' means the file is someone else's
   try {
     fd = fs.openSync(tmp, 'wx');
+    created = true;
     fs.writeFileSync(fd, text, 'utf8');
     fs.closeSync(fd);
     fd = null;
@@ -153,7 +155,7 @@ function writeConfigAtomic(target, text) {
     fs.renameSync(tmp, target);
   } finally {
     if (fd !== null) { try { fs.closeSync(fd); } catch {} }
-    try { fs.rmSync(tmp, { force: true }); } catch {}
+    if (created) { try { fs.rmSync(tmp, { force: true }); } catch {} }
   }
 }
 
