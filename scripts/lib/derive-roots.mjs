@@ -28,6 +28,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { gitEnv } from './git-env.mjs';
 
+// testing.md/coding-style Error Handling item 6: every spawn has a finite clock. Measured 2026-10-18 on this box (n=5, `git check-ignore --quiet` in a fresh repo): min 124, median 158,
+// max 241 ms, so 30 s is about 120x the slowest. A killed git has status null (and `error` ETIMEDOUT), which the fail-closed test below reads as FAIL, never as 'not ignored'.
+const CHECK_IGNORE_TIMEOUT_MS = 30000;
+
 export function deriveRootSets(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   let fed = 0;
@@ -36,7 +40,7 @@ export function deriveRootSets(dir) {
   for (const e of entries) {
     fed++; // counted BEFORE the git call, so a mid-loop bail reports what was actually
             // visited, never the full directory size assumed
-    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir, env: gitEnv(path.dirname(dir)) });
+    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir, env: gitEnv(path.dirname(dir)), timeout: CHECK_IGNORE_TIMEOUT_MS, killSignal: 'SIGKILL' });
     if (res.error || (res.status !== 0 && res.status !== 1)) return { ok: false, fed };
     if (res.status === 0) ignoredRoots.add(e.name);
     else if (!e.name.startsWith('.')) ourRoots.add(e.name);

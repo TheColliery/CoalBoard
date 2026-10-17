@@ -31,7 +31,6 @@ const ENGINE = path.resolve(REPO_ROOT, 'scripts/lib/link-check.mjs');
 // CWK-120 row 6 hermetic follow-through: a temp-repo git spawn in these tests must not
 // inherit GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE from whatever invoked "node --test" --
 // e.g. these tests running inside the repo's own pre-commit hook, which sets all three.
-const GIT_ENV_CLEAN = gitEnv();
 
 // hooks-safety.md section 7 (t170 #2): every child -- the engine and the git it is set up with -- gets HOME/USERPROFILE/TMPDIR/TMP/TEMP inside a sandbox folder that is removed
 // with the test. The folder is separate from the test's own repo, so the repo's tracked-file list is unchanged.

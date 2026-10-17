@@ -359,7 +359,7 @@ function shortAlias(dir) {
 }
 test('configure CWK-125: HOME spelled as its 8.3 ALIAS -- the walk stops at home, a foreign config above it is neither read nor rewritten', (t) => {
   const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-125-')));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  t.after(() => removeTree(base));
   const home = path.join(base, 'a-long-home-directory-name-cwk125');
   const proj = path.join(home, 'a-long-project-directory-name');
   fs.mkdirSync(proj, { recursive: true });
@@ -382,7 +382,7 @@ test('configure CWK-125: HOME spelled as its 8.3 ALIAS -- the walk stops at home
 for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude', '.coalboard.json']], ['root .coalboard.json', ['.coalboard.json']]]) {
   test(`configure: a LEGACY config (${label}) migrates on write when cwd is spelled as its 8.3 ALIAS`, (t) => {
     const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cb-cfg-alias-')));
-    t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+    t.after(() => removeTree(base));
     const home = path.join(base, 'a-long-home-directory-name-migr');
     const proj = path.join(home, 'a-long-project-directory-name');
     fs.mkdirSync(path.dirname(path.join(proj, ...legacyRel)), { recursive: true });

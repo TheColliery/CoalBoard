@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { deriveRootSets } from './derive-roots.mjs';
 import { gitEnv } from './git-env.mjs';
 import { removeTree } from './test-teardown.mjs';
@@ -104,5 +104,54 @@ test('deriveRootSets: fed counts entries actually visited, not the directory siz
     assert.equal(r.fed, 1, 'must report the ONE entry it actually tried, never the full 2-entry directory');
   } finally {
     removeTree(dir);
+  }
+});
+
+// 18a2 (L-d): a git killed by a signal has status null and no exit code. deriveRootSets must read that as FAIL (ok: false), never as 'not ignored' (CWK-090 fail-closed). The fake git is a
+// shell script that kills itself; the leg probes whether such a script can be built and run here and skips visibly where it cannot (Windows does not run a shebang script). CI's leg.
+function fakeKilledGit() {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk-fakegit-'));
+  const script = path.join(bin, 'git');
+  fs.writeFileSync(script, '#!/bin/sh' + String.fromCharCode(10) + 'kill -9 $$' + String.fromCharCode(10));
+  fs.chmodSync(script, 0o755);
+  return bin;
+}
+const SKIP_KILLED = (() => {
+  let bin = null;
+  try {
+    bin = fakeKilledGit();
+    const r = spawnSync(path.join(bin, 'git'), [], { timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+    return r.signal === 'SIGKILL' ? false : 'a self-killing shell script cannot be run here (capability probe) -- a CI leg';
+  } catch { return 'a self-killing shell script cannot be built here (capability probe) -- a CI leg'; } finally { if (bin) removeTree(bin); }
+})();
+
+test('deriveRootSets: a git killed by a signal (status null) is a FAIL, never "not ignored" (L-d, POSIX leg)', { skip: SKIP_KILLED }, () => {
+  const dir = makeRepo();
+  const bin = fakeKilledGit();
+  const savedPath = process.env.PATH;
+  try {
+    process.env.PATH = bin + path.delimiter + savedPath;
+    const r = deriveRootSets(dir);
+    assert.equal(r.ok, false, 'a killed git must not be read as an answer');
+    assert.equal(r.fed, 1, 'it bails on the first entry');
+  } finally {
+    process.env.PATH = savedPath;
+    removeTree(bin);
+    removeTree(path.dirname(dir));
+  }
+});
+test('deriveRootSets: a git that cannot be started (status null, no exit code) is a FAIL, never "not ignored" (L-d, every platform)', () => {
+  const dir = makeRepo();
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk-nogit-'));
+  const savedPath = process.env.PATH;
+  try {
+    process.env.PATH = empty;
+    const r = deriveRootSets(dir);
+    assert.equal(r.ok, false, 'a git that never ran must not be read as an answer');
+    assert.equal(r.fed, 1, 'it bails on the first entry');
+  } finally {
+    process.env.PATH = savedPath;
+    removeTree(empty);
+    removeTree(path.dirname(dir));
   }
 });
