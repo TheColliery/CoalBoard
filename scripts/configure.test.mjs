@@ -700,3 +700,74 @@ test('configure (H1): the .bak name is judged only when a backup will be made, s
     assert.deepStrictEqual(fs.readdirSync(outside), []);
   } finally { clean(sb); }
 });
+
+// ---- 17c (T-16f-1): the config write is temp-then-rename in the target's own folder (node/runtime.md section 5). COALBOARD_TEST_STEP is the script's test seam.
+const runStep = (args, sb, step) => spawnSync(process.execPath, [CLI, ...args], { cwd: sb.proj, encoding: 'utf8', env: { ...process.env, HOME: sb.home, USERPROFILE: sb.home, COALBOARD_TEST_STEP: step }, timeout: 20000 });
+const tmpsBeside = (file) => fs.readdirSync(path.dirname(file)).filter((n) => n.endsWith('.tmp'));
+
+test('configure (17c): a failure between the temp write and the rename leaves the old config byte-equal, no .tmp beside it, and a non-zero exit', () => {
+  const sb = sandbox();
+  try {
+    const old = JSON.stringify({ updateCheckDays: 30 }) + '\n';
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+    fs.writeFileSync(PROJECT_TARGET(sb.proj), old);
+    const r = runStep(['--language', 'en'], sb, 'fail');
+    assert.strictEqual(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /Failed to write to config file/);
+    assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), old, 'the old file is untouched');
+    assert.deepStrictEqual(tmpsBeside(PROJECT_TARGET(sb.proj)), [], 'the temp is deleted');
+  } finally { clean(sb); }
+});
+
+test('configure (17c): a rename that really fails (the target name is a non-empty directory) leaves nothing torn and no .tmp, on every OS', () => {
+  const sb = sandbox();
+  try {
+    const dirAtTarget = PROJECT_TARGET(sb.proj);
+    fs.mkdirSync(dirAtTarget, { recursive: true });
+    fs.writeFileSync(path.join(dirAtTarget, 'keep.txt'), 'keep');
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 1, r.stdout + r.stderr);
+    assert.strictEqual(fs.readFileSync(path.join(dirAtTarget, 'keep.txt'), 'utf8'), 'keep');
+    assert.deepStrictEqual(tmpsBeside(dirAtTarget), [], 'the temp is deleted');
+  } finally { clean(sb); }
+});
+
+test('configure (17c): a file symlink planted at the target name AFTER the guards is replaced by the rename, never written through (POSIX leg; needs a file symlink)', { skip: SKIP_FILE }, () => {
+  const sb = sandbox();
+  try {
+    const victim = path.join(sb.home, 'victim.txt');
+    fs.writeFileSync(victim, 'keep');
+    const r = runStep(['--language', 'en'], sb, 'plant:' + victim);
+    assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+    assert.strictEqual(fs.readFileSync(victim, 'utf8'), 'keep', 'the victim is not written through');
+    assert.ok(!fs.lstatSync(PROJECT_TARGET(sb.proj)).isSymbolicLink(), 'the target is a regular file again');
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).language, 'en');
+    assert.deepStrictEqual(tmpsBeside(PROJECT_TARGET(sb.proj)), []);
+  } finally { clean(sb); }
+});
+
+test('configure (17c): the happy path writes the same bytes as before and leaves no .tmp', () => {
+  const sb = sandbox();
+  try {
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), JSON.stringify({ language: 'en' }, null, 2) + '\n');
+    assert.deepStrictEqual(tmpsBeside(PROJECT_TARGET(sb.proj)), []);
+  } finally { clean(sb); }
+});
+
+test('configure (17c): a HARD link at the target (no privilege needed, every OS) is replaced by the rename, never written through', () => {
+  const sb = sandbox();
+  try {
+    const victim = path.join(sb.home, 'victim.json');
+    const before = JSON.stringify({ updateCheckDays: 30 }) + '\n';
+    fs.writeFileSync(victim, before);
+    fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+    fs.linkSync(victim, PROJECT_TARGET(sb.proj));
+    const r = run(['--language', 'en'], sb);
+    assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+    assert.strictEqual(fs.readFileSync(victim, 'utf8'), before, 'the other name of the file is untouched');
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).language, 'en');
+    assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the existing keys were read and kept');
+  } finally { clean(sb); }
+});

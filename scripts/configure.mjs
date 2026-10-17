@@ -136,6 +136,27 @@ function ownDirDefault(cwd) {
   return path.join(cwd, dir, 'coal', 'coalboard.json');
 }
 
+// 17c (T-16f-1): temp opened O_EXCL in the target's own folder (rename is same-device only), then renamed over the target; any failure leaves the old file untouched, deletes the
+// temp, and surfaces the error. Never an in-place fallback. COALBOARD_TEST_STEP is a test seam read only here (a dev-only script; the env is the caller's, never a clone's):
+// 'fail' throws between the temp write and the rename, 'plant:<victim>' plants a file symlink at the target name there (POSIX legs; the rename must replace it).
+function writeConfigAtomic(target, text) {
+  const tmp = `${target}.${process.pid}.tmp`;
+  let fd = null;
+  try {
+    fd = fs.openSync(tmp, 'wx');
+    fs.writeFileSync(fd, text, 'utf8');
+    fs.closeSync(fd);
+    fd = null;
+    const step = process.env.COALBOARD_TEST_STEP || '';
+    if (step === 'fail') throw new Error('injected failure between the temp write and the rename');
+    if (step.startsWith('plant:')) fs.symlinkSync(step.slice(6), target, 'file');
+    fs.renameSync(tmp, target);
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch {} }
+    try { fs.rmSync(tmp, { force: true }); } catch {}
+  }
+}
+
 function printHelp() {
   const lines = [
     'CoalBoard Configurator Utility',
@@ -293,9 +314,12 @@ function main() {
   // candidate list holds writePath (projectCandidates, walked from cwd exactly as findProjectCfg walks it), so it is right for a write at cwd, for a canonical config found above cwd
   // and for a LEGACY config found above cwd (written in place: .claude/.coalboard.json or .coalboard.json, one or two levels from its root, not three; 17a L1).
   // The global config has no project root (null: the plain recursive make, a dotfile manager may link ~/.claude).
-  // The three file-level checks go beyond the exemplar (CoalLedger's mkdirRepoParents + writeRepoFile): its write is a contained temp-then-rename and ours is a plain writeFileSync,
-  // so refusing a link at the config file stands in for that containment. They cover every name the run reads or writes through: the write target, the read source (a legacy file
+  // The three file-level checks go beyond the exemplar (CoalLedger's mkdirRepoParents + writeRepoFile): its write is a contained temp-then-rename and ours is a temp-then-rename in the target's own folder
+  // (17c, T-16f-1), so the link refusal at the config file is the check made BEFORE the write. They cover every name the run reads or writes through: the write target, the read source (a legacy file
   // that is a link would be read into the project, 17a M1) and the .bak copy's destination (copyFileSync follows a link there, 17a H1).
+  // What the rename buys (node/runtime.md section 5): it replaces a directory entry, so a link planted at the target name AFTER these checks is replaced, never written through, and a crash
+  // leaves the old file or the new one, never a torn one. What it does NOT close: the folder-swap window (a checked folder swapped for a junction before the temp is made): the temp and the
+  // rename land inside whatever the folder then is.
   const projectRootOf = (file) => {
     for (let d = cwd; ; d = path.dirname(d)) {
       if (projectCandidates(d).includes(file)) return d;
@@ -323,7 +347,7 @@ function main() {
   }
 
   try {
-    fs.writeFileSync(writePath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+    writeConfigAtomic(writePath, JSON.stringify(cfg, null, 2) + '\n');
     // Move-on-CONFIG-WRITE-only (no-old-version-leftover): the legacy file is
     // removed only AFTER the new-home write above succeeded, and only when this
     // write actually migrated it (readPath was the legacy file and writePath
