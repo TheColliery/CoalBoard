@@ -35,10 +35,14 @@ function sandboxVars(home) {
   return { HOME: home, USERPROFILE: home, TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir };
 }
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
+// 18f (INSPECT 18e2 V1, testing.md MUST): every spawn in this file has a finite clock. The verify run keeps the 120 s the CWK-136 legs already used; a single git call gets 30 s (git init, add and commit measured at 215 to 429 ms on this box, 17e2).
+const VERIFY_TIMEOUT_MS = 120000;
+const GIT_TIMEOUT_MS = 30000;
+const KILL = 'SIGKILL';
 const NL = String.fromCharCode(10);
 
 function runVerify(env) {
-  return spawnSync(process.execPath, [verifyPath], { cwd: root, env: env ?? process.env, encoding: 'utf8' });
+  return spawnSync(process.execPath, [verifyPath], { cwd: root, env: env ?? process.env, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
 }
 
 test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when git is unavailable', () => {
@@ -122,7 +126,7 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
   // a real throwaway git repo, never a hardcoded literal.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk079-nonlocal-'));
   try {
-    execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)) });
+    execFileSync('git', ['init', '--quiet'], { cwd: dir, env: { ...gitEnv(path.dirname(dir)), ...sandboxVars(dir + '-home') }, timeout: GIT_TIMEOUT_MS, killSignal: KILL });
     fs.writeFileSync(path.join(dir, '.gitignore'), 'throwaway-build/\n');
     fs.mkdirSync(path.join(dir, 'throwaway-build'));
 
@@ -140,7 +144,7 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
       const ignoredRoots = new Set();
       if (candidateRoots.size) {
         const ci = spawnSync('git', ['check-ignore', '--stdin'],
-          { cwd: dir, env: gitEnv(path.dirname(dir)), encoding: 'utf8', input: [...candidateRoots].map((n) => n + PROBE_SUFFIX).join('\n') + '\n' });
+          { cwd: dir, env: { ...gitEnv(path.dirname(dir)), ...sandboxVars(dir + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL, input: [...candidateRoots].map((n) => n + PROBE_SUFFIX).join('\n') + '\n' });
         if (!ci.error && ci.status !== 128 && typeof ci.stdout === 'string') {
           for (const line of ci.stdout.split('\n')) {
             const t = line.trim();
@@ -177,6 +181,7 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
     assert.match(findA.msg, /gitignored/, 'plant A must now FAIL -- it was never exempt from the check, only from discovering its own root');
     assert.match(findB.msg, /gitignored/, 'plant B, the citation that discovered the root, must FAIL too');
   } finally {
+    removeTree(dir + '-home');
     removeTree(dir);
   }
 });
@@ -211,7 +216,7 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
       NL + 'See `totally-fake-root/notes.md` for details.' + NL);
 
     const git = (args) => {
-      const r = spawnSync('git', args, { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8' });
+      const r = spawnSync('git', args, { cwd: tmp, env: { ...gitEnv(path.dirname(tmp)), ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL });
       if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr || r.error?.message}`);
       return r.stdout;
     };
@@ -228,26 +233,27 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
       'the probed root must be genuinely absent -- that absence is what the false match depends on');
 
     // THE DISCRIMINATING PAIR, at the git level, on this exact fixture.
-    const bare = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'totally-fake-root/\n' });
+    const bare = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: { ...gitEnv(path.dirname(tmp)), ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL, input: 'totally-fake-root/\n' });
     assert.equal(bare.status, 0,
       'RED: the bare feed must reproduce the false match on THIS fixture -- an absent, un-patterned root reported ignored');
-    const probed = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'totally-fake-root/.pointer-check-probe\n' });
+    const probed = spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: { ...gitEnv(path.dirname(tmp)), ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL, input: 'totally-fake-root/.pointer-check-probe\n' });
     assert.equal(probed.status, 1, 'the injection-site feed correctly reports the SAME root as NOT ignored');
 
     // CONTROL: a genuinely-ignored root still matches under BOTH feeds -- the fix loses
     // no true positive.
-    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'scratchpad/\n' }).status, 0);
-    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: gitEnv(path.dirname(tmp)), encoding: 'utf8', input: 'scratchpad/.pointer-check-probe\n' }).status, 0);
+    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: { ...gitEnv(path.dirname(tmp)), ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL, input: 'scratchpad/\n' }).status, 0);
+    assert.equal(spawnSync('git', ['check-ignore', '--stdin'], { cwd: tmp, env: { ...gitEnv(path.dirname(tmp)), ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: KILL, input: 'scratchpad/.pointer-check-probe\n' }).status, 0);
 
     // END-TO-END: the real gate, driven against this exact fixture, must still catch a
     // genuine gitignored citation and must NOT false-FAIL the absent, un-patterned one.
     fs.appendFileSync(path.join(tmp, 'commands', 'stats.md'), NL + 'Notes: `scratchpad/notes.md`.' + NL);
-    const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
     assert.match(r.stdout, /FAIL.*cites `scratchpad\/notes\.md`.*gitignored/,
       'the real gate, driven end-to-end against the lone-CR fixture, must still catch the genuinely-ignored citation');
     assert.doesNotMatch(r.stdout, /totally-fake-root/,
       'the real gate must never false-FAIL the absent, un-patterned root under the lone-CR fixture');
   } finally {
+    removeTree(tmp + '-home');
     removeTree(tmp);
   }
 });
@@ -270,14 +276,14 @@ function censusTree(plant) {
 test('CWK-136 RED-FIRST: planting env: process.env on a git spawn makes the verify gate FAIL, naming the file', (t) => {
   const tmp = censusTree(true);
   t.after(() => removeTree(tmp));
-  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
   assert.match(r.stdout, /FAIL git spawn census: finding 1\/1: scripts\/lib\/zz-planted\.mjs:1 .*process\.env/);
   assert.notEqual(r.status, 0, 'a refused spawn fails the gate');
 });
 test('CWK-136 control: the same tree with nothing planted passes the census line', (t) => {
   const tmp = censusTree(false);
   t.after(() => removeTree(tmp));
-  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: 120000 });
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
   assert.match(r.stdout, /ok {3}git spawn census: every one of \d+ git spawn\(s\)/);
   assert.doesNotMatch(r.stdout, /FAIL git spawn census/);
 });

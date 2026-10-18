@@ -203,6 +203,7 @@ test('deriveRootSets (18e2): HOME alone reaches git: an excludesFile named in th
   assert.ok(r.ignoredRoots.has('tracked-dir'), 'the handed-in HOME .gitconfig must reach git');
 });
 
+// 18f (t195): the child gets only PATH (to find git; SystemRoot for node and git on Windows), the sandbox variables and the deliberate XDG override, never the whole process.env.
 // XDG_CONFIG_HOME: the CALLER's environment carries a host-shaped XDG_CONFIG_HOME with a git ignore file naming tracked-dir; a child process (never a process.env change here) calls deriveRootSets with a clean sandbox home.
 // childEnv must override that ambient variable, or a developer's XDG ignore file moves the sets.
 const DERIVE_URL = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'derive-roots.mjs')).href;
@@ -216,7 +217,7 @@ test('deriveRootSets (18e2): XDG_CONFIG_HOME in the caller environment never rea
   fs.writeFileSync(path.join(hostXdg, 'git', 'ignore'), 'tracked-dir' + NL);
   const home = path.join(root, 'home');
   fs.mkdirSync(path.join(home, 'tmp'), { recursive: true });
-  const c = spawnSync(process.execPath, ['-e', CHILD_CODE, DERIVE_URL, dir, home], { env: { ...process.env, XDG_CONFIG_HOME: hostXdg }, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  const c = spawnSync(process.execPath, ['-e', CHILD_CODE, DERIVE_URL, dir, home], { env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, ...sandboxVars(root), XDG_CONFIG_HOME: hostXdg }, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
   assert.equal(c.status, 0, c.stderr);
   const out = JSON.parse(c.stdout);
   assert.equal(out.ok, true);
