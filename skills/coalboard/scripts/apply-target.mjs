@@ -4,16 +4,18 @@
 // land on the link's target, which can sit outside the project. Lexical containment does not stop a link (node/runtime.md section 4), so this walks
 // the path with lstat and canonicalizes with realpath.native. It is a CLI, not a hook: it FAILS LOUD (hooks-safety.md section 1.0). Zero-dependency, Node 22+.
 //   node apply-target.mjs <project-root> <target> [<target>...]      a target is relative to the root, or absolute
-//   stdout: one line per target, "OK <target>" or "REFUSE <target> <reason> <real path or ->"   reason: link | outside | unresolvable
+//   stdout: one line per target, "OK <target>" or "REFUSE <target> <reason> <real path or ->"   reason: link | outside | unresolvable | name
 //   exit: 0 every target OK, 1 any target refused, 2 usage error
 // Only links AT or BELOW the root are refused (the hook's own split: the root is resolved first, then joined); a link ABOVE the root is the user's layout.
+// A target segment below the root that ends in a dot or a space is refused as `name` (18e, T-15b5-1): Windows strips that character, so `foo.`, `foo ` and `foo` are one file there and a target could be checked under one spelling and written under another.
+// The rule runs before any file-system call and on every platform, so a target name stays portable and the verdict never depends on what the platform strips; `.` and `..` keep their meaning and the root's own segments are the user's layout, not judged.
 // A refused target is never written; the caller lists it as not applicable. Segments are compared with path.relative (segEq), which folds case exactly where the platform does;
 // case-folding is never a containment key of its own.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const USAGE = 'usage: node apply-target.mjs <project-root> <target> [<target>...]\n  prints OK <target> or REFUSE <target> <link|outside|unresolvable> <real path or -> per target; exit 0 all OK, 1 any refused, 2 usage error\n  report a problem at https://github.com/TheColliery/CoalBoard/issues\n';
+const USAGE = 'usage: node apply-target.mjs <project-root> <target> [<target>...]\n  prints OK <target> or REFUSE <target> <link|outside|unresolvable|name> <real path or -> per target; exit 0 all OK, 1 any refused, 2 usage error\n  report a problem at https://github.com/TheColliery/CoalBoard/issues\n';
 const SPLIT = path.sep === '\\' ? /[\\/]+/ : /\/+/;
 
 const clean = (s) => String(s).replace(/\p{Cc}/gu, '?'); // a target is untrusted text printed back: one line per target
@@ -64,6 +66,8 @@ function check(root, rootLexical, target) {
   } else {
     segs = target.split(SPLIT).filter((s) => s && s !== '.');
   }
+  // 18e (T-15b5-1): the name rule, before any lstat. `..` ends in a dot but is a step, not a name.
+  if (segs.some((seg) => seg !== '..' && /[. ]$/.test(seg))) return refuse('name', '-');
   if (!segs.length) return refuse('unresolvable', root); // the root itself is not a file target
   let missingAt = -1;
   for (let i = 0; i < segs.length; i++) {

@@ -372,3 +372,48 @@ test('the dist copy answers the same as the source', (t) => {
   assert.equal(b.status, a.status);
   assert.equal(b.stdout, a.stdout);
 });
+
+// ---- 18e (T-15b5-1): a target segment below the root that ends in a dot or a space is refused as `name`, on every platform ----------------
+// Windows strips a trailing dot or space from a path component, so `foo.`, `foo ` and `foo` are one file there and a target could be checked under one spelling and written under
+// another. The rule judges the RAW segments, before any file-system call; `.` and `..` keep their meaning, and the root's own segments are the user's layout.
+const NAME_CASES = ['sub./a.txt', 'sub /a.txt', 'a.txt.', 'a.txt ', '.../a', 'ok/b. /c'];
+test('a segment ending in a dot or a space is refused as name, whichever segment it is (relative spelling)', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'ok.txt'));
+  const r = run(s, [s.proj, ...NAME_CASES]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.deepEqual(lines(r), NAME_CASES.map((c) => `REFUSE ${c} name -`));
+});
+
+test('the same segments are refused as name in the ABSOLUTE spelling', (t) => {
+  const s = sandbox(t);
+  const abs = NAME_CASES.map((c) => s.proj + path.sep + c.split('/').join(path.sep));
+  const r = run(s, [s.proj, ...abs]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.deepEqual(lines(r), abs.map((c) => `REFUSE ${c} name -`));
+});
+
+test('names that merely contain a dot or start with one stay OK, and so does a .. that stays inside the root (relative and absolute)', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.proj, 'sub'));
+  touch(path.join(s.proj, 'ok.txt'));
+  const rel = ['a.b/c.txt', '.hidden/x', 'sub/../ok.txt', 'sp ace/f.txt', 'new.d/file'];
+  const abs = rel.map((c) => s.proj + path.sep + c.split('/').join(path.sep));
+  const r = run(s, [s.proj, ...rel, ...abs]);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), [...rel, ...abs].map((c) => `OK ${c}`));
+});
+
+test('a root whose OWN path has a trailing-dot folder above it is not judged (the root is the user\'s layout; capability leg, it runs wherever the platform can make such a folder)', (t) => {
+  const base = mk();
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const up = path.join(base, 'up.');
+  try { fs.mkdirSync(up); } catch { /* the probe below decides */ }
+  if (!fs.readdirSync(base).includes('up.')) { t.skip('this platform cannot make a folder whose name ends in a dot (capability probe) -- a CI leg'); return; }
+  const proj = path.join(up, 'proj');
+  fs.mkdirSync(proj);
+  const s = { base, proj };
+  const r = run(s, [proj, 'a.txt', proj + path.sep + 'b.txt']);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), ['OK a.txt', 'OK ' + proj + path.sep + 'b.txt']);
+});
