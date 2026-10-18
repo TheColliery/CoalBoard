@@ -66,8 +66,8 @@ function check(root, rootLexical, target) {
   } else {
     segs = target.split(SPLIT).filter((s) => s && s !== '.');
   }
-  // 18e (T-15b5-1): the name rule, before any lstat. `..` ends in a dot but is a step, not a name.
-  if (segs.some((seg) => seg !== '..' && /[. ]$/.test(seg))) return refuse('name', '-');
+  // 18e (T-15b5-1): the name rule, before any lstat. `..` ends in a dot but is a step, not a name. The dot or space also counts right before a `:` (an NTFS stream suffix): `a.txt.::$DATA` is `a.txt.` once Windows strips it (INSPECT M1); a colon on its own is not refused.
+  if (segs.some((seg) => seg !== '..' && /[. ](?::|$)/.test(seg))) return refuse('name', '-');
   if (!segs.length) return refuse('unresolvable', root); // the root itself is not a file target
   let missingAt = -1;
   for (let i = 0; i < segs.length; i++) {

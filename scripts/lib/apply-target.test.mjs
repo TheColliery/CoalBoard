@@ -376,7 +376,8 @@ test('the dist copy answers the same as the source', (t) => {
 // ---- 18e (T-15b5-1): a target segment below the root that ends in a dot or a space is refused as `name`, on every platform ----------------
 // Windows strips a trailing dot or space from a path component, so `foo.`, `foo ` and `foo` are one file there and a target could be checked under one spelling and written under
 // another. The rule judges the RAW segments, before any file-system call; `.` and `..` keep their meaning, and the root's own segments are the user's layout.
-const NAME_CASES = ['sub./a.txt', 'sub /a.txt', 'a.txt.', 'a.txt ', '.../a', 'ok/b. /c'];
+// 18e r2 (INSPECT M1): a trailing dot or space right before an NTFS stream colon is the same name once Windows strips it (a.txt.::$DATA is a.txt.), so it is refused too.
+const NAME_CASES = ['sub./a.txt', 'sub /a.txt', 'a.txt.', 'a.txt ', '.../a', 'ok/b. /c', 'a.txt.::$DATA', 'sub :x/f.txt', 'sub.:s/x'];
 test('a segment ending in a dot or a space is refused as name, whichever segment it is (relative spelling)', (t) => {
   const s = sandbox(t);
   touch(path.join(s.proj, 'ok.txt'));
@@ -397,7 +398,8 @@ test('names that merely contain a dot or start with one stay OK, and so does a .
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'sub'));
   touch(path.join(s.proj, 'ok.txt'));
-  const rel = ['a.b/c.txt', '.hidden/x', 'sub/../ok.txt', 'sp ace/f.txt', 'new.d/file'];
+  // a.txt::$DATA is the main stream of a.txt, and c:d/x is a name with a colon that is legal on POSIX; on this Windows box the checker gives both the same OK verdict (18e r2, probed).
+  const rel = ['a.b/c.txt', '.hidden/x', 'sub/../ok.txt', 'sp ace/f.txt', 'new.d/file', 'a.txt::$DATA', 'c:d/x'];
   const abs = rel.map((c) => s.proj + path.sep + c.split('/').join(path.sep));
   const r = run(s, [s.proj, ...rel, ...abs]);
   assert.equal(r.status, 0, r.stdout);
