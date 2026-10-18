@@ -401,7 +401,14 @@ for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude',
 
 // ---- PR 19 #15 (u2): the migration must never delete a file git tracks (the room's own CodeRabbit path instruction). A tracked legacy file
 // survives with a printed note; an untracked one is removed as before; with no git on PATH behaviour is unchanged (git stays optional).
-const gitIn = (dir, ...args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 20000, env: gitEnv(path.dirname(dir)) });
+// 18c (L-b; 7d57207 claimed this and did not land it): the setup git children get HOME/USERPROFILE/TMPDIR/TMP/TEMP under the sandbox home (dir is sb.proj, so its parent), keeping gitEnv()'s GIT_* cleanup and ceiling.
+// sandboxVars returns a literal of named keys over names declared once, the shape the git spawn census reads whole (verify.mjs).
+function sandboxVars(home) {
+  const tmpDir = path.join(home, 'tmp');
+  fs.mkdirSync(tmpDir, { recursive: true });
+  return { HOME: home, USERPROFILE: home, TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir };
+}
+const gitIn = (dir, ...args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 20000, env: { ...gitEnv(path.dirname(dir)), ...sandboxVars(path.dirname(dir)) } });
 const legacyRepo = (sb, rel) => {
   const legacy = path.join(sb.proj, ...rel);
   fs.mkdirSync(path.dirname(legacy), { recursive: true });
@@ -530,7 +537,8 @@ const SKIP_DIR = CAN_DIR_LINK ? false : 'this box cannot create a directory link
 const SKIP_FILE = CAN_FILE_LINK ? false : 'this box cannot create a file symlink (capability probe, no privilege)';
 const refusal = (r) => { assert.strictEqual(r.status, 1, 'exit 1: ' + r.stdout + r.stderr); assert.ok(/^Error: .*(refus|link|junction)/mi.test(r.stderr), 'an Error line names the refusal: ' + r.stderr); };
 
-test('configure (CWK2-042): a .claude JUNCTION to a folder outside the project is refused: exit 1, nothing made outside, nothing written anywhere', { skip: SKIP_DIR }, () => {
+test('configure (CWK2-042): a .claude JUNCTION to a folder outside the project is refused: exit 1, nothing made outside, nothing written anywhere', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -542,7 +550,8 @@ test('configure (CWK2-042): a .claude JUNCTION to a folder outside the project i
   } finally { clean(sb); }
 });
 
-test('configure (CWK2-042): a junction AT .claude/coal is refused the same way', { skip: SKIP_DIR }, () => {
+test('configure (CWK2-042): a junction AT .claude/coal is refused the same way', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -555,7 +564,8 @@ test('configure (CWK2-042): a junction AT .claude/coal is refused the same way',
   } finally { clean(sb); }
 });
 
-test('configure (CWK2-042): a link AT the target file is refused and the file it points to stays byte-equal', { skip: SKIP_FILE }, () => {
+test('configure (CWK2-042): a link AT the target file is refused and the file it points to stays byte-equal', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'victim.json');
@@ -581,7 +591,8 @@ test('configure (CWK2-042): the plain case, a missing .claude and a missing coal
   } finally { clean(a); clean(b); }
 });
 
-test('configure (CWK2-042): the global config (no project root) still makes ~/.claude and writes, and a ~/.claude that is itself a link (a dotfile manager) still works', { skip: SKIP_DIR }, () => {
+test('configure (CWK2-042): the global config (no project root) still makes ~/.claude and writes, and a ~/.claude that is itself a link (a dotfile manager) still works', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const a = sandbox();
   const b = sandbox();
   try {
@@ -596,7 +607,8 @@ test('configure (CWK2-042): the global config (no project root) still makes ~/.c
   } finally { clean(a); clean(b); }
 });
 
-test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .bak (the guard runs before the backup)', { skip: SKIP_DIR }, () => {
+test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .bak (the guard runs before the backup)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -616,7 +628,8 @@ const runAt = (args, { home }, cwd) => spawnSync(process.execPath, [CLI, ...args
 const MALFORMED = '{ "language": ';
 const malformedProject = (sb) => { fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true }); fs.writeFileSync(PROJECT_TARGET(sb.proj), MALFORMED); };
 
-test('configure (H1): a FILE symlink at <config>.bak is refused and the file it points to stays byte-equal', { skip: SKIP_FILE }, () => {
+test('configure (H1): a FILE symlink at <config>.bak is refused and the file it points to stays byte-equal', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'victim.txt');
@@ -630,7 +643,8 @@ test('configure (H1): a FILE symlink at <config>.bak is refused and the file it 
   } finally { clean(sb); }
 });
 
-test('configure (H1): a JUNCTION at <config>.bak is refused before anything is rewritten', { skip: SKIP_DIR }, () => {
+test('configure (H1): a JUNCTION at <config>.bak is refused before anything is rewritten', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -644,7 +658,8 @@ test('configure (H1): a JUNCTION at <config>.bak is refused before anything is r
   } finally { clean(sb); }
 });
 
-test('configure (M1): a legacy <cwd>/.coalboard.json that is a FILE symlink is refused: its target is never read into the project', { skip: SKIP_FILE }, () => {
+test('configure (M1): a legacy <cwd>/.coalboard.json that is a FILE symlink is refused: its target is never read into the project', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'secret.json');
@@ -658,7 +673,8 @@ test('configure (M1): a legacy <cwd>/.coalboard.json that is a FILE symlink is r
   } finally { clean(sb); }
 });
 
-test('configure (M1): a legacy <cwd>/.coalboard.json that is a JUNCTION is refused, nothing is migrated', { skip: SKIP_DIR }, () => {
+test('configure (M1): a legacy <cwd>/.coalboard.json that is a JUNCTION is refused, nothing is migrated', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -671,7 +687,8 @@ test('configure (M1): a legacy <cwd>/.coalboard.json that is a JUNCTION is refus
   } finally { clean(sb); }
 });
 
-test('configure (L1): a legacy config found at an ANCESTOR folder is updated in place, and a .claude junction above cwd still refuses', { skip: SKIP_DIR }, () => {
+test('configure (L1): a legacy config found at an ANCESTOR folder is updated in place, and a .claude junction above cwd still refuses', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const a = sandbox();
   const b = sandbox();
   try {
@@ -694,7 +711,8 @@ test('configure (L1): a legacy config found at an ANCESTOR folder is updated in 
   } finally { clean(a); clean(b); }
 });
 
-test('configure (H1): the .bak name is judged only when a backup will be made, so a link there does not block a write over a VALID config', { skip: SKIP_DIR }, () => {
+test('configure (H1): the .bak name is judged only when a backup will be made, so a link there does not block a write over a VALID config', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const sb = sandbox();
   try {
     const outside = path.join(sb.home, 'outside');
@@ -775,7 +793,8 @@ test('configure (17c): a rename that really fails (the target name is a non-empt
   } finally { clean(sb); }
 });
 
-test('configure (17c): a file symlink planted at the target name AFTER the guards is replaced by the rename, never written through (POSIX leg; needs a file symlink)', { skip: SKIP_FILE }, () => {
+test('configure (17c): a file symlink planted at the target name AFTER the guards is replaced by the rename, never written through (POSIX leg; needs a file symlink)', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'victim.txt');
@@ -806,7 +825,8 @@ const probeHardLink = () => {
 };
 const SKIP_HARD = probeHardLink() ? false : 'this box cannot create a hard link (capability probe)';
 
-test('configure (17c): a HARD link at the target is replaced by the rename, never written through', { skip: SKIP_HARD }, () => {
+test('configure (17c): a HARD link at the target is replaced by the rename, never written through', (t) => {
+  if (SKIP_HARD) { t.skip(SKIP_HARD); return; }
   const sb = sandbox();
   try {
     const victim = path.join(sb.home, 'victim.json');
@@ -871,7 +891,8 @@ const SKIP_MODES = probeModes() ? false : 'POSIX permission bits are not meaning
 
 // 17e2 (L1): the child's umask is pinned to 077 by the preload. Under it a mode passed to open(2) is narrowed (0664 would open as 0600), so a 0664 config comes back 0664 ONLY through
 // the fchmodSync: dropping it (mutant M1b) fails this leg on any POSIX runner whatever that runner's own umask is. 0600 is the control: it survives the umask with or without the fchmod.
-test('configure (17e2): a rewritten config keeps its permission bits under a pinned umask 077, 0600 and 0664 alike (POSIX leg, CI)', { skip: SKIP_MODES }, () => {
+test('configure (17e2): a rewritten config keeps its permission bits under a pinned umask 077, 0600 and 0664 alike (POSIX leg, CI)', (t) => {
+  if (SKIP_MODES) { t.skip(SKIP_MODES); return; }
   for (const mode of [0o600, 0o664]) {
     const sb = sandbox();
     try {

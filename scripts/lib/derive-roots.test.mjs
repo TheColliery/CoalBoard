@@ -24,6 +24,14 @@ function sandboxVars(root) {
   return { HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
 }
 
+// 18c: the walk runs inside the test's sandbox: root/home is the HOME the git child reads (the tmp folder under it is made here).
+function walk(dir, root) {
+  sandboxVars(root);
+  const home = path.join(root, 'home');
+  fs.mkdirSync(path.join(home, 'tmp'), { recursive: true });
+  return deriveRootSets(dir, home);
+}
+
 // The fixture repo is root/repo; root also holds the sandbox home and tmp, so a teardown removes the whole root.
 function makeRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-'));
@@ -68,7 +76,7 @@ test('CWK-133: a planted ABSOLUTE GIT_DIR / GIT_INDEX_FILE never redirects the f
 test('deriveRootSets: a hidden-but-not-ignored dir (the .github shape) never enters ourRoots', () => {
   const dir = makeRepo();
   try {
-    const r = deriveRootSets(dir);
+    const r = walk(dir, path.dirname(dir));
     assert.equal(r.ok, true);
     assert.ok(!r.ourRoots.has('.github'), 'a hidden entry must never enter ourRoots even when git does not ignore it');
     assert.ok(!r.ignoredRoots.has('.github'), 'and it must not land in ignoredRoots either -- it is neither, by construction');
@@ -82,7 +90,7 @@ test('deriveRootSets: a hidden-but-not-ignored dir (the .github shape) never ent
 test('deriveRootSets: a non-hidden gitignored directory AND a gitignored file both land in ignoredRoots', () => {
   const dir = makeRepo();
   try {
-    const r = deriveRootSets(dir);
+    const r = walk(dir, path.dirname(dir));
     assert.ok(r.ignoredRoots.has('ignored-dir'));
     assert.ok(r.ignoredRoots.has('ignored-file.txt'));
     assert.equal(r.ignoredCount, 2);
@@ -93,17 +101,19 @@ test('deriveRootSets: a non-hidden gitignored directory AND a gitignored file bo
 });
 
 test('deriveRootSets: fed counts entries actually visited, not the directory size -- a non-repo bails on entry 1', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-nogit-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-derive-nogit-'));
+  const dir = path.join(root, 'plain');
+  fs.mkdirSync(dir);
   try {
     fs.writeFileSync(path.join(dir, 'a.txt'), 'x');
     fs.writeFileSync(path.join(dir, 'b.txt'), 'x');
     // No `git init` -- `git check-ignore` in a non-repo exits fatal (neither 0 nor 1), which
     // is the "git cannot answer" path regardless of which entry is visited first.
-    const r = deriveRootSets(dir);
+    const r = walk(dir, root);
     assert.equal(r.ok, false);
     assert.equal(r.fed, 1, 'must report the ONE entry it actually tried, never the full 2-entry directory');
   } finally {
-    removeTree(dir);
+    removeTree(root);
   }
 });
 
@@ -120,18 +130,19 @@ const SKIP_KILLED = (() => {
   let bin = null;
   try {
     bin = fakeKilledGit();
-    const r = spawnSync(path.join(bin, 'git'), [], { timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+    const r = spawnSync(path.join(bin, 'git'), [], { env: sandboxVars(bin), timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
     return r.signal === 'SIGKILL' ? false : 'a self-killing shell script cannot be run here (capability probe) -- a CI leg';
   } catch { return 'a self-killing shell script cannot be built here (capability probe) -- a CI leg'; } finally { if (bin) removeTree(bin); }
 })();
 
-test('deriveRootSets: a git killed by a signal (status null) is a FAIL, never "not ignored" (L-d, POSIX leg)', { skip: SKIP_KILLED }, () => {
+test('deriveRootSets: a git killed by a signal (status null) is a FAIL, never "not ignored" (L-d, POSIX leg)', (t) => {
+  if (SKIP_KILLED) { t.skip(SKIP_KILLED); return; }
   const dir = makeRepo();
   const bin = fakeKilledGit();
   const savedPath = process.env.PATH;
   try {
     process.env.PATH = bin + path.delimiter + savedPath;
-    const r = deriveRootSets(dir);
+    const r = walk(dir, path.dirname(dir));
     assert.equal(r.ok, false, 'a killed git must not be read as an answer');
     assert.equal(r.fed, 1, 'it bails on the first entry');
   } finally {
@@ -146,7 +157,7 @@ test('deriveRootSets: a git that cannot be started (status null, no exit code) i
   const savedPath = process.env.PATH;
   try {
     process.env.PATH = empty;
-    const r = deriveRootSets(dir);
+    const r = walk(dir, path.dirname(dir));
     assert.equal(r.ok, false, 'a git that never ran must not be read as an answer');
     assert.equal(r.fed, 1, 'it bails on the first entry');
   } finally {
@@ -154,4 +165,23 @@ test('deriveRootSets: a git that cannot be started (status null, no exit code) i
     removeTree(empty);
     removeTree(path.dirname(dir));
   }
+});
+
+// 18c (t179 #1), red first: a git exclude planted in a HOST-shaped HOME (XDG ignore file) changes what the walk reports when that env reaches git, and a sandboxed call does not see it.
+// Against the pre-18c deriveRootSets (no sandbox HOME parameter) the first assert fails: the planted HOME never reaches git, so tracked-dir stays in ourRoots.
+test('deriveRootSets (18c): the HOME handed in reaches git, so a global exclude in a host-shaped HOME moves the sets and the sandbox keeps them stable', (t) => {
+  const dir = makeRepo();
+  const root = path.dirname(dir);
+  t.after(() => removeTree(root));
+  const hostHome = path.join(root, 'hosthome');
+  fs.mkdirSync(path.join(hostHome, '.config', 'git'), { recursive: true });
+  fs.writeFileSync(path.join(hostHome, '.config', 'git', 'ignore'), 'tracked-dir' + String.fromCharCode(10));
+  fs.mkdirSync(path.join(hostHome, 'tmp'), { recursive: true });
+  const hostShaped = deriveRootSets(dir, hostHome);
+  assert.equal(hostShaped.ok, true);
+  assert.ok(hostShaped.ignoredRoots.has('tracked-dir'), 'the planted global exclude must reach git through the HOME parameter');
+  assert.ok(!hostShaped.ourRoots.has('tracked-dir'));
+  const sandboxed = walk(dir, root);
+  assert.ok(sandboxed.ourRoots.has('tracked-dir'), 'inside the sandbox HOME the same walk is stable');
+  assert.ok(!sandboxed.ignoredRoots.has('tracked-dir'));
 });

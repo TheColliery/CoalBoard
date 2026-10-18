@@ -32,7 +32,16 @@ import { gitEnv } from './git-env.mjs';
 // max 241 ms, so 30 s is about 120x the slowest. A killed git has status null (and `error` ETIMEDOUT), which the fail-closed test below reads as FAIL, never as 'not ignored'.
 const CHECK_IGNORE_TIMEOUT_MS = 30000;
 
-export function deriveRootSets(dir) {
+// 18c (t179 #1): a test passes a sandbox HOME, so the git child reads that HOME's git config and excludes and a developer's global ones cannot move the sets.
+// Without it (verify.mjs's call) the env is gitEnv() alone, byte for byte what it was. The helper has two plain returns, the shape the git spawn census reads whole.
+function childEnv(ceiling, home) {
+  if (home === undefined) return gitEnv(ceiling);
+  const tmp = path.join(home, 'tmp');
+  const xdg = path.join(home, '.config');
+  return { ...gitEnv(ceiling), HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: xdg, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+}
+
+export function deriveRootSets(dir, sandboxHome) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   let fed = 0;
   const ourRoots = new Set();
@@ -40,7 +49,7 @@ export function deriveRootSets(dir) {
   for (const e of entries) {
     fed++; // counted BEFORE the git call, so a mid-loop bail reports what was actually
             // visited, never the full directory size assumed
-    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir, env: gitEnv(path.dirname(dir)), timeout: CHECK_IGNORE_TIMEOUT_MS, killSignal: 'SIGKILL' });
+    const res = spawnSync('git', ['check-ignore', '--quiet', '--', e.name], { cwd: dir, env: childEnv(path.dirname(dir), sandboxHome), timeout: CHECK_IGNORE_TIMEOUT_MS, killSignal: 'SIGKILL' });
     if (res.error || (res.status !== 0 && res.status !== 1)) return { ok: false, fed };
     if (res.status === 0) ignoredRoots.add(e.name);
     else if (!e.name.startsWith('.')) ourRoots.add(e.name);
