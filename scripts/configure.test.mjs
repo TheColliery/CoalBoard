@@ -591,20 +591,26 @@ test('configure (CWK2-042): the plain case, a missing .claude and a missing coal
   } finally { clean(a); clean(b); }
 });
 
-test('configure (CWK2-042): the global config (no project root) still makes ~/.claude and writes, and a ~/.claude that is itself a link (a dotfile manager) still works', (t) => {
-  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+// 18e2 (t187): the ordinary leg and the junction leg are two tests, so the junction capability skip no longer hides the ordinary assertions.
+test('configure (CWK2-042): the global config (no project root) still makes ~/.claude and writes', () => {
   const a = sandbox();
-  const b = sandbox();
   try {
     assert.strictEqual(run(['--global', '--language', 'en'], a).status, 0);
     assert.ok(fs.existsSync(GLOBAL_TARGET(a.home)), 'the global folder is made and the file written');
+  } finally { clean(a); }
+});
+
+test('configure (CWK2-042): a ~/.claude that is itself a link (a dotfile manager) still works', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+  const b = sandbox();
+  try {
     const managed = path.join(b.home, 'dotfiles');
     fs.mkdirSync(managed);
     fs.symlinkSync(managed, path.join(b.home, '.claude'), 'junction');
     const r = run(['--global', '--language', 'en'], b);
     assert.strictEqual(r.status, 0, r.stderr);
     assert.ok(fs.existsSync(path.join(managed, '.coalboard.json')), 'the write lands in the managed folder, as before');
-  } finally { clean(a); clean(b); }
+  } finally { clean(b); }
 });
 
 test('configure (CWK2-042): a refused write over a MALFORMED config leaves no .bak (the guard runs before the backup)', (t) => {
@@ -687,10 +693,8 @@ test('configure (M1): a legacy <cwd>/.coalboard.json that is a JUNCTION is refus
   } finally { clean(sb); }
 });
 
-test('configure (L1): a legacy config found at an ANCESTOR folder is updated in place, and a .claude junction above cwd still refuses', (t) => {
-  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+test('configure (L1): a legacy config found at an ANCESTOR folder is updated in place', () => {
   const a = sandbox();
-  const b = sandbox();
   try {
     const sub = path.join(a.proj, 'sub');
     fs.mkdirSync(sub);
@@ -699,7 +703,13 @@ test('configure (L1): a legacy config found at an ANCESTOR folder is updated in 
     assert.strictEqual(r.status, 0, r.stderr);
     assert.strictEqual(JSON.parse(fs.readFileSync(path.join(a.proj, '.coalboard.json'), 'utf8')).language, 'en', 'written in place at the ancestor');
     assert.ok(!fs.existsSync(path.join(sub, '.claude')), 'nothing is made at cwd');
+  } finally { clean(a); }
+});
 
+test('configure (L1): a .claude junction above cwd still refuses', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+  const b = sandbox();
+  try {
     const outside = path.join(b.home, 'outside');
     fs.mkdirSync(outside);
     fs.writeFileSync(path.join(outside, '.coalboard.json'), JSON.stringify({ updateCheckDays: 30 }));
@@ -708,7 +718,7 @@ test('configure (L1): a legacy config found at an ANCESTOR folder is updated in 
     const r2 = runAt(['--language', 'en'], b, path.join(b.proj, 'sub'));
     refusal(r2);
     assert.strictEqual(JSON.parse(fs.readFileSync(path.join(outside, '.coalboard.json'), 'utf8')).language, undefined, 'the file behind the link is unchanged');
-  } finally { clean(a); clean(b); }
+  } finally { clean(b); }
 });
 
 test('configure (H1): the .bak name is judged only when a backup will be made, so a link there does not block a write over a VALID config', (t) => {

@@ -38,7 +38,7 @@ function childEnv(ceiling, home) {
   if (home === undefined) return gitEnv(ceiling);
   const tmp = path.join(home, 'tmp');
   const xdg = path.join(home, '.config');
-  return { ...gitEnv(ceiling), HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: xdg, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+  return { ...gitEnv(ceiling), GIT_CONFIG_NOSYSTEM: '1', HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: xdg, TMPDIR: tmp, TMP: tmp, TEMP: tmp }; // NOSYSTEM: the machine's own git config cannot move a sandboxed walk either (18e2)
 }
 
 export function deriveRootSets(dir, sandboxHome) {

@@ -67,7 +67,8 @@ test('exit 0 and one OK line when every target is a plain in-root file or a new 
   assert.deepEqual(lines(r), ['OK src/a.js', 'OK src/new.js', 'OK deep/er/new.js']);
 });
 
-test('exit 1 when any target is refused, with one line per target, the refused one naming its reason and real path', { skip: SKIP_DIR }, (t) => {
+test('exit 1 when any target is refused, with one line per target, the refused one naming its reason and real path', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'ok.js'));
   link(s.outside, path.join(s.proj, 'ln'), 'junction');
@@ -113,7 +114,8 @@ test('a control character in a target never forges a second output line', (t) =>
 });
 
 // ---- link refusals ---------------------------------------------------------------------------------------------------------------------
-test('a junction AS the target\'s directory, pointing outside the root, is refused as link', { skip: SKIP_DIR }, (t) => {
+test('a junction AS the target\'s directory, pointing outside the root, is refused as link', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   link(s.outside, path.join(s.proj, 'dir'), 'junction');
   const r = run(s, [s.proj, 'dir/x.js']);
@@ -121,7 +123,8 @@ test('a junction AS the target\'s directory, pointing outside the root, is refus
   assert.ok(lines(r)[0].startsWith('REFUSE dir/x.js link '), r.stdout);
 });
 
-test('a junction in the MIDDLE of the path is refused as link', { skip: SKIP_DIR }, (t) => {
+test('a junction in the MIDDLE of the path is refused as link', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'a'));
   link(s.outside, path.join(s.proj, 'a', 'ln'), 'junction');
@@ -130,7 +133,8 @@ test('a junction in the MIDDLE of the path is refused as link', { skip: SKIP_DIR
   assert.ok(lines(r)[0].startsWith('REFUSE a/ln/b/c.js link '), r.stdout);
 });
 
-test('a junction to another folder INSIDE the root is refused as link, not accepted as inside', { skip: SKIP_DIR }, (t) => {
+test('a junction to another folder INSIDE the root is refused as link, not accepted as inside', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'real', 'f.js'));
   link(path.join(s.proj, 'real'), path.join(s.proj, 'alias'), 'junction');
@@ -139,7 +143,8 @@ test('a junction to another folder INSIDE the root is refused as link, not accep
   assert.ok(lines(r)[0].startsWith('REFUSE alias/f.js link '), r.stdout);
 });
 
-test('a NEW file under a junction is refused as link (the missing tail does not hide the link)', { skip: SKIP_DIR }, (t) => {
+test('a NEW file under a junction is refused as link (the missing tail does not hide the link)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   link(s.outside, path.join(s.proj, 'dir'), 'junction');
   const r = run(s, [s.proj, 'dir/not-yet/new.js']);
@@ -148,7 +153,8 @@ test('a NEW file under a junction is refused as link (the missing tail does not 
   assert.ok(!fs.existsSync(path.join(s.outside, 'not-yet')), 'the checker writes nothing');
 });
 
-test('a junction AT the target name is refused as link', { skip: SKIP_DIR }, (t) => {
+test('a junction AT the target name is refused as link', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   link(s.outside, path.join(s.proj, 'x.js'), 'junction');
   const r = run(s, [s.proj, 'x.js']);
@@ -156,7 +162,8 @@ test('a junction AT the target name is refused as link', { skip: SKIP_DIR }, (t)
   assert.ok(lines(r)[0].startsWith('REFUSE x.js link '), r.stdout);
 });
 
-test('a file symlink AT the target to an outside file is refused as link', { skip: SKIP_FILE }, (t) => {
+test('a file symlink AT the target to an outside file is refused as link', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const s = sandbox(t);
   touch(path.join(s.outside, 'victim.txt'));
   link(path.join(s.outside, 'victim.txt'), path.join(s.proj, 'f.js'), 'file');
@@ -165,7 +172,8 @@ test('a file symlink AT the target to an outside file is refused as link', { ski
   assert.ok(lines(r)[0].startsWith('REFUSE f.js link '), r.stdout);
 });
 
-test('a file symlink AT the target to a file INSIDE the root is refused as link', { skip: SKIP_FILE }, (t) => {
+test('a file symlink AT the target to a file INSIDE the root is refused as link', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'real.js'));
   link(path.join(s.proj, 'real.js'), path.join(s.proj, 'f.js'), 'file');
@@ -194,7 +202,8 @@ test('a .. that stays inside the root is OK', (t) => {
   assert.deepEqual(lines(r), ['OK a/../b.js']);
 });
 
-test('a .. after a junction is judged by the REAL parent, not the lexical one (a/link/../b)', { skip: SKIP_DIR }, (t) => {
+test('a .. after a junction is judged by the REAL parent, not the lexical one (a/link/../b)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'a'));
   link(s.outside, path.join(s.proj, 'a', 'ln'), 'junction');
@@ -221,7 +230,8 @@ test('the project root itself is not a file target', (t) => {
 });
 
 // ---- the root reached through a link ABOVE it (the user's layout) -------------------------------------------------------------------------
-test('a root reached through a junction ABOVE it is OK, by its relative and its absolute spelling', { skip: SKIP_DIR }, (t) => {
+test('a root reached through a junction ABOVE it is OK, by its relative and its absolute spelling', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'f.js'));
   const via = path.join(s.base, 'via');
@@ -275,7 +285,8 @@ test('the final guard judges containment with path.relative, not a string prefix
 const dotdot = (base, through, file) => [base, through, '..', file].join(path.sep);
 // R2 HIGH-1: the ABSOLUTE spelling must not collapse .. before the walk. On POSIX the kernel resolves the link first and then .., so a/ln/../b is outside the
 // project while a lexical collapse reads inside it. Both branches now go through one textual segment strip and one lstat walk.
-test('an ABSOLUTE target with a .. after a junction is judged by the real parent, like the relative spelling (<root>/ln/../x.js)', { skip: SKIP_DIR }, (t) => {
+test('an ABSOLUTE target with a .. after a junction is judged by the real parent, like the relative spelling (<root>/ln/../x.js)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   link(s.outside, path.join(s.proj, 'ln'), 'junction');
   const rel = run(s, [s.proj, 'ln/../x.js']);
@@ -285,7 +296,8 @@ test('an ABSOLUTE target with a .. after a junction is judged by the real parent
   assert.ok(lines(abs)[0].includes(' link '), abs.stdout);
 });
 
-test('an ABSOLUTE .. after a junction is refused through the lexical spelling of the root too (a root reached through a junction above it)', { skip: SKIP_DIR }, (t) => {
+test('an ABSOLUTE .. after a junction is refused through the lexical spelling of the root too (a root reached through a junction above it)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   const via = path.join(s.base, 'via');
   link(s.proj, via, 'junction');
@@ -297,7 +309,8 @@ test('an ABSOLUTE .. after a junction is refused through the lexical spelling of
 
 // R3 MEDIUM-1: a missing component is forward-only. After it the lstat walk has nothing to judge, so a later .. would let the lexical join step back onto a link
 // further along the path (nope/../lnk/x.txt) and answer OK for a path that is REFUSE link when spelled lnk/x.txt. Fail closed as unresolvable.
-test('a missing component followed by .. that then passes an in-project junction is refused (relative spelling nope/../lnk/canary.txt)', { skip: SKIP_DIR }, (t) => {
+test('a missing component followed by .. that then passes an in-project junction is refused (relative spelling nope/../lnk/canary.txt)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'inproj'));
   link(path.join(s.proj, 'inproj'), path.join(s.proj, 'lnk'), 'junction');
@@ -308,7 +321,8 @@ test('a missing component followed by .. that then passes an in-project junction
   assert.ok(lines(r)[0].startsWith('REFUSE nope/../lnk/canary.txt unresolvable '), r.stdout);
 });
 
-test('a missing component followed by .. that then passes an in-project junction is refused (ABSOLUTE spelling <root>/nope/../lnk/canary.txt)', { skip: SKIP_DIR }, (t) => {
+test('a missing component followed by .. that then passes an in-project junction is refused (ABSOLUTE spelling <root>/nope/../lnk/canary.txt)', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'inproj'));
   link(path.join(s.proj, 'inproj'), path.join(s.proj, 'lnk'), 'junction');
@@ -328,7 +342,8 @@ test('a missing component followed by .. is refused even with no link anywhere (
 
 // R2 LOW-1 / M5: where this platform's own path.relative folds case (win32), a case-variant absolute target is the SAME file and is OK; a string-prefix test would refuse it.
 const CASE_FOLDS = path.relative('a', 'A') === '';
-test('a case-variant ABSOLUTE target is OK where path.relative folds case (C:/PROJ/F.JS for root C:/proj)', { skip: CASE_FOLDS ? false : 'path.relative does not fold case on this platform' }, (t) => {
+test('a case-variant ABSOLUTE target is OK where path.relative folds case (C:/PROJ/F.JS for root C:/proj)', (t) => {
+  if (!CASE_FOLDS) { t.skip('path.relative does not fold case on this platform'); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'f.js'));
   const variant = path.join(s.realProj, 'f.js').toUpperCase();
@@ -352,7 +367,8 @@ function aclDenyWorks() {
   }
 }
 const ACL = aclDenyWorks();
-test('a real ACL-denied file (icacls /deny R) is refused as unresolvable', { skip: ACL ? false : 'no read denial via icacls on this volume or OS (capability probe)' }, (t) => {
+test('a real ACL-denied file (icacls /deny R) is refused as unresolvable', (t) => {
+  if (!ACL) { t.skip('no read denial via icacls on this volume or OS (capability probe)'); return; }
   const s = sandbox(t);
   const f = path.join(s.proj, 'acl.js');
   touch(f);

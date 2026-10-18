@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deriveRootSets } from './derive-roots.mjs';
 import { gitEnv } from './git-env.mjs';
 import { removeTree } from './test-teardown.mjs';
@@ -24,9 +25,8 @@ function sandboxVars(root) {
   return { HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
 }
 
-// 18c: the walk runs inside the test's sandbox: root/home is the HOME the git child reads (the tmp folder under it is made here).
+// 18c: the walk runs inside the test's sandbox: root/home is the HOME the git child reads (the tmp folder under it is made here; 18e2 N1: the side-effect call to sandboxVars is gone, makeRepo already made root/home).
 function walk(dir, root) {
-  sandboxVars(root);
   const home = path.join(root, 'home');
   fs.mkdirSync(path.join(home, 'tmp'), { recursive: true });
   return deriveRootSets(dir, home);
@@ -184,4 +184,42 @@ test('deriveRootSets (18c): the HOME handed in reaches git, so a global exclude 
   const sandboxed = walk(dir, root);
   assert.ok(sandboxed.ourRoots.has('tracked-dir'), 'inside the sandbox HOME the same walk is stable');
   assert.ok(!sandboxed.ignoredRoots.has('tracked-dir'));
+});
+
+// ---- 18e2 (INSPECT 18c L2): the 18c leg pins that A sandbox variable reaches git, not WHICH one. Each leg below needs exactly one of them, so dropping that variable from childEnv turns its leg red.
+// HOME: a global ~/.gitconfig in the handed-in HOME names an excludesFile that lists tracked-dir. (On Windows git reads HOME, else USERPROFILE; both come from the one handed-in home.)
+const NL = String.fromCharCode(10);
+test('deriveRootSets (18e2): HOME alone reaches git: an excludesFile named in the handed-in HOME .gitconfig moves the sets', (t) => {
+  const dir = makeRepo();
+  const root = path.dirname(dir);
+  t.after(() => removeTree(root));
+  const hostHome = path.join(root, 'hosthome');
+  fs.mkdirSync(path.join(hostHome, 'tmp'), { recursive: true });
+  const listFile = path.join(hostHome, 'global-ignore');
+  fs.writeFileSync(listFile, 'tracked-dir' + NL);
+  fs.writeFileSync(path.join(hostHome, '.gitconfig'), '[core]' + NL + String.fromCharCode(9) + 'excludesFile = ' + listFile.split(path.sep).join('/') + NL);
+  const r = deriveRootSets(dir, hostHome);
+  assert.equal(r.ok, true);
+  assert.ok(r.ignoredRoots.has('tracked-dir'), 'the handed-in HOME .gitconfig must reach git');
+});
+
+// XDG_CONFIG_HOME: the CALLER's environment carries a host-shaped XDG_CONFIG_HOME with a git ignore file naming tracked-dir; a child process (never a process.env change here) calls deriveRootSets with a clean sandbox home.
+// childEnv must override that ambient variable, or a developer's XDG ignore file moves the sets.
+const DERIVE_URL = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'derive-roots.mjs')).href;
+const CHILD_CODE = 'import(process.argv[1]).then((m) => { const r = m.deriveRootSets(process.argv[2], process.argv[3]); process.stdout.write(JSON.stringify({ ok: r.ok, ours: [...r.ourRoots], ignored: [...r.ignoredRoots] })); });';
+test('deriveRootSets (18e2): XDG_CONFIG_HOME in the caller environment never reaches git: the sandbox overrides it', (t) => {
+  const dir = makeRepo();
+  const root = path.dirname(dir);
+  t.after(() => removeTree(root));
+  const hostXdg = path.join(root, 'hostxdg');
+  fs.mkdirSync(path.join(hostXdg, 'git'), { recursive: true });
+  fs.writeFileSync(path.join(hostXdg, 'git', 'ignore'), 'tracked-dir' + NL);
+  const home = path.join(root, 'home');
+  fs.mkdirSync(path.join(home, 'tmp'), { recursive: true });
+  const c = spawnSync(process.execPath, ['-e', CHILD_CODE, DERIVE_URL, dir, home], { env: { ...process.env, XDG_CONFIG_HOME: hostXdg }, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, killSignal: CALL_KILL });
+  assert.equal(c.status, 0, c.stderr);
+  const out = JSON.parse(c.stdout);
+  assert.equal(out.ok, true);
+  assert.ok(out.ours.includes('tracked-dir'), 'the host XDG ignore file must not reach git inside the sandbox');
+  assert.ok(!out.ignored.includes('tracked-dir'));
 });

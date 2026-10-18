@@ -27,6 +27,13 @@ import { removeTree } from './lib/test-teardown.mjs';
 import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// 18e2 (INSPECT 18c L1): the fixture's git child gets HOME/USERPROFILE/TMPDIR/TMP/TEMP under the fixture's own sandbox home, and a finite clock. The literal is the shape the git spawn census reads.
+function sandboxVars(home) {
+  const tmpDir = path.join(home, 'tmp');
+  fs.mkdirSync(tmpDir, { recursive: true });
+  return { HOME: home, USERPROFILE: home, TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir };
+}
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
 const NL = String.fromCharCode(10);
 
@@ -81,12 +88,14 @@ test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still
   // `.github`-shape test: build a throwaway git repo, derive its roots for real, and run
   // `checkPointers` directly against that derivation -- never against the real CoalBoard
   // tree, so this passes identically on a dev box, in a fresh clone, and in CI.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-red-fixture-'));
+  const box = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-red-fixture-'));
+  const dir = path.join(box, 'repo');
+  fs.mkdirSync(dir);
   try {
-    execFileSync('git', ['init', '--quiet'], { cwd: dir, env: gitEnv(path.dirname(dir)) });
+    execFileSync('git', ['init', '--quiet'], { cwd: dir, env: { ...gitEnv(box), ...sandboxVars(path.join(box, 'home')) }, timeout: 30000, killSignal: 'SIGKILL' });
     fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored-dir/\n');
     fs.mkdirSync(path.join(dir, 'ignored-dir'));
-    const roots = deriveRootSets(dir);
+    const roots = deriveRootSets(dir, path.join(box, 'home'));
     assert.equal(roots.ok, true);
     assert.ok(roots.ignoredRoots.has('ignored-dir'), 'the fixture ignored dir must actually derive as ignored');
     const findings = checkPointers({
@@ -98,7 +107,7 @@ test('the derived ignoredRoots (git check-ignore, not a hardcoded literal) still
     assert.equal(findings.length, 1);
     assert.match(findings[0].msg, /gitignored `ignored-dir\//);
   } finally {
-    removeTree(dir);
+    removeTree(box);
   }
 });
 
