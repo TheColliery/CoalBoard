@@ -414,8 +414,9 @@ test('names that merely contain a dot or start with one stay OK, and so does a .
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.proj, 'sub'));
   touch(path.join(s.proj, 'ok.txt'));
-  // a.txt::$DATA is the main stream of a.txt, and c:d/x is a name with a colon that is legal on POSIX; on this Windows box the checker gives both the same OK verdict (18e r2, probed).
-  const rel = ['a.b/c.txt', '.hidden/x', 'sub/../ok.txt', 'sp ace/f.txt', 'new.d/file', 'a.txt::$DATA', 'c:d/x'];
+  // a.txt::$DATA is the main stream of a.txt; ab:c/x and sub:s are names with a colon that are legal on POSIX and stay OK (18e r2). A drive-letter start (c:d/x) moved to the refused cases in 18f.
+  // sub/z:foo/x and ./z:foo are OK because the drive-like text is not at the very start of the target: a resolving writer only reads a drive prefix there (18f, probed).
+  const rel = ['a.b/c.txt', '.hidden/x', 'sub/../ok.txt', 'sp ace/f.txt', 'new.d/file', 'a.txt::$DATA', 'ab:c/x', 'sub:s', 'sub/z:foo/x', './z:foo/x'];
   const abs = rel.map((c) => s.proj + path.sep + c.split('/').join(path.sep));
   const r = run(s, [s.proj, ...rel, ...abs]);
   assert.equal(r.status, 0, r.stdout);
@@ -434,4 +435,23 @@ test('a root whose OWN path has a trailing-dot folder above it is not judged (th
   const r = run(s, [proj, 'a.txt', proj + path.sep + 'b.txt']);
   assert.equal(r.status, 0, r.stdout);
   assert.deepEqual(lines(r), ['OK a.txt', 'OK ' + proj + path.sep + 'b.txt']);
+});
+
+// ---- 18f (T-18e-2, INSPECT 18e D1): a RELATIVE target that starts with a drive prefix (one letter and a colon) is refused as name, on every platform ----------------------------------------
+// path.isAbsolute('z:foo/x.txt') is false on win32, so the checker would judge it joined to the root, while a writer that RESOLVES it (path.win32.resolve(root, 'z:foo/x.txt')) lands on z:\foo\x.txt, on another drive.
+// The rule reads the raw target's first characters only: a colon later in the name stays OK, and so does an ABSOLUTE spelling (see the next test).
+const DRIVE_CASES = ['z:foo/x.txt', 'Z:foo/x.txt', 'c:d/x', 'C:D/x', 'x:y', 'X:y'];
+test('a relative target that starts with a drive prefix is refused as name, in both letter cases', (t) => {
+  const s = sandbox(t);
+  const r = run(s, [s.proj, ...DRIVE_CASES]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.deepEqual(lines(r), DRIVE_CASES.map((c) => `REFUSE ${c} name -`));
+});
+
+test('an ABSOLUTE target whose below-root first segment looks like a drive prefix stays OK: a writer is handed the whole path, and a drive prefix is read only at its start', (t) => {
+  const s = sandbox(t);
+  const abs = ['z:foo/x.txt', 'c:d/x', 'x:y'].map((c) => s.proj + path.sep + c.split('/').join(path.sep));
+  const r = run(s, [s.proj, ...abs]);
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(lines(r), abs.map((c) => `OK ${c}`));
 });

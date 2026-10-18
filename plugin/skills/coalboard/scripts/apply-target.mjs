@@ -9,6 +9,7 @@
 // Only links AT or BELOW the root are refused (the hook's own split: the root is resolved first, then joined); a link ABOVE the root is the user's layout.
 // A target segment below the root that ends in a dot or a space is refused as `name` (18e, T-15b5-1): Windows strips that character, so `foo.`, `foo ` and `foo` are one file there and a target could be checked under one spelling and written under another.
 // The rule runs before any file-system call and on every platform, so a target name stays portable and the verdict never depends on what the platform strips; `.` and `..` keep their meaning and the root's own segments are the user's layout, not judged.
+// A relative target that starts with a drive prefix (`z:foo/x`) is refused as `name` too (18f, T-18e-2): on win32 it is not absolute, so it would be judged joined to the root, and a writer that resolves it would land on another drive.
 // A refused target is never written; the caller lists it as not applicable. Segments are compared with path.relative (segEq), which folds case exactly where the platform does;
 // case-folding is never a containment key of its own.
 import fs from 'node:fs';
@@ -68,6 +69,8 @@ function check(root, rootLexical, target) {
   }
   // 18e (T-15b5-1): the name rule, before any lstat. `..` ends in a dot but is a step, not a name. The dot or space also counts right before a `:` (an NTFS stream suffix): `a.txt.::$DATA` is `a.txt.` once Windows strips it (INSPECT M1); a colon on its own is not refused.
   if (segs.some((seg) => seg !== '..' && /[. ](?::|$)/.test(seg))) return refuse('name', '-');
+  // 18f (T-18e-2): a RELATIVE target that starts with a drive prefix (one letter and a colon) is refused as `name`: path.isAbsolute is false for `z:foo/x` on win32, so it would be judged joined to the root, while a writer that resolves it lands on another drive. Raw target, every platform; an absolute spelling and a colon later in the name are not touched.
+  if (!path.isAbsolute(target) && /^[A-Za-z]:/.test(target)) return refuse('name', '-');
   if (!segs.length) return refuse('unresolvable', root); // the root itself is not a file target
   let missingAt = -1;
   for (let i = 0; i < segs.length; i++) {
