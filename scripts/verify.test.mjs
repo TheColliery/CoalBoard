@@ -28,11 +28,13 @@ import { checkPointers, pointerCandidates, looksPathShaped } from './lib/pointer
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// 18e2 (INSPECT 18c L1): the fixture's git child gets HOME/USERPROFILE/TMPDIR/TMP/TEMP under the fixture's own sandbox home, and a finite clock. The literal is the shape the git spawn census reads.
+// 18e2 (INSPECT 18c L1): the fixture's git child gets HOME/USERPROFILE/TMPDIR/TMP/TEMP under the fixture's own sandbox home, and a finite clock. 18i (T-18h-2): plus XDG_CONFIG_HOME inside it and GIT_CONFIG_NOSYSTEM=1, as derive-roots.mjs childEnv does. The literal is the shape the git spawn census reads.
 function sandboxVars(home) {
   const tmpDir = path.join(home, 'tmp');
+  const xdg = path.join(home, '.config');
   fs.mkdirSync(tmpDir, { recursive: true });
-  return { HOME: home, USERPROFILE: home, TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir };
+  fs.mkdirSync(xdg, { recursive: true });
+  return { GIT_CONFIG_NOSYSTEM: '1', HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: xdg, TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir };
 }
 const verifyPath = path.join(root, 'scripts', 'verify.mjs');
 // 18f (INSPECT 18e2 V1, testing.md MUST): every spawn in this file has a finite clock. The verify run keeps the 120 s the CWK-136 legs already used; a single git call gets 30 s (git init, add and commit measured at 215 to 429 ms on this box, 17e2).
@@ -42,13 +44,14 @@ const KILL = 'SIGKILL';
 const NL = String.fromCharCode(10);
 
 // 18h (T-18f-1, CodeRabbit t202): every verify child runs with HOME, USERPROFILE, TMPDIR, TMP and TEMP inside the test's own sandbox, so it can neither read the real home nor write the real temp folder.
-// WITNESS: an --import preload, written into the test's own folder, records os.homedir() and os.tmpdir() as the verify child sees them (and, for the quick legs, exits at once so the whole gate does not run).
+// 18i (T-18h-2, INSPECT v13 L1): the sandbox also pins XDG_CONFIG_HOME inside it and sets GIT_CONFIG_NOSYSTEM=1, so a host git config or ignore file (user level or system level) cannot reach a git child of the verify run.
+// WITNESS: an --import preload, written into the test's own folder, records os.homedir(), os.tmpdir(), XDG_CONFIG_HOME and GIT_CONFIG_NOSYSTEM as the verify child sees them (and, for the quick legs, exits at once so the whole gate does not run).
 // A test then asserts both sit under its sandbox home. The query string carries the output file and the exit flag.
 const WITNESS_SRC = [
   "import fs from 'node:fs';",
   "import os from 'node:os';",
   'const u = new URL(import.meta.url);',
-  "fs.writeFileSync(u.searchParams.get('out'), JSON.stringify({ home: os.homedir(), tmp: os.tmpdir() }));",
+  "fs.writeFileSync(u.searchParams.get('out'), JSON.stringify({ home: os.homedir(), tmp: os.tmpdir(), xdg: process.env.XDG_CONFIG_HOME, nosystem: process.env.GIT_CONFIG_NOSYSTEM }));",
   "if (u.searchParams.get('exit') === '1') process.exit(0);",
 ].join(NL);
 let witnessCount = 0;
@@ -64,6 +67,8 @@ function assertSandboxed(w, home, label) {
   const seen = JSON.parse(fs.readFileSync(w.out, 'utf8'));
   assert.ok(within(seen.home, home), `${label}: the verify child saw homedir ${seen.home}, outside its sandbox ${home}`);
   assert.ok(within(seen.tmp, home), `${label}: the verify child saw tmpdir ${seen.tmp}, outside its sandbox ${home}`);
+  assert.ok(typeof seen.xdg === 'string' && within(seen.xdg, home), `${label}: the verify child saw XDG_CONFIG_HOME ${seen.xdg}, outside its sandbox ${home}`);
+  assert.equal(seen.nosystem, '1', `${label}: the verify child saw GIT_CONFIG_NOSYSTEM ${seen.nosystem}, not 1`);
 }
 
 function runVerify(env, home, nodeArgs = []) {
@@ -89,9 +94,12 @@ test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when
   const box = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-empty-path-'));
   const emptyPathDir = path.join(box, 'empty');
   const home = path.join(box, 'home');
+  const hostXdg = path.join(box, 'hostxdg');
   fs.mkdirSync(emptyPathDir);
+  fs.mkdirSync(path.join(hostXdg, 'git'), { recursive: true });
+  fs.writeFileSync(path.join(hostXdg, 'git', 'config'), '[core]' + NL + String.fromCharCode(9) + 'excludesFile = nowhere' + NL);
   try {
-    const env = { ...process.env, PATH: emptyPathDir, Path: emptyPathDir };
+    const env = { ...process.env, PATH: emptyPathDir, Path: emptyPathDir, XDG_CONFIG_HOME: hostXdg };
     const w = witness(home);
     const res = runVerify(env, home, w.args);
     assertSandboxed(w, home, 'runVerify with a supplied env');
