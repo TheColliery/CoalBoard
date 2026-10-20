@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deriveRootSets } from './lib/derive-roots.mjs';
 import { gitEnv } from './lib/git-env.mjs';
 import { removeTree } from './lib/test-teardown.mjs';
@@ -41,8 +41,33 @@ const GIT_TIMEOUT_MS = 30000;
 const KILL = 'SIGKILL';
 const NL = String.fromCharCode(10);
 
-function runVerify(env) {
-  return spawnSync(process.execPath, [verifyPath], { cwd: root, env: env ?? process.env, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+// 18h (T-18f-1, CodeRabbit t202): every verify child runs with HOME, USERPROFILE, TMPDIR, TMP and TEMP inside the test's own sandbox, so it can neither read the real home nor write the real temp folder.
+// WITNESS: an --import preload, written into the test's own folder, records os.homedir() and os.tmpdir() as the verify child sees them (and, for the quick legs, exits at once so the whole gate does not run).
+// A test then asserts both sit under its sandbox home. The query string carries the output file and the exit flag.
+const WITNESS_SRC = [
+  "import fs from 'node:fs';",
+  "import os from 'node:os';",
+  'const u = new URL(import.meta.url);',
+  "fs.writeFileSync(u.searchParams.get('out'), JSON.stringify({ home: os.homedir(), tmp: os.tmpdir() }));",
+  "if (u.searchParams.get('exit') === '1') process.exit(0);",
+].join(NL);
+let witnessCount = 0;
+function witness(home, { exit = false } = {}) {
+  fs.mkdirSync(home, { recursive: true });
+  const file = path.join(home, 'witness-preload.mjs');
+  fs.writeFileSync(file, WITNESS_SRC);
+  const out = path.join(home, 'witness-' + (witnessCount++) + '.json');
+  return { out, args: ['--import', pathToFileURL(file).href + '?out=' + encodeURIComponent(out) + (exit ? '&exit=1' : '')] };
+}
+const within = (p, dir) => { const rel = path.relative(path.resolve(dir), path.resolve(p)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+function assertSandboxed(w, home, label) {
+  const seen = JSON.parse(fs.readFileSync(w.out, 'utf8'));
+  assert.ok(within(seen.home, home), `${label}: the verify child saw homedir ${seen.home}, outside its sandbox ${home}`);
+  assert.ok(within(seen.tmp, home), `${label}: the verify child saw tmpdir ${seen.tmp}, outside its sandbox ${home}`);
+}
+
+function runVerify(env, home, nodeArgs = []) {
+  return spawnSync(process.execPath, [...nodeArgs, verifyPath], { cwd: root, env: env === undefined ? { ...process.env, ...sandboxVars(home) } : { ...env, ...sandboxVars(home) }, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
 }
 
 test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when git is unavailable', () => {
@@ -61,15 +86,33 @@ test('pointer check root-derivation degrades to a named SKIP, never a FAIL, when
   // test passed on the one OS it was authored on while failing on the other two in CI
   // (CWK-078 RED round 3). An empty directory has no name to dodge and is unreachable the
   // same way on every OS.
-  const emptyPathDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-empty-path-'));
+  const box = fs.mkdtempSync(path.join(os.tmpdir(), 'cwk078-empty-path-'));
+  const emptyPathDir = path.join(box, 'empty');
+  const home = path.join(box, 'home');
+  fs.mkdirSync(emptyPathDir);
   try {
     const env = { ...process.env, PATH: emptyPathDir, Path: emptyPathDir };
-    const res = runVerify(env);
+    const w = witness(home);
+    const res = runVerify(env, home, w.args);
+    assertSandboxed(w, home, 'runVerify with a supplied env');
     assert.match(res.stdout, /pointer check.*(could not derive|SKIPPED)/i, res.stdout);
     assert.doesNotMatch(res.stdout, /FAIL pointer check/);
     assert.equal(res.status, 0, `expected the gate to still PASS overall with git absent -- got:\n${res.stdout}`);
   } finally {
-    fs.rmSync(emptyPathDir, { recursive: true, force: true });
+    removeTree(box);
+  }
+});
+
+test('runVerify with no env supplied also hands the verify child a sandbox home and temp (18h)', () => {
+  const box = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-verify-default-'));
+  const home = path.join(box, 'home');
+  try {
+    const w = witness(home, { exit: true });
+    const res = runVerify(undefined, home, w.args);
+    assert.equal(res.status, 0, res.stderr);
+    assertSandboxed(w, home, 'runVerify with the default env');
+  } finally {
+    removeTree(box);
   }
 });
 
@@ -247,7 +290,9 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
     // END-TO-END: the real gate, driven against this exact fixture, must still catch a
     // genuine gitignored citation and must NOT false-FAIL the absent, un-patterned one.
     fs.appendFileSync(path.join(tmp, 'commands', 'stats.md'), NL + 'Notes: `scratchpad/notes.md`.' + NL);
-    const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+    const w = witness(tmp + '-home');
+    const r = spawnSync(process.execPath, [...w.args, path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, env: { ...process.env, ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+    assertSandboxed(w, tmp + '-home', 'the lone-CR end-to-end verify run');
     assert.match(r.stdout, /FAIL.*cites `scratchpad\/notes\.md`.*gitignored/,
       'the real gate, driven end-to-end against the lone-CR fixture, must still catch the genuinely-ignored citation');
     assert.doesNotMatch(r.stdout, /totally-fake-root/,
@@ -276,14 +321,20 @@ function censusTree(plant) {
 test('CWK-136 RED-FIRST: planting env: process.env on a git spawn makes the verify gate FAIL, naming the file', (t) => {
   const tmp = censusTree(true);
   t.after(() => removeTree(tmp));
-  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+  t.after(() => removeTree(tmp + '-home'));
+  const w = witness(tmp + '-home');
+  const r = spawnSync(process.execPath, [...w.args, path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, env: { ...process.env, ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+  assertSandboxed(w, tmp + '-home', 'the census verify run');
   assert.match(r.stdout, /FAIL git spawn census: finding 1\/1: scripts\/lib\/zz-planted\.mjs:1 .*process\.env/);
   assert.notEqual(r.status, 0, 'a refused spawn fails the gate');
 });
 test('CWK-136 control: the same tree with nothing planted passes the census line', (t) => {
   const tmp = censusTree(false);
   t.after(() => removeTree(tmp));
-  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+  t.after(() => removeTree(tmp + '-home'));
+  const w = witness(tmp + '-home');
+  const r = spawnSync(process.execPath, [...w.args, path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, env: { ...process.env, ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+  assertSandboxed(w, tmp + '-home', 'the census verify run');
   assert.match(r.stdout, /ok {3}git spawn census: every one of \d+ git spawn\(s\)/);
   assert.doesNotMatch(r.stdout, /FAIL git spawn census/);
 });
