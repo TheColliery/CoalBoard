@@ -139,8 +139,8 @@
     "nasa":     { "data": "opus",   "truth": "fable",  "feeling": "opus",   "adversary": "fable" }
   },
 
-  // ## Consent to seat Fable 5, the TOP lens rung. Fable is real-money on lower plans (metered credit) but within the
-  // ## weekly Fable cap on Max / Team-Premium (no extra money). Because the skill cannot know your plan, at high/nasa
+  // ## Consent to seat Fable (the fable alias, Fable 5.1), the TOP lens rung. On Max it is within the separate weekly
+  // ## Fable limit, then usage credits if they are on; on other plans and seat tiers it can bill to usage credits. Because the skill cannot know your plan, at high/nasa
   // ## (the only rigors that seat fable) a consent box fires BEFORE the fable seats spawn, showing the exact fable
   // ## count (1 at high, 2 at nasa) + a rough ~est token/credit cost. Options: once (this run) · always (this project —
   // ## writes "always" here) · no (fall to the highest non-fable tier, opus). Set it directly to skip the box:
