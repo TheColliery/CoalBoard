@@ -432,7 +432,7 @@ function main() {
     // 'trajectory'/'proof', imports 'bcrypt'/'jsonwebtoken'/'child_process') -- a CB-only-keyword
     // turn (e.g. a bare "ledger" mention) fires this block while CT's cue stays silent that turn.
     // The Triage sentence below is BYTE-IDENTICAL in CoalTipple's conductor (one flock, one
-    // colour); edit both rooms in the same batch or not at all. CWK-135 (b) / CWK-111 R9: it names a
+    // colour); edit both rooms in the same batch or not at all. The shared reference copy of the sentence is CoalWorks/warehouse/arbitration-cue-2026-09.txt (853 characters, the sha256 in its header). CWK-135 (b) / CWK-111 R9: it names a
     // sibling plugin only conditionally ("if present"; a plugin that is not present leads nothing) and
     // routes an undecidable Layer 2 to stakes -- CoalTipple's copy already read this form, this room's
     // had drifted to the unconditional "CoalTipple = tier-lever". Full wave-by-wave tuning history (Run-13's original carve through wave 5's revert) is
