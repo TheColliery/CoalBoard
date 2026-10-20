@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.8] - 2026-10-20
+
+The Fable notes name Fable 5.1 and the Max weekly limit.
+
+### Changed
+- **The Fable model name and plan wording in `skills/coalboard/references/platform-cc.md` now match the vendor pages.** The `fable` alias resolves to Fable 5.1 (`claude-fable-5-1`, Claude Code v2.1.257 or later) and Fable 5 stays reachable by `claude-fable-5`. On Max, Fable draws on a separate weekly Fable limit; on other plans and seat tiers it can bill to usage credits. The old "Team-Premium" plan name, which the vendor pages do not confirm, is gone. The note also says that in `-p`, and in an Agent SDK app that shows no prompt, Claude Code bills Fable without asking, so the board's own ask is the only consent there. The `fableConsent` row in `README.md` and its help text say the same. Checked 2026-10-20 against `code.claude.com/docs/en/model-config`, `platform.claude.com/docs/en/about-claude/pricing` and `support.claude.com/en/articles/12429409-extra-usage-for-paid-claude-plans`.
+- **A comment in `hooks/coalboard-conductor.js` names the shared reference copy of the Triage sentence** (`CoalWorks/warehouse/arbitration-cue-2026-09.txt`). No emitted character changes.
+
 ## [2.8.7] - 2026-10-19
 
 The apply check refuses a relative name starting with a drive letter.
