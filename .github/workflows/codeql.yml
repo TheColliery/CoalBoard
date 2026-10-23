@@ -231,13 +231,13 @@ jobs:
         with:
           persist-credentials: false # pushes nothing
       - id: init
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
         with:
           languages: javascript-typescript, actions
           queries: security-and-quality
       - id: analyze
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         if: needs.changes.result == 'success' && needs.changes.outputs.code == 'true'
       # LOW-1 (CWK-074 findings-back): the FIRST honesty step above runs BEFORE checkout/init/
       # analyze exist in this job, so its own "will run" branch can only state INTENT -- it
