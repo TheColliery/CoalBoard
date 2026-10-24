@@ -646,6 +646,13 @@ test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 
   assert.match(v.message, /failed to spawn: spawnSync git EOF/);
 });
 
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a NON-pipe error beside status 128 stays "failed to spawn" (ENOENT is not the child answering)', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('ENOENT', 128, NO_WORK_TREE));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /failed to spawn: spawnSync git ENOENT/);
+  assert.doesNotMatch(v.message, /exited 128/);
+});
+
 test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside NO status stays "failed to spawn"', () => {
   const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', null));
   assert.equal(v.ok, false);
