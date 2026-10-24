@@ -499,7 +499,17 @@ function preFixLogic(ci) {
 function assertFailClosedVerdict(ci) {
   const verdict = classifyCheckIgnoreResult(ci);
   assert.equal(verdict.ok, false, 'a non-0/1 real git run is a FAIL in BOTH terminal shapes -- this leg never branches');
-  if (ci.error) {
+  // r24c (CWK2-060): a pipe code beside a non-0/1 integer status is the child ANSWERING, so the verdict names its exit.
+  // Before r24c this helper asserted the spawn-error branch for every error-set shape, which encoded the defect's
+  // message as the expected verdict. Any other error-set pairing (ENOENT, a pipe beside 0, 1 or no status) stays on
+  // the spawn-error branch below.
+  const pipeBesideExit = Boolean(ci.error) && (ci.error.code === 'EPIPE' || ci.error.code === 'EOF')
+    && Number.isInteger(ci.status) && ci.status !== 0 && ci.status !== 1;
+  if (pipeBesideExit) {
+    assert.match(verdict.message, new RegExp('exited ' + ci.status),
+      'pipe error beside a real exit: the message names the exit status, got: ' + verdict.message);
+    assert.doesNotMatch(verdict.message, /failed to spawn/, 'pipe error beside a real exit must take the exit-status branch');
+  } else if (ci.error) {
     assert.ok(verdict.message.includes('failed to spawn: ' + ci.error.message),
       'error-set shape: the message names the spawn error itself, got: ' + verdict.message);
     assert.doesNotMatch(verdict.message, /exited/, 'error-set shape must take the spawn-error branch, not the exit-status one');
@@ -549,7 +559,7 @@ test('classifyCheckIgnoreResult: FORCED status-only shape (stdin not connected) 
   }
 });
 
-test('classifyCheckIgnoreResult: FORCED error-set shape (input far past the pipe buffer, git exits first) -- a spawn error is a FAIL naming that error', () => {
+test('classifyCheckIgnoreResult: FORCED error-set shape (input far past the pipe buffer, git exits first) -- a pipe error beside git\'s exit is a FAIL naming the EXIT (r24c)', () => {
   const tmp = mkGitRepoForIgnoreProbe();
   try {
     // ~4 MB of input against a git that rejects its flag and exits without reading: the write cannot complete
@@ -597,6 +607,49 @@ test('classifyCheckIgnoreResult: a genuine spawn error (git missing) is a FAIL n
   const verdict = classifyCheckIgnoreResult({ error: new Error('spawn git ENOENT'), status: null, stdout: null, stderr: null });
   assert.equal(verdict.ok, false);
   assert.match(verdict.message, /failed to spawn: spawn git ENOENT/);
+});
+
+// r24c (CWK2-060): git exits BEFORE it reads stdin (a core.bare=true repo refuses at once with 128) while spawnSync
+// is still writing `input`, so spawnSync returns BOTH a pipe error (EPIPE on POSIX, EOF on Windows) AND the real
+// status. The child answered, so its exit is the verdict. Any other pairing stays fail-closed. Keyed on error.code.
+const brokenPipe = (code, status, stderr = '') => ({ error: Object.assign(new Error('spawnSync git ' + code), { code }), status, stdout: '', stderr });
+const NO_WORK_TREE = 'fatal: this operation must be run in a work tree' + NL;
+
+test('classifyCheckIgnoreResult: r24c -- EPIPE beside status 128 names the EXIT, not a spawn failure (POSIX pipe race)', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 128, NO_WORK_TREE));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /exited 128 -- fatal: this operation must be run in a work tree/);
+  assert.doesNotMatch(v.message, /failed to spawn/);
+});
+
+test('classifyCheckIgnoreResult: r24c -- EOF beside status 128 names the EXIT (Windows pipe race, measured)', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EOF', 128, NO_WORK_TREE));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /exited 128 -- fatal: this operation must be run in a work tree/);
+  assert.doesNotMatch(v.message, /failed to spawn/);
+});
+
+test('classifyCheckIgnoreResult: r24c -- a pipe error with empty stderr names the status with no dangling separator', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 128, ''));
+  assert.equal(v.message, 'git check-ignore --stdin exited 128 -- cannot tell which cited roots are gitignored');
+});
+
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 0 stays "failed to spawn" (input may not have reached git)', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 0));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /failed to spawn: spawnSync git EPIPE/);
+});
+
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 1 stays "failed to spawn" (git may have stopped reading)', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EOF', 1));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /failed to spawn: spawnSync git EOF/);
+});
+
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside NO status stays "failed to spawn"', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', null));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /failed to spawn: spawnSync git EPIPE/);
 });
 
 // applyCheckIgnoreProbe -- built PROACTIVELY in this DI shape (never the naive inline
