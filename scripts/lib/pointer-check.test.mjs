@@ -659,6 +659,17 @@ test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside NO stat
   assert.match(v.message, /failed to spawn: spawnSync git EPIPE/);
 });
 
+// r25a (CWK2-061): the classifier keys on error.code, never error.message. One leg per pipe word, so a mutant that
+// reads the word from the message (M9 EPIPE, M13 EOF) is killed by name, not only by the pipe-code legs above.
+for (const word of ['EPIPE', 'EOF']) {
+  test(`classifyCheckIgnoreResult: CWK2-061 FAIL-CLOSED -- a "${word}" word in error.message with a non-pipe error.code stays "failed to spawn" (keyed on the code, never the message)`, () => {
+    const v = classifyCheckIgnoreResult({ error: Object.assign(new Error(`write ${word}`), { code: 'ENOENT' }), status: 128, stdout: '', stderr: NO_WORK_TREE });
+    assert.equal(v.ok, false);
+    assert.match(v.message, new RegExp(`failed to spawn: write ${word}`));
+    assert.doesNotMatch(v.message, /exited 128/);
+  });
+}
+
 // applyCheckIgnoreProbe -- built PROACTIVELY in this DI shape (never the naive inline
 // `if (!verdict.ok)` at the call site), specifically because CoalMine's own history shows
 // that shape is untestable-by-mutation: their reviewer mutated the equivalent condition
