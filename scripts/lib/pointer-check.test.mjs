@@ -490,7 +490,7 @@ function preFixLogic(ci) {
 //   (status-only) git drained stdin or spawnSync finished writing first -> { status: 129, error: undefined }
 //   (error-set)   git exited first -> spawnSync's write fails (EPIPE on POSIX, EOF on Windows) ->
 //                 { error: <set>, status: 129 } -- MEASURED here: status is STILL 129 alongside the error,
-//                 not null, and classifyCheckIgnoreResult takes its spawn-error branch FIRST by design.
+//                 not null; since r24c (CWK2-060) classifyCheckIgnoreResult reads a pipe code beside a non-0/1 exit as that exit, so this shape names exit 129 too.
 // Both are non-0/1 runs the gate must fail closed on. The old test pinned only the first spelling
 // (/exited 129/), so it was a coin flip that only landed on the second shape under load. The invariant is
 // asserted below over BOTH shapes, keyed on WHICH one occurred (never an ||-regex that would also pass if the
