@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.9] - 2026-10-25
+
+The setup wizard no longer offers a house folder as a target.
+
+### Changed
+- **The TARGET question in `skills/coalboard/references/wizard.md` drops the "clean mirror" option.** It named a folder inside the maintainers' own workspace, which was retired on 2026-10-25 and never existed on a user's machine. To check any other folder, pick `path` (programmer flow) or `a folder` (plain flow) and name it.
+
 ## [2.8.8] - 2026-10-20
 
 The Fable notes name Fable 5.1 and the Max weekly limit.
