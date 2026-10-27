@@ -150,6 +150,21 @@ test('H1: an indented line that is not a "- item" inside the list makes the fiel
   assert.ok(f.some((m) => /cb-truth/.test(m)), `an unreadable field read green:\n${f.join('\n')}`);
 });
 
+// 27b bounce 2 (M1, reviewer round 2): two more spellings that hid a granted Bash. Each must be a finding, never a green read.
+test('M1: a duplicate column-0 tools: key, or an inline value folded onto an indented line, is unreadable: a finding, never a green read', () => {
+  const head = '---\nname: cb-truth\ndescription: x\n';
+  const spellings = {
+    'a duplicate tools: key where the LAST grants Bash': head + 'tools:\n  - Read\n  - Grep\n  - Glob\ntools:\n  - Read\n  - Grep\n  - Glob\n  - Bash\n---\n\nBody.\n',
+    'an inline value wrapped onto an indented Bash line': head + 'tools: Read, Grep, Glob,\n  Bash\n---\n\nBody.\n',
+    'an inline value with an indented continuation line, , Bash': head + 'tools: Read, Grep, Glob\n  , Bash\n---\n\nBody.\n',
+  };
+  for (const [name, text] of Object.entries(spellings)) {
+    const defs = agentDefs().map((d) => (d.rel === 'agents/cb-truth.md' ? { ...d, text } : d));
+    const f = checkSeatRights({ skillText: skillText(), agentDefs: defs });
+    assert.ok(f.some((m) => /cb-truth/.test(m)), `${name} read green:\n${f.join('\n')}`);
+  }
+});
+
 test('a ledger row edited without its agent def is a finding (a data seat given a shell in the ledger only)', () => {
   const widened = skillText().replace('| **data** (sub1 empirical) | ✔ | ✖ | ✔ |', '| **data** (sub1 empirical) | ✔ | ✔ | ✔ |');
   assert.notEqual(widened, skillText());
