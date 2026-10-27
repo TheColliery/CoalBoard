@@ -39,6 +39,8 @@ test('agy validate: the built plugin has no error finding and every agent loads'
   const { name, version, description } = manifest;
   fs.writeFileSync(path.join(staged, 'plugin.json'), JSON.stringify({ name, version, description }, null, 2) + '\n');
   const expectedAgents = fs.readdirSync(path.join(PLUGIN, 'agents')).filter((f) => f.endsWith('.md')).length;
+  // 27c CR-3: an empty plugin/agents/ must not pass with 0 loaded, so a zero expectation is a failure, never a match.
+  assert.ok(expectedAgents > 0, 'plugin/agents/ holds no agent definitions to load');
 
   const r = spawnSync('agy', ['plugin', 'validate', staged, '--json'], { encoding: 'utf8', timeout: AGY_TIMEOUT_MS });
   assert.equal(r.error, undefined, `agy plugin validate did not run: ${r.error && r.error.code}`);

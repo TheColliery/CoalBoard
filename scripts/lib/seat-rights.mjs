@@ -28,20 +28,26 @@ export function parseSeatLedger(skillText) {
 const FRONTMATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const COMMENT_OR_BLANK = /^[ \t]*(?:#.*)?$/;
 const YAML_ITEM = /^[ \t]+-[ \t]+(.*)$/;
+// 27c bounce 1 (H1, L1): the key may be spelled with a space before the colon or with quotes, and every item must be a bare
+// tool name (an allowlist, not a denylist). A comment, quotes or a trailing comment on an item grant the tool in YAML while the
+// parser would record raw text no rights list matches, so any other item makes the whole field unreadable.
+const TOOLS_KEY = /^["']?tools["']?[ \t]*:/;
+const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
+const namesOnly = (items) => (items.every((t) => TOOL_NAME.test(t)) ? items : null);
 
 // One seat's `tools:` field, or null when it is absent, a flow list, empty, or holds a line that is not a `- item`.
 // 27b bounce 2 (M1): a second column-0 `tools:` key is refused (YAML keeps the LAST, the gate would read the FIRST), and an
 // inline value followed by an indented line is refused (YAML folds that line into the value, so it can grant a right).
 function readTools(frontmatter) {
   const lines = frontmatter.replace(/\r/g, '').split('\n');
-  const keys = lines.filter((l) => /^tools:/.test(l)).length;
+  const keys = lines.filter((l) => TOOLS_KEY.test(l)).length;
   if (keys !== 1) return null;
-  const at = lines.findIndex((l) => /^tools:/.test(l));
-  const inline = lines[at].slice('tools:'.length).trim();
+  const at = lines.findIndex((l) => TOOLS_KEY.test(l));
+  const inline = lines[at].replace(TOOLS_KEY, '').trim();
   if (inline) {
     const next = lines.slice(at + 1).find((l) => !COMMENT_OR_BLANK.test(l));
     if (next !== undefined && /^[ \t]/.test(next)) return null;
-    return inline.startsWith('[') ? null : inline.split(',').map((t) => t.trim()).filter(Boolean);
+    return inline.startsWith('[') ? null : namesOnly(inline.split(',').map((t) => t.trim()).filter(Boolean));
   }
   const items = [];
   for (const line of lines.slice(at + 1)) {
@@ -51,7 +57,7 @@ function readTools(frontmatter) {
     if (!m) return null;
     items.push(m[1].trim());
   }
-  return items.length ? items : null;
+  return items.length ? namesOnly(items) : null;
 }
 
 export function parseAgentTools(agentDefs) {

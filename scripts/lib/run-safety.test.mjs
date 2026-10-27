@@ -165,6 +165,44 @@ test('M1: a duplicate column-0 tools: key, or an inline value folded onto an ind
   }
 });
 
+// 27c bounce 1 (H1, CodeRabbit t213 CR-2): a tool item must be a bare tool name. A comment, quotes or a trailing comment on
+// an item grant the tool in YAML, while the parser recorded raw text that no rights list matches, so the gate read green.
+test('27c H1: a tool item that is not a bare tool name makes the field unreadable, a finding, never a green read', () => {
+  const head = '---\nname: cb-truth\ndescription: x\ntools:\n  - Read\n  - Grep\n  - Glob\n';
+  const spellings = {
+    'a block item with a trailing comment, Bash # reason': head + '  - Bash # reason\n---\n\nBody.\n',
+    'a double-quoted block item, "Bash"': head + '  - "Bash"\n---\n\nBody.\n',
+    "a single-quoted block item, 'Bash'": head + "  - 'Bash'\n---\n\nBody.\n",
+    'a WebFetch item with a trailing comment': head + '  - WebFetch # fetch\n---\n\nBody.\n',
+    'a double-quoted Edit item': head + '  - "Edit"\n---\n\nBody.\n',
+    'an inline value with a trailing comment on Bash': '---\nname: cb-truth\ndescription: x\ntools: Read, Grep, Glob, Bash # x\n---\n\nBody.\n',
+    'an inline value with a double-quoted Bash': '---\nname: cb-truth\ndescription: x\ntools: Read, Grep, Glob, "Bash"\n---\n\nBody.\n',
+  };
+  for (const [name, text] of Object.entries(spellings)) {
+    const defs = agentDefs().map((d) => (d.rel === 'agents/cb-truth.md' ? { ...d, text } : d));
+    const f = checkSeatRights({ skillText: skillText(), agentDefs: defs });
+    assert.ok(f.some((m) => /cb-truth/.test(m)), `${name} read green:\n${f.join('\n')}`);
+  }
+});
+
+// 27c bounce 1 (L1, reviewer round 3): the duplicate-key check counts a `tools` key spelled with a space or quotes, and a
+// column-0 quoted continuation is refused by the same tool-name rule as H1.
+test('27c L1: a second tools key spelled with a space or quotes, or a quoted inline value split at column 0, is unreadable', () => {
+  const head = '---\nname: cb-truth\ndescription: x\ntools:\n  - Read\n  - Grep\n  - Glob\n';
+  const tail = '  - Read\n  - Grep\n  - Glob\n  - Bash\n---\n\nBody.\n';
+  const spellings = {
+    'a second key spelled `tools :`, the LAST grants Bash': head + 'tools :\n' + tail,
+    'a second key spelled `"tools":`, the LAST grants Bash': head + '"tools":\n' + tail,
+    "a second key spelled `'tools':`, the LAST grants Bash": head + "'tools':\n" + tail,
+    'a quoted inline value continued at column 0 by Bash"': '---\nname: cb-truth\ndescription: x\ntools: "WebFetchX, Read, Grep, Glob,\nBash"\n---\n\nBody.\n',
+  };
+  for (const [name, text] of Object.entries(spellings)) {
+    const defs = agentDefs().map((d) => (d.rel === 'agents/cb-truth.md' ? { ...d, text } : d));
+    const f = checkSeatRights({ skillText: skillText(), agentDefs: defs });
+    assert.ok(f.some((m) => /cb-truth/.test(m)), `${name} read green:\n${f.join('\n')}`);
+  }
+});
+
 test('a ledger row edited without its agent def is a finding (a data seat given a shell in the ledger only)', () => {
   const widened = skillText().replace('| **data** (sub1 empirical) | ✔ | ✖ | ✔ |', '| **data** (sub1 empirical) | ✔ | ✔ | ✔ |');
   assert.notEqual(widened, skillText());
