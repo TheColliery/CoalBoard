@@ -2,6 +2,15 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.10] - 2026-10-27
+
+The five board seat agents now pass Antigravity's agent validator.
+
+The five board seat agents (`cb-adversary`, `cb-data`, `cb-feeling`, `cb-observer`, `cb-truth`) declared their `tools:` field as a comma-separated string, which Antigravity's loader cannot read as a list. The field is now a YAML list. Claude Code accepts either form, so Claude Code users see no change. The instrument is `agy plugin validate`, run on a temporary copy of the built plugin with a root `plugin.json` added, because CoalBoard's shipped plugin has no root `plugin.json` and agy does not load it as is. CoalBoard's documented Antigravity route is unchanged: the skill folder copy in the README, which never used these agent files. Antigravity does not run the board's seats.
+
+### Fixed
+- **The five board seat agents pass Antigravity's agent validator.** Before: agy 1.4.8 validate reported ``line 3: cannot unmarshal !!str `Read, G...` into []string. The loader skips this agent`` for each of the five agents. The `tools:` field is now a YAML list, and the validate test finds no error finding on the built plugin. Claude Code accepts both forms in its subagent frontmatter (code.claude.com/docs/en/sub-agents: "as a comma-separated string such as `Read, Grep, Bash` or a YAML list"). — test: scripts/agy-validate.test.mjs
+
 ## [2.8.9] - 2026-10-25
 
 The setup wizard no longer offers a house folder as a target.
