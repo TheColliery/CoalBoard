@@ -97,7 +97,19 @@ test('the ledger parser reads ids, binds and proofs (S1 carries real paths and h
 
 // The duty adds no RIGHT: the seats' tool rights stay exactly the ledger's (P19), agent defs agree.
 const agentDefs = () => fs.readdirSync(path.join(root, 'agents')).filter((f) => f.endsWith('.md')).map((f) => ({ rel: `agents/${f}`, text: read(path.join(root, 'agents', f)) }));
-const withTools = (seat, fn) => agentDefs().map((d) => (d.rel === `agents/cb-${seat}.md` ? { ...d, text: d.text.replace(/^tools:\s*(.+)$/m, (_, t) => `tools: ${fn(t.split(',').map((x) => x.trim())).join(', ')}`) } : d));
+// 27b: the agent defs carry `tools:` as a YAML block list (agy's loader requires it) or a comma string. The mutation
+// reads the seat's CURRENT rights through the same parser the gate uses, then writes them back in the comma form, so a
+// widened right is judged the same whatever spelling the file carries.
+// 27b bounce 1: the mutation rewrites the seat's rights in the FRONTMATTER only, and its field pattern spans every line the
+// fixed parser reads for the field (a blank or comment line inside the list included), so no item is left dangling.
+const FRONTMATTER = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+const TOOLS_FIELD = /^tools:(?:[ \t]*(?:#[^\n]*)?\r?\n(?:[ \t]*(?:#[^\n]*)?\r?\n|[ \t]+-[ \t]+[^\n]*\n)*|[^\n]*\n)/m;
+const withTools = (seat, fn) => agentDefs().map((d) => {
+  if (d.rel !== `agents/cb-${seat}.md`) return d;
+  const current = parseAgentTools([d])[seat];
+  const rewrite = (block) => block.replace(TOOLS_FIELD, `tools: ${fn(current).join(', ')}\n`);
+  return { ...d, text: d.text.replace(FRONTMATTER, rewrite) };
+});
 const skillText = () => read(path.join(skillDir, 'SKILL.md'));
 
 test('the real agent defs match the Seat-permissions ledger exactly', () => {
@@ -114,6 +126,28 @@ test('a widened right is a finding: a shell on cb-truth, fetch on cb-feeling, a 
   assert.ok(f3.some((m) => /cb-adversary: grants Write, which NO seat is ever granted/.test(m)), f3.join('\n'));
   const f4 = checkSeatRights({ skillText: skillText(), agentDefs: withTools('data', (t) => t.filter((x) => x !== 'WebSearch')) });
   assert.ok(f4.some((m) => /cb-data: the ledger row says fetch but WebSearch is not granted/.test(m)), f4.join('\n'));
+});
+
+// 27b bounce 1 (H1): three legal YAML spellings that hid a widened right from the gate. Each must report the shell.
+test('H1: a shell under a comment line or a blank line inside the block list, or a body tools: line, is a finding (not a green read)', () => {
+  const head = '---\nname: cb-truth\ndescription: x\n';
+  const spellings = {
+    'a comment line inside the list, then Bash': head + 'tools:\n  - Read\n  - Grep\n  - Glob\n  # shell below\n  - Bash\n---\n\nBody.\n',
+    'a blank line inside the list, then Bash': head + 'tools:\n  - Read\n  - Grep\n  - Glob\n\n  - Bash\n---\n\nBody.\n',
+    'a frontmatter list with Bash, and a body line tools: Read, Grep, Glob': head + 'tools:\n  - Read\n  - Grep\n  - Glob\n  - Bash\n---\n\ntools: Read, Grep, Glob\n',
+  };
+  for (const [name, text] of Object.entries(spellings)) {
+    const defs = agentDefs().map((d) => (d.rel === 'agents/cb-truth.md' ? { ...d, text } : d));
+    const f = checkSeatRights({ skillText: skillText(), agentDefs: defs });
+    assert.ok(f.some((m) => /cb-truth: grants Bash but the ledger row says no run/.test(m)), `${name} read green:\n${f.join('\n')}`);
+  }
+});
+
+test('H1: an indented line that is not a "- item" inside the list makes the field unreadable, a finding, never a partial read', () => {
+  const text = '---\nname: cb-truth\ndescription: x\ntools:\n  - Read\n  - Grep\n  - Glob\n  model: sonnet\n  - Bash\n---\n\nBody.\n';
+  const defs = agentDefs().map((d) => (d.rel === 'agents/cb-truth.md' ? { ...d, text } : d));
+  const f = checkSeatRights({ skillText: skillText(), agentDefs: defs });
+  assert.ok(f.some((m) => /cb-truth/.test(m)), `an unreadable field read green:\n${f.join('\n')}`);
 });
 
 test('a ledger row edited without its agent def is a finding (a data seat given a shell in the ledger only)', () => {

@@ -39,6 +39,8 @@ const TESTS = [
   'scripts/lib/test-suite.test.mjs',
   'scripts/lib/test-teardown.test.mjs',
   'scripts/lib/repo-fs.test.mjs',
+  'scripts/lib/agy-probe.test.mjs',
+  'scripts/agy-validate.test.mjs',
   'scripts/secret-scan.test.mjs',
   'scripts/secret-gate.test.mjs',
   'scripts/release-notes.test.mjs',

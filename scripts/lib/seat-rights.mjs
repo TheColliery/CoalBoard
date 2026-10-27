@@ -19,13 +19,41 @@ export function parseSeatLedger(skillText) {
   return seats;
 }
 
-// agents/cb-<seat>.md frontmatter `tools: A, B, C` -> { data: ['Read', ...] }
+// agents/cb-<seat>.md frontmatter -> { data: ['Read', ...] }. Two spellings carry the same rights: the comma string
+// `tools: A, B, C` (Claude Code) and a YAML block list `tools:` then `  - A` lines (agy's loader requires it, 27b; the
+// CoalMine shape, commit 04ae068). Both read to the same array, so the rights check is unchanged by the spelling.
+// 27b bounce 1 (H1): the field is read from the frontmatter only, and a YAML comment or blank line inside the list is
+// skipped (YAML keeps reading items after it). An indented line that is not `- item` makes the field unreadable: the seat
+// gets no entry, so the gate reports it, never a partial read that hides a granted right.
+const FRONTMATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const COMMENT_OR_BLANK = /^[ \t]*(?:#.*)?$/;
+const YAML_ITEM = /^[ \t]+-[ \t]+(.*)$/;
+
+// One seat's `tools:` field, or null when it is absent, a flow list, empty, or holds a line that is not a `- item`.
+function readTools(frontmatter) {
+  const lines = frontmatter.replace(/\r/g, '').split('\n');
+  const at = lines.findIndex((l) => /^tools:/.test(l));
+  if (at < 0) return null;
+  const inline = lines[at].slice('tools:'.length).trim();
+  if (inline) return inline.startsWith('[') ? null : inline.split(',').map((t) => t.trim()).filter(Boolean);
+  const items = [];
+  for (const line of lines.slice(at + 1)) {
+    if (COMMENT_OR_BLANK.test(line)) continue;
+    if (/^\S/.test(line)) break;
+    const m = YAML_ITEM.exec(line);
+    if (!m) return null;
+    items.push(m[1].trim());
+  }
+  return items.length ? items : null;
+}
+
 export function parseAgentTools(agentDefs) {
   const out = {};
   for (const { rel, text } of agentDefs) {
     const seat = /cb-([a-z0-9]+)\.md$/.exec(rel);
-    const tools = /^tools:\s*(.+)$/m.exec(text);
-    if (seat && tools) out[seat[1]] = tools[1].split(',').map((t) => t.trim()).filter(Boolean);
+    const fm = FRONTMATTER.exec(text);
+    const tools = seat && fm ? readTools(fm[1]) : null;
+    if (seat && tools) out[seat[1]] = tools;
   }
   return out;
 }
@@ -40,7 +68,7 @@ export function checkSeatRights({ skillText, agentDefs }) {
   if (seats.length !== 5) findings.push(`the Seat-permissions ledger must have exactly 5 rows, parsed ${seats.length} (${seats.join(', ')})`);
   for (const seat of seats) {
     const t = tools[seat];
-    if (!t) { findings.push(`seat \`${seat}\` has a ledger row but no agents/cb-${seat}.md \`tools:\` line`); continue; }
+    if (!t) { findings.push(`seat \`${seat}\` has a ledger row but no readable \`tools:\` field in agents/cb-${seat}.md (absent, a flow list, empty, or a line that is not a \`- item\`)`); continue; }
     const has = (list) => list.filter((x) => t.includes(x));
     for (const r of READ_TOOLS) if (!t.includes(r)) findings.push(`cb-${seat}: Read-class tool ${r} missing (every seat reads)`);
     if (has(SHELL_TOOLS).length > 0 && !ledger[seat].run) findings.push(`cb-${seat}: grants ${has(SHELL_TOOLS).join('/')} but the ledger row says no run (P19)`);
