@@ -1,6 +1,6 @@
 # CoalBoard on Antigravity (partial, measured 2026-10-27)
 
-> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. The 2026-06-22 end-to-end validation (Claude Opus 4.6, self-run, not third-party-audited: 3 read-only-leaf lenses → invoke parallel → judge → reap) predates the body's growth and no longer holds. Measured 2026-10-27 with agy 1.4.8: Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's body is 51,244 bytes, so the instructions for steps 1 to 4 never reach it; the skill installs and starts.
+> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. The 2026-06-22 end-to-end validation (Claude Opus 4.6, self-run, not third-party-audited: 3 read-only-leaf lenses → invoke parallel → judge → reap) predates the body's growth and no longer holds. Measured 2026-10-27 with agy 1.4.8: Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's SKILL.md body is more than twice that (51,244 bytes at 2.8.10, 51,508 at 2.8.11; measured 2026-10-27 with agy 1.4.8), so the instructions for steps 1 to 4 never reach it; the skill installs and starts.
 
 ## Tool mapping (Claude Code → Antigravity)
 | step | Claude Code | Antigravity |
