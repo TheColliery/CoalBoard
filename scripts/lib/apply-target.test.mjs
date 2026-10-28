@@ -44,7 +44,7 @@ function sandbox(t) {
     fs.rmSync(outside, { recursive: true, force: true });
     assert.ok(survived, 'cleanup of the sandbox removed the outside root content: a link was followed');
   });
-  return { base, proj, outside, realProj: fs.realpathSync.native(proj), realOutside: fs.realpathSync.native(outside) };
+  return { base, proj, outside, realProj: fs.realpathSync.native(proj) };
 }
 const touch = (p, text = 'x') => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); };
 const link = (target, at, type) => { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.symlinkSync(target, at, type); };
@@ -67,7 +67,7 @@ test('exit 0 and one OK line when every target is a plain in-root file or a new 
   assert.deepEqual(lines(r), ['OK src/a.js', 'OK src/new.js', 'OK deep/er/new.js']);
 });
 
-test('exit 1 when any target is refused, with one line per target, the refused one naming its reason and real path', (t) => {
+test('exit 1 when any target is refused, with one line per target, the refused one naming its reason and its link text', (t) => {
   if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
   const s = sandbox(t);
   touch(path.join(s.proj, 'ok.js'));
@@ -77,8 +77,9 @@ test('exit 1 when any target is refused, with one line per target, the refused o
   const l = lines(r);
   assert.equal(l.length, 2);
   assert.equal(l[0], 'OK ok.js');
-  assert.ok(l[1].startsWith('REFUSE ln/x.js link '), l[1]);
-  assert.ok(l[1].endsWith(s.realOutside), `the refusal names the link's real path: ${l[1]}`);
+  // the checker prints the link's own target text (readlink, never resolved): compare with what Node returns for the same link, not with a realpath
+  const linkText = fs.readlinkSync(path.join(s.proj, 'ln'));
+  assert.equal(l[1], `REFUSE ln/x.js link ${linkText}`, `the refusal names the link's own text: ${l[1]}`);
 });
 
 test('exit 2 on a usage error: no arguments, no target, an unresolvable root, an unknown flag', (t) => {
