@@ -6,7 +6,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 The Antigravity claim is now partial, as measured on 2026-10-27
 
-The board's Antigravity status is corrected. Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's SKILL.md body is more than twice that (51,244 bytes at 2.8.10, 51,508 at 2.8.11; measured 2026-10-27 with agy 1.4.8), so the instructions for steps 1 to 4 never reach it. The 2026-06-22 end-to-end validation predates that growth and no longer holds. Claude Code is unchanged.
+The board's Antigravity status is corrected. Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's SKILL.md body is more than twice that (51,244 bytes at 2.8.10, 51,554 at 2.8.11; measured 2026-10-27 with agy 1.4.8), so the instructions for steps 1 to 4 never reach it. The 2026-06-22 end-to-end validation predates that growth and no longer holds. Claude Code is unchanged.
 
 ### Changed
 - **The Antigravity claim is corrected everywhere it appears.** The README badge, install section and debate paragraph, CONTRIBUTING, the SKILL.md frontmatter and capability note, `references/platform-antigravity.md`, and both `plugin.json` and `marketplace.json` descriptions now say Antigravity is partial, with the measurement (agy 1.4.8, 2026-10-27). The Claude Code validation is unchanged.
