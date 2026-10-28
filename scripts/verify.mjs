@@ -614,8 +614,17 @@ check('factory config valid against schema', () => {
     else srFindings.forEach((m, i) => check(`seat rights: finding ${i + 1}/${srFindings.length}`, () => m));
     // 28b: the load set (SKILL.md plus the two references read before Step 0) is named once here, and its References rows are checked.
     const lsFindings = rsMods.ls.checkLoadSet(rsFiles);
-    if (lsFindings.length === 0) check('load set: SKILL.md, references/steps.md and references/rails.md are read before Step 0 (each a MANDATORY row of the References ledger)', () => null);
+    if (lsFindings.length === 0) check('load set: SKILL.md, references/steps.md and references/rails.md are read before Step 0 (each a MANDATORY row of the References ledger, each heading once)', () => null);
     else lsFindings.forEach((m, i) => check(`load set: finding ${i + 1}/${lsFindings.length}`, () => m));
+    // INSPECT 28b F1: the Antigravity load facts the 2.9.0 claim rests on, checked on the source AND on the built dist (the body cap, the steps pointer, the MANDATORY line).
+    const distSkillRel = 'plugin/skills/coalboard/SKILL.md';
+    const distSkillPath = path.join(root, ...distSkillRel.split('/'));
+    const agyFindings = [
+      ...rsMods.ls.checkAntigravityLoad(rsFiles[0]),
+      ...(fs.existsSync(distSkillPath) ? rsMods.ls.checkAntigravityLoad({ rel: distSkillRel, text: fs.readFileSync(distSkillPath, 'utf8') }) : [`${distSkillRel} is missing (the dist check reports it)`]),
+    ];
+    if (agyFindings.length === 0) check(`Antigravity load: the SKILL.md body is within ${rsMods.ls.ANTIGRAVITY_BODY_CAP} bytes on source and dist, and ## The steps sits inside it and names both references as MANDATORY`, () => null);
+    else agyFindings.forEach((m, i) => check(`Antigravity load: finding ${i + 1}/${agyFindings.length}`, () => m));
     const ssFindings = rsMods.ss.checkSourceSet({ files: rsFiles });
     if (ssFindings.length === 0) check('source set: every ledger row is read by an actor that already holds the right, and the duty reaches the seats, Step 1 and GATE 1', () => null);
     else ssFindings.forEach((m, i) => check(`source set: finding ${i + 1}/${ssFindings.length}`, () => m));

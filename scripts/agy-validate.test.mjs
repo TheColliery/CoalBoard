@@ -10,7 +10,7 @@
 // components.agents 0 without opening any agent. So the witness copies the built plugin/ into a temp folder and writes a
 // root plugin.json there, holding only name, version and description from plugin/.claude-plugin/plugin.json. The shipped
 // dist keeps no root plugin.json: that would be a native AG route, not in this unit. Warnings (commands and hooks that
-// never load, the SKILL body over 24000 bytes) are not asserted.
+// never load) are not asserted here; the SKILL body over 24000 bytes is verify's Antigravity load check (28b F1).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
