@@ -48,7 +48,7 @@ A "never" inside a Step and not listed here is that step's sequencing mechanics,
 - **P8 — NEVER free-write a lens prompt** — instantiate `references/lens-prompts.md` (steps.md Step 1).
 - **P9 — A dead / EMPTY-returning lens is a FAILURE, never a voice** (steps.md Step 1).
 - **P10 — Never re-pick a model known-unavailable this run** (steps.md Step 1).
-- **P11 — Main never does a lens's own work** — inline-self replaces the whole BOARD near a budget limit, never one lens's angle (steps.md Step 1–2).
+- **P11 — Main never does a lens's own work** — inline-self replaces the whole BOARD near a budget limit, never one lens's angle (steps.md Steps 1–2).
 - **P12 — Never restart a recoverable run from scratch** — resume/re-spawn the journal-tracked remainder (steps.md · Memory & resume).
 - **P13 — The REPORT exists only after GATE 3, and a `stop` leaves NO work product** — a `stop` writes nothing and DELETES anything this run staged into `proposed/` (steps.md Step 4).
 - **P14 — The board PROPOSES, never executes** — a side-effecting step is NEVER auto-retried (steps.md Step 4).
@@ -69,7 +69,7 @@ A "never" inside a Step and not listed here is that step's sequencing mechanics,
 | **adversary** | ✔ | ✔ | ✖ |
 | **sub4 / observer** | ✔ | ✖ | ✖ |
 
-Every command a shell seat or main RUNS also carries `references/run-safety.md` S1-S5 (a duty, never a right; the seat's own prompt states it). The OPINION lane's four seats carry their own rights column in `references/opinion-board.md` — never re-derived here. The JUDGE is main, not a spawned seat: every ground-truth RUN is main's (steps.md Step 2 · 4.2).
+Every command a shell seat or main RUNS also carries `references/run-safety.md` S1-S5 (a duty, never a right; the seat's own prompt states it). The OPINION lane's four seats carry their own rights column in `references/opinion-board.md` — never re-derived here. The JUDGE is main, not a spawned seat: every ground-truth RUN is main's (steps.md Steps 2 · 4.2).
 
 ### On-disk output — the complete set (5 writes below; a 6th bullet is a disposition NOTE, never a write; everything else is chat, bar the post-run folder the last bullet names)
 - `stagingDir` (def `.coalboard/proposed/`) — staged fix-changes ONLY, never the report.
@@ -88,7 +88,7 @@ A recovery move inside a Step and not listed here is that step's mechanics, not 
 - **F4** — a lens looping on an unavailable tool → fail FAST, return "couldn't reach it — flagged" (steps.md Step 1).
 - **F5** — deadlock (consensus below `consensusThreshold`) → `contestedRound` cross-exam (high/nasa) → sub4 blind-solve → matched camp WINS / matches neither → the HUMAN (steps.md Step 3).
 - **F6** — verify FAILS → discard staging → climb ONCE (a stronger tier) or sub4 (one attempt) → still failing → the human + the post-mortem file (steps.md Step 4.6).
-- **F7** — near a budget/quota limit, or a spawn denial (references/rails.md · Grants & denials) → fewer workers, or inline-self for the WHOLE board — never main-as-one-lens (P11) (steps.md Step 1–2).
+- **F7** — near a budget/quota limit, or a spawn denial (references/rails.md · Grants & denials) → fewer workers, or inline-self for the WHOLE board — never main-as-one-lens (P11) (steps.md Steps 1–2).
 - **F8** — mid-run death / overflow / limit-hit → resume from the memory net on the un-done remainder (steps.md · Memory & resume).
 - **F9** — headless, no human reachable → report-only forced (P2).
 - **F10** — an unverifiable tail (correlated blind spot · unprovable logic · an execute denial, references/rails.md · Grants & denials) → "could not verify — human decision", carried into GATE 3's digest, never a fake green (steps.md Step 4.2).

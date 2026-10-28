@@ -27,6 +27,6 @@ Run the probe from a script file, never an inline quoted shell string. A box exi
 
 ## How this binds the seats
 
-`references/lens-prompts.md` carries the S1-S5 rule in every Bash-holding seat's FIXED rules, so the seat's own prompt states it. references/steps.md steps.md Step 4.2's isolation line names this ledger for main's runs. The seats' tool rights do NOT change (Seat permissions is untouched): this adds a duty to a run, never a right.
+`references/lens-prompts.md` carries the S1-S5 rule in every Bash-holding seat's FIXED rules, so the seat's own prompt states it. steps.md Step 4.2's isolation line names this ledger for main's runs. The seats' tool rights do NOT change (Seat permissions is untouched): this adds a duty to a run, never a right.
 
 **Grant vs guarantee:** these are rails a model follows, enforced below probability 1 like every prose rail (hooks-safety.md section 9). S2's compare is what turns a slip into a finding even when a rail was missed, which is why the baseline is a compare-and-restore and not an instruction to be careful.
