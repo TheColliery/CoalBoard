@@ -6,8 +6,9 @@
 // Ported from CoalMine scripts/lib/agy-probe.mjs (commit 04ae068, 27b).
 import { spawnSync } from 'node:child_process';
 
-export function probeAgy({ command = 'agy', args = ['--version'], timeoutMs }) {
-  const r = spawnSync(command, args, { encoding: 'utf8', timeout: timeoutMs });
+// 28a (T-27c-1): `env` is the environment the child runs with; the default is the caller's own process.env, so an existing caller is unchanged.
+export function probeAgy({ command = 'agy', args = ['--version'], timeoutMs, env = process.env }) {
+  const r = spawnSync(command, args, { encoding: 'utf8', timeout: timeoutMs, env });
   const shown = [command, ...args].join(' ');
   if (r.error && r.error.code === 'ENOENT') return { state: 'absent', reason: `${command} is not on PATH` };
   if (r.error) return { state: 'failed', reason: `${shown} did not run: ${r.error.code}` };
