@@ -5,6 +5,7 @@
 // the path with lstat and canonicalizes with realpath.native. It is a CLI, not a hook: it FAILS LOUD (hooks-safety.md section 1.0). Zero-dependency, Node 22+.
 //   node apply-target.mjs <project-root> <target> [<target>...]      a target is relative to the root, or absolute
 //   stdout: one line per target, "OK <target>" or "REFUSE <target> <reason> <real path or ->"   reason: link | outside | unresolvable | name
+//   the last field: the real path where the walk resolved one (the final containment check); the RAW target text for outside (28a: a refused outside target is never resolved); the link's own target text for link (read, never followed); - otherwise
 //   exit: 0 every target OK, 1 any target refused, 2 usage error
 // Only links AT or BELOW the root are refused (the hook's own split: the root is resolved first, then joined); a link ABOVE the root is the user's layout.
 // A target segment below the root that ends in a dot or a space is refused as `name` (18e, T-15b5-1): Windows strips that character, so `foo.`, `foo ` and `foo` are one file there and a target could be checked under one spelling and written under another.
@@ -22,6 +23,10 @@ const SPLIT = path.sep === '\\' ? /[\\/]+/ : /\/+/;
 const clean = (s) => String(s).replace(/\p{Cc}/gu, '?'); // a target is untrusted text printed back: one line per target
 const insideRel = (rel) => rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
 const refuse = (reason, real) => ({ ok: false, reason, real: real || '-' });
+// 28a: a target whose raw text is a network path (UNC, //host/share, the \\?\ and \\.\ device forms) is refused on that text before any file-system call; on win32 a realpath or lstat of it reaches the network.
+const NETWORK_TEXT = /^[\\/]{2}/;
+// a link's own target text, read with readlink (which does not resolve it); '-' when it cannot be read. The link is never followed, so a network target inside it is never reached.
+const linkText = (p) => { try { return clean(fs.readlinkSync(p)); } catch { return '-'; } };
 
 // the real path of `p`, or of its nearest existing ancestor joined with the missing tail; null when it cannot be resolved
 function realOf(p) {
@@ -58,11 +63,12 @@ function belowRoot(target, rootSpelling) {
 
 // Walk the target's components below the root with lstat. Every verified component is a real non-link directory, so a `..` step is the true parent.
 function check(root, rootLexical, target) {
+  if (NETWORK_TEXT.test(target)) return refuse('outside', target); // 28a: refused on its raw text, before any path call below
   let segs;
   let cur = root;
   if (path.isAbsolute(target)) {
     const below = belowRoot(target, root) ?? belowRoot(target, rootLexical);
-    if (below === null) return refuse('outside', realOf(path.resolve(target))); // not under the root's spelling (over-refuses a collapsible path that only reaches it through ..: the safe direction)
+    if (below === null) return refuse('outside', target); // not under the root's spelling (over-refuses a collapsible path that only reaches it through ..: the safe direction); 28a: the outside target is never resolved
     segs = below;
   } else {
     segs = target.split(SPLIT).filter((s) => s && s !== '.');
@@ -77,7 +83,7 @@ function check(root, rootLexical, target) {
     const seg = segs[i];
     if (seg === '..') {
       cur = path.dirname(cur);
-      if (!insideRel(path.relative(root, cur)) && path.relative(root, cur) !== '') return refuse('outside', realOf(cur));
+      if (!insideRel(path.relative(root, cur)) && path.relative(root, cur) !== '') return refuse('outside', target); // 28a: the parent of the root is never resolved
       continue;
     }
     const next = path.join(cur, seg);
@@ -86,7 +92,7 @@ function check(root, rootLexical, target) {
       if (e && e.code === 'ENOENT') { missingAt = i; break; }
       return refuse('unresolvable', '-');
     }
-    if (st.isSymbolicLink()) return refuse('link', realOf(next));
+    if (st.isSymbolicLink()) return refuse('link', linkText(next)); // 28a: the link is not followed; its own target text is reported
     if (i < segs.length - 1 && !st.isDirectory()) return refuse('unresolvable', '-'); // a path through a plain file
     cur = next;
   }
@@ -96,7 +102,7 @@ function check(root, rootLexical, target) {
   let finalPath = cur;
   if (missingAt !== -1) {
     finalPath = path.join(cur, ...segs.slice(missingAt));
-    if (!insideRel(path.relative(root, finalPath))) return refuse('outside', realOf(finalPath));
+    if (!insideRel(path.relative(root, finalPath))) return refuse('outside', target);
   }
   const real = realOf(finalPath);
   if (real === null) return refuse('unresolvable', '-');

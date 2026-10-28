@@ -455,3 +455,70 @@ test('an ABSOLUTE target whose below-root first segment looks like a drive prefi
   assert.equal(r.status, 0, r.stdout);
   assert.deepEqual(lines(r), abs.map((c) => `OK ${c}`));
 });
+
+// ---- 28a: a REFUSED target never reaches a file-system resolve ---------------------------------------------------------------------------
+// A CJS preload wraps fs.realpathSync.native and fs.lstatSync and logs every path it is handed, so the log is the checker's own file-system trace.
+// The assertions read that trace, never the verdict alone: a correct REFUSE line with a resolve of the refused path is still the defect. A network
+// path is refused on its raw text; an outside target and a link are refused without resolving them (a link's own target text is read, never followed).
+// fakeLink (optional): a path ending in that name reports as a symbolic link at lstat, so the link branch runs on a box with no symlink privilege.
+function traced(s, fakeLink = null) {
+  const log = path.join(s.outside, 'fs-trace.log');
+  const pre = path.join(s.outside, 'fs-trace.cjs');
+  fs.writeFileSync(pre, [
+    "const fs = require('fs');",
+    `const LOG = ${JSON.stringify(log)};`,
+    `const FAKE = ${JSON.stringify(fakeLink)};`,
+    "const note = (kind, p) => fs.appendFileSync(LOG, kind + ' ' + String(p) + '\\n');",
+    'const realNative = fs.realpathSync.native;',
+    "fs.realpathSync.native = function (p) { note('realpath', p); return realNative.apply(this, arguments); };",
+    'const realLstat = fs.lstatSync;',
+    "fs.lstatSync = function (p) { note('lstat', p); if (FAKE !== null && String(p).endsWith(FAKE)) return { isSymbolicLink: () => true, isDirectory: () => false }; return realLstat.apply(this, arguments); };",
+  ].join('\n'));
+  return { log, pre };
+}
+const trace = (tr) => (fs.existsSync(tr.log) ? fs.readFileSync(tr.log, 'utf8').split('\n').filter(Boolean) : []);
+const resolved = (tr) => trace(tr).filter((l) => l.startsWith('realpath ')).map((l) => l.slice('realpath '.length));
+const insideRoot = (p, root) => { const rel = path.relative(root, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+
+test('28a: a network-path target (UNC, //host/share, \\\\?\\UNC) is refused on its raw text, before any file-system call, on every platform', (t) => {
+  const s = sandbox(t);
+  const tr = traced(s);
+  const cases = ['\\\\zzhost\\share\\x.js', '//zzhost/share/x.js', '\\\\?\\UNC\\zzhost\\share\\x.js'];
+  for (const c of cases) {
+    fs.rmSync(tr.log, { force: true });
+    const r = run(s, [s.proj, c], { preload: tr.pre });
+    assert.equal(r.status, 1, r.stdout);
+    assert.deepEqual(trace(tr).filter((l) => l.includes('zzhost')), [], `a file-system call reached the refused network path ${c}`);
+    assert.deepEqual(lines(r), [`REFUSE ${c} outside ${c}`]);
+  }
+});
+
+test('28a: a plain absolute target outside the root is refused without a resolve of any path outside the root', (t) => {
+  const s = sandbox(t);
+  const tr = traced(s);
+  const r = run(s, [s.proj, path.join(s.outside, 'x.js')], { preload: tr.pre });
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].startsWith('REFUSE ') && lines(r)[0].includes(' outside '), r.stdout);
+  const escaped = resolved(tr).filter((p) => !insideRoot(p, s.proj) && !insideRoot(p, s.realProj));
+  assert.deepEqual(escaped, [], `the checker resolved a path outside the root: ${escaped.join(', ')}`);
+});
+
+test('28a: a target that climbs out of the root with .. is refused without a resolve of any path above the root', (t) => {
+  const s = sandbox(t);
+  const tr = traced(s);
+  const r = run(s, [s.proj, '../zzclimb/x.js'], { preload: tr.pre });
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].startsWith('REFUSE ../zzclimb/x.js outside '), r.stdout);
+  const escaped = resolved(tr).filter((p) => !insideRoot(p, s.proj) && !insideRoot(p, s.realProj));
+  assert.deepEqual(escaped, [], `the checker resolved a path above the root: ${escaped.join(', ')}`);
+});
+
+test('28a: a link is refused as link without a resolve of the link path (the link is simulated at lstat, so no symlink privilege is needed)', (t) => {
+  const s = sandbox(t);
+  const tr = traced(s, 'ln.js');
+  const r = run(s, [s.proj, 'ln.js'], { preload: tr.pre });
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(lines(r)[0].startsWith('REFUSE ln.js link '), r.stdout);
+  const hit = resolved(tr).filter((p) => p === path.join(s.realProj, 'ln.js') || p === path.join(s.proj, 'ln.js'));
+  assert.deepEqual(hit, [], `the checker resolved the refused link: ${hit.join(', ')}`);
+});
