@@ -21,6 +21,15 @@ const mutate = (rel, from, to) => realFiles().map((f) => {
   assert.equal(f.text.split(from).length - 1, 1, `fixture anchor must match exactly once: ${from.slice(0, 60)}`);
   return { ...f, text: f.text.replace(from, () => to) };
 });
+// 28b: an anchor sits in whichever LOAD-SET file holds it now (SKILL.md, references/steps.md, references/rails.md); it must match exactly once across the load set.
+const LOAD = ['skills/coalboard/SKILL.md', 'skills/coalboard/references/steps.md', 'skills/coalboard/references/rails.md'];
+const mutateLoad = (from, to) => {
+  const files = realFiles();
+  const count = files.filter((f) => LOAD.includes(f.rel)).reduce((n, f) => n + (f.text.split(from).length - 1), 0);
+  assert.equal(count, 1, `fixture anchor must match exactly once in the load set: ${from.slice(0, 60)}`);
+  const hit = files.find((f) => LOAD.includes(f.rel) && f.text.includes(from));
+  return files.map((f) => (f === hit ? { ...f, text: f.text.replace(from, () => to) } : f));
+};
 const dropRow = (id) => realFiles().map((f) => (f.rel === REF ? { ...f, text: f.text.split('\n').filter((l) => !l.startsWith(`| **${id}`)).join('\n') } : f));
 
 test('the shipped contract passes', () => {
@@ -84,9 +93,8 @@ test('the duty must reach the seat: a lens-prompts FIXED rule missing, or missin
 });
 
 test("main's own runs: Step 4.2 must point at the ledger and the references table must list it MANDATORY", () => {
-  const skill = 'skills/coalboard/SKILL.md';
-  assert.ok(checkRunSafety({ files: mutate(skill, 'Isolation = `references/run-safety.md` S1-S5', 'Isolation = ') }).some((m) => /Step 4\.2 does not point at references\/run-safety\.md/.test(m)));
-  assert.ok(checkRunSafety({ files: mutate(skill, '| **MANDATORY before ANY command is run against a target**', '| on-demand') }).some((m) => /not as MANDATORY/.test(m)));
+  assert.ok(checkRunSafety({ files: mutateLoad('Isolation = `references/run-safety.md` S1-S5', 'Isolation = ') }).some((m) => /Step 4\.2 \(references\/steps\.md\) does not point at references\/run-safety\.md/.test(m)));
+  assert.ok(checkRunSafety({ files: mutateLoad('| **MANDATORY before ANY command is run against a target**', '| on-demand') }).some((m) => /not as MANDATORY/.test(m)));
 });
 
 test('the ledger parser reads ids, binds and proofs (S1 carries real paths and hashes as its proof)', () => {

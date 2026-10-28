@@ -1,8 +1,8 @@
 # CoalBoard — RUN SAFETY: what a run is allowed to leave behind (CWK-160)
 
-The board's seats RUN things (`feeling` and `adversary` hold a shell; main runs Step 2's checks and Step 4.2's gates). A run is how a claim is proven, so the run STAYS. What changes is that every run is surveyed first and compared after. The reason is measured: a seat ran a tool on a COPY with a sandboxed `HOME`, and the tool still walked up out of the copy and rewrote the owner's real global config, because a faked `HOME` defeats a guard that compares against the home directory.
+The board's seats RUN things (`feeling` and `adversary` hold a shell; main runs steps.md Step 2's checks and steps.md Step 4.2's gates). A run is how a claim is proven, so the run STAYS. What changes is that every run is surveyed first and compared after. The reason is measured: a seat ran a tool on a COPY with a sandboxed `HOME`, and the tool still walked up out of the copy and rewrote the owner's real global config, because a faked `HOME` defeats a guard that compares against the home directory.
 
-**Every actor that runs a command against a target is bound by S1, S2, S3 and S5 below, and by S4 where a real box exists; a target whose effects are not files is run only inside such a box (S4).** Actors: `main` (Step 2 and Step 4.2 runs), `feeling`, `adversary`. A seat that cannot do S1 and S2 does not run: the dimension it would have run is NOT-CHECKED (never clean). **A run that leaves its clone behind has not met its own done-criteria (S5).**
+**Every actor that runs a command against a target is bound by S1, S2, S3 and S5 below, and by S4 where a real box exists; a target whose effects are not files is run only inside such a box (S4).** Actors: `main` (steps.md Step 2 and steps.md Step 4.2 runs), `feeling`, `adversary`. A seat that cannot do S1 and S2 does not run: the dimension it would have run is NOT-CHECKED (never clean). **A run that leaves its clone behind has not met its own done-criteria (S5).**
 
 ## The safeguard ledger — S1-S5 (TRANSCRIBE; the proof column is what the return states)
 
@@ -27,6 +27,6 @@ Run the probe from a script file, never an inline quoted shell string. A box exi
 
 ## How this binds the seats
 
-`references/lens-prompts.md` carries the S1-S5 rule in every Bash-holding seat's FIXED rules, so the seat's own prompt states it. SKILL.md Step 4.2's isolation line names this ledger for main's runs. The seats' tool rights do NOT change (Seat permissions is untouched): this adds a duty to a run, never a right.
+`references/lens-prompts.md` carries the S1-S5 rule in every Bash-holding seat's FIXED rules, so the seat's own prompt states it. references/steps.md steps.md Step 4.2's isolation line names this ledger for main's runs. The seats' tool rights do NOT change (Seat permissions is untouched): this adds a duty to a run, never a right.
 
 **Grant vs guarantee:** these are rails a model follows, enforced below probability 1 like every prose rail (hooks-safety.md section 9). S2's compare is what turns a slip into a finding even when a rail was missed, which is why the baseline is a compare-and-restore and not an instruction to be careful.

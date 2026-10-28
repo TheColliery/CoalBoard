@@ -23,6 +23,15 @@ const mutate = (rel, from, to) => realFiles().map((f) => {
   assert.equal(f.text.split(from).length - 1, 1, `fixture anchor must match exactly once: ${from.slice(0, 60)}`);
   return { ...f, text: f.text.replace(from, () => to) };
 });
+// 28b: an anchor sits in whichever LOAD-SET file holds it now (SKILL.md, references/steps.md, references/rails.md); it must match exactly once across the load set.
+const LOAD = [SKILL, 'skills/coalboard/references/steps.md', 'skills/coalboard/references/rails.md'];
+const mutateLoad = (from, to) => {
+  const files = realFiles();
+  const count = files.filter((f) => LOAD.includes(f.rel)).reduce((n, f) => n + (f.text.split(from).length - 1), 0);
+  assert.equal(count, 1, `fixture anchor must match exactly once in the load set: ${from.slice(0, 60)}`);
+  const hit = files.find((f) => LOAD.includes(f.rel) && f.text.includes(from));
+  return files.map((f) => (f === hit ? { ...f, text: f.text.replace(from, () => to) } : f));
+};
 const row = (id) => realFiles().find((f) => f.rel === REF).text.split('\n').find((l) => l.startsWith(`| **${id}**`));
 const mutateRow = (id, fn) => mutate(REF, row(id), fn(row(id)));
 const run = (files = realFiles()) => checkSourceSet({ files });
@@ -88,13 +97,13 @@ test('the duty reaches the seats: the placeholder, the code checklist, the TRACE
 });
 
 test("main's read is named, not hidden: Step 1's brief rail, GATE 1's TARGET block and the network row's one exception", () => {
-  assert.ok(run(mutate(SKILL, 'a source main cannot reach is `NOT-CHECKED`, never clean, and no seat gains a right.', 'done.')).some((m) => /Step 1 has no rail that builds the alert brief/.test(m)));
-  assert.ok(run(mutate(SKILL, ' · the SOURCE SET reachable this run (A1-A3 alerts, L1-L5 live sources, E1 box — `references/source-set.md`) with each unreachable one named;', ';')).some((m) => /TARGET block does not list the source set/.test(m)));
-  assert.ok(run(mutate(SKILL, ', except A1-A3\'s read-only alert GET through its `execute` grant (`references/source-set.md`)', '')).some((m) => /network row says main never fetches but does not name A1-A3/.test(m)));
+  assert.ok(run(mutateLoad('a source main cannot reach is `NOT-CHECKED`, never clean, and no seat gains a right.', 'done.')).some((m) => /Step 1 has no rail that builds the alert brief/.test(m)));
+  assert.ok(run(mutateLoad(' · the SOURCE SET reachable this run (A1-A3 alerts, L1-L5 live sources, E1 box — `references/source-set.md`) with each unreachable one named;', ';')).some((m) => /TARGET block does not list the source set/.test(m)));
+  assert.ok(run(mutateLoad(', except A1-A3\'s read-only alert GET through its `execute` grant (`references/source-set.md`)', '')).some((m) => /network row says main never fetches but does not name A1-A3/.test(m)));
 });
 
 test('the references table lists it MANDATORY at its moment', () => {
-  assert.ok(run(mutate(SKILL, '| **MANDATORY for a code / CI / config target or a repo audit**', '| on-demand')).some((m) => /not as MANDATORY/.test(m)));
+  assert.ok(run(mutateLoad('| **MANDATORY for a code / CI / config target or a repo audit**', '| on-demand')).some((m) => /not as MANDATORY/.test(m)));
 });
 
 // R15 findings-back round 1 (MEDIUM-1, HIGH-1): the ledger's CONTENT anchors, each with the reviewer's mutant.
@@ -155,4 +164,11 @@ test('t24 #8: L2 must say OSV is read by id, and must point the package lookup a
   assert.ok(run(mutateRow('L2', (r) => r.replace('a vulnerability by id', 'a vulnerability'))).some((m) => /L2 must say OSV is read by id/.test(m)));
   assert.ok(run(mutateRow('L2', (r) => r.replace(L2_NOW, 'a vulnerability by id'))).some((m) => /L2 must point the package-and-version lookup at L1/.test(m)));
   assert.ok(run(mutateRow('L2', (r) => r.replace('affects=', 'filter='))).some((m) => /L2 must point the package-and-version lookup at L1/.test(m)));
+});
+
+// 28b mutant m2: the Grants network row is deleted from references/rails.md (where the Grants table now lives); the gate names the missing row.
+test('28b mutant m2: deleting the Grants network row from references/rails.md is a finding', () => {
+  const noNetwork = realFiles().map((f) => (f.rel === 'skills/coalboard/references/rails.md' ? { ...f, text: f.text.split('\n').filter((l) => !l.startsWith('| network |')).join('\n') } : f));
+  const f = run(noNetwork);
+  assert.ok(f.some((m) => /Grants table \(references\/rails\.md\) has no network row/.test(m)), f.join('\n'));
 });

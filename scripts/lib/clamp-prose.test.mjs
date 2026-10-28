@@ -19,12 +19,24 @@ const realFiles = () => [
 const schemaEnums = Object.fromEntries(CONFIG_SCHEMA.filter((s) => s.type === 'enum').map((s) => [s.key, s.values]));
 const conductor = read(path.join(root, 'hooks', 'coalboard-conductor.js'));
 const run = (files = realFiles(), clampedKeys = hookClampedKeys(conductor), clampedDefaults = hookClampedDefaults(conductor), clampedOrders = hookClampedOrders(conductor)) => checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaults, clampedOrders });
-const mutate = (rel, from, to) => realFiles().map((f) => {
-  if (f.rel !== rel) return f;
-  assert.equal(f.text.split(from).length - 1, 1, `fixture anchor must match exactly once: ${from.slice(0, 50)}`);
-  return { ...f, text: f.text.replace(from, () => to) };
-});
+// 28b: an anchor sits in whichever LOAD-SET file holds it now (SKILL.md, references/steps.md, references/rails.md). It must match exactly once across the
+// load set, and the test proves the same failure wherever the text lives.
 const SKILL = 'skills/coalboard/SKILL.md';
+const LOAD = [SKILL, 'skills/coalboard/references/steps.md', 'skills/coalboard/references/rails.md'];
+const mutateLoad = (from, to) => {
+  const files = realFiles();
+  const count = files.filter((f) => LOAD.includes(f.rel)).reduce((n, f) => n + (f.text.split(from).length - 1), 0);
+  assert.equal(count, 1, `fixture anchor must match exactly once in the load set: ${from.slice(0, 50)}`);
+  const hit = files.find((f) => LOAD.includes(f.rel) && f.text.includes(from));
+  return files.map((f) => (f === hit ? { ...f, text: f.text.replace(from, () => to) } : f));
+};
+// Remove one `## ` section (its heading through the line before the next `## ` heading, or the end of the file).
+const withoutSection = (text, heading) => {
+  const at = text.indexOf(heading);
+  assert.notEqual(at, -1, `section heading not found: ${heading}`);
+  const next = text.indexOf('\n## ', at + heading.length);
+  return text.slice(0, at) + (next === -1 ? '' : text.slice(next + 1));
+};
 
 test("the hook's clamped keys are derived from the conductor, not listed here", () => {
   assert.deepEqual(hookClampedKeys(conductor), ['coalboardMode', 'updateMode']);
@@ -36,26 +48,26 @@ test('the shipped skill text passes: one canonical clause, schema-equal values, 
 });
 
 test('RED-FIRST: a read site written without the merged qualifier is named by file:line', () => {
-  const f = run(mutate(SKILL, 'by the MERGED `coalboardMode` (Always):', 'by `coalboardMode`:'));
+  const f = run(mutateLoad('by the MERGED `coalboardMode` (references/rails.md · Always):', 'by `coalboardMode`:'));
   assert.equal(f.length, 1);
-  assert.match(f[0], /skills\/coalboard\/SKILL\.md:\d+ reads `coalboardMode` without saying it is the MERGED/);
+  assert.match(f[0], /skills\/coalboard\/(SKILL\.md|references\/(steps|rails)\.md):\d+ reads `coalboardMode` without saying it is the MERGED/);
 });
 
 test('every agent-read consent key is held to the same rule (fableConsent, applyConsent)', () => {
-  assert.equal(run(mutate(SKILL, 'AND the MERGED `fableConsent` is `ask`;', 'AND `fableConsent` is `ask`;')).length, 1);
-  assert.equal(run(mutate(SKILL, '(the MERGED `applyConsent` = explicit approval', '(`applyConsent` = explicit approval')).length, 1);
+  assert.equal(run(mutateLoad('AND the MERGED `fableConsent` is `ask`;', 'AND `fableConsent` is `ask`;')).length, 1);
+  assert.equal(run(mutateLoad('(the MERGED `applyConsent` = explicit approval', '(`applyConsent` = explicit approval')).length, 1);
 });
 
 test('the canonical clause must name the two unclamped consent keys it states a rule for', () => {
-  const f = run(mutate(SKILL, '`fableConsent` (`ask`/`always`/`never`, default `ask`) and `applyConsent` (a boolean, default `true`) in particular', 'the consent keys in particular'));
+  const f = run(mutateLoad('`fableConsent` (`ask`/`always`/`never`, default `ask`) and `applyConsent` (a boolean, default `true`) in particular', 'the consent keys in particular'));
   assert.ok(f.some((m) => /does not name `fableConsent`/.test(m)), f.join('\n'));
   assert.ok(f.some((m) => /does not name `applyConsent`/.test(m)), f.join('\n'));
 });
 
 test('the clause cannot drift off the schema: a dropped or an invented enum value is a finding', () => {
-  const dropped = run(mutate(SKILL, '`updateMode`: `off`/`remind`/`ask`/`auto`;', '`updateMode`: `off`/`ask`/`auto`;'));
+  const dropped = run(mutateLoad('`updateMode`: `off`/`remind`/`ask`/`auto`;', '`updateMode`: `off`/`ask`/`auto`;'));
   assert.ok(dropped.some((m) => /`updateMode` without the schema value\(s\) `remind`/.test(m)), dropped.join('\n'));
-  const invented = run(mutate(SKILL, '`coalboardMode`: `off`/`ask`/`auto`;', '`coalboardMode`: `off`/`ask`/`auto`/`always`;'));
+  const invented = run(mutateLoad('`coalboardMode`: `off`/`ask`/`auto`;', '`coalboardMode`: `off`/`ask`/`auto`/`always`;'));
   assert.ok(invented.some((m) => /does not declare: `always`/.test(m)), invented.join('\n'));
 });
 
@@ -66,7 +78,7 @@ test('a key the HOOK newly clamps but the clause never names is a finding (deriv
 
 test('no derivable hook clamp, or no / two canonical clauses, is a finding, never a silent pass', () => {
   assert.ok(run(realFiles(), []).some((m) => /no hook-clamped keys were derived/.test(m)));
-  const none = run(mutate(SKILL, 'counts as ABSENT', 'counts as missing'));
+  const none = run(mutateLoad('counts as ABSENT', 'counts as missing'));
   assert.ok(none.some((m) => /exactly ONE canonical clamp-aware clause.*found 0/.test(m)), none.join('\n'));
   const two = realFiles().map((f) => (f.rel === SKILL ? { ...f, text: `${f.text}\nA second ABSENT rule under safer-value-wins.\n` } : f));
   assert.ok(run(two).some((m) => /found 2/.test(m)));
@@ -87,12 +99,12 @@ test('the persist exemption is per MENTION: a read later on the same line as a p
 // R15 findings-back round 1 (LOW-2): the absent / default RULE of the canonical clause, not only its keys and values.
 test('LOW-2: the schema defaults are derived from the conductor, and the clause must carry the global fallback to that default', () => {
   assert.deepEqual(hookClampedDefaults(conductor), { coalboardMode: 'ask', updateMode: 'ask' });
-  const f = run(mutate(SKILL, "a global's to the default `ask`", "a global's to `auto`"));
+  const f = run(mutateLoad("a global's to the default `ask`", "a global's to `auto`"));
   assert.ok(f.some((m) => /a global's out-of-set value reads as the schema default `ask`/.test(m)), f.join('\n'));
 });
 
 test("LOW-2: the clause must say a project's out-of-set value falls back to the global value", () => {
-  const f = run(mutate(SKILL, "a project's falls back to the global value", "a project's is used as written"));
+  const f = run(mutateLoad("a project's falls back to the global value", "a project's is used as written"));
   assert.ok(f.some((m) => /falls back to the global value/.test(m)), f.join('\n'));
 });
 
@@ -113,16 +125,16 @@ test("the hook's clamp ORDER is derived from the conductor, not listed here", ()
 
 test('RED-FIRST PR 19 #17: the stated order must equal SAFER_ENUM, so ask and remind as equals, a swap and a reversal are each a finding', () => {
   const isOrder = (key) => (m) => m.includes('`' + key + '`') && /order/.test(m);
-  const equal = run(mutate(SKILL, UPDATE_ORDER, '`updateMode` ranks `off`<`ask`/`remind`<`auto`'));
+  const equal = run(mutateLoad(UPDATE_ORDER, '`updateMode` ranks `off`<`ask`/`remind`<`auto`'));
   assert.ok(equal.some(isOrder('updateMode')), equal.join('\n'));
-  const swapped = run(mutate(SKILL, UPDATE_ORDER, '`updateMode` ranks `off`<`ask`<`remind`<`auto`'));
+  const swapped = run(mutateLoad(UPDATE_ORDER, '`updateMode` ranks `off`<`ask`<`remind`<`auto`'));
   assert.ok(swapped.some(isOrder('updateMode')), swapped.join('\n'));
-  const reversed = run(mutate(SKILL, BOARD_ORDER, '`coalboardMode` ranks `auto`<`ask`<`off`'));
+  const reversed = run(mutateLoad(BOARD_ORDER, '`coalboardMode` ranks `auto`<`ask`<`off`'));
   assert.ok(reversed.some(isOrder('coalboardMode')), reversed.join('\n'));
 });
 
 test('a clause that states no order for a hook-clamped key is a finding', () => {
-  const none = run(mutate(SKILL, BOARD_ORDER + '; ', ''));
+  const none = run(mutateLoad(BOARD_ORDER + '; ', ''));
   assert.ok(none.some((m) => m.includes('`coalboardMode`') && /order/.test(m)), none.join('\n'));
 });
 
@@ -136,7 +148,7 @@ test('RED-FIRST t29 #2: a clamped key with no derived order is a finding even wh
   const orders = hookClampedOrders(conductor);
   const { updateMode, ...onlyBoard } = orders;
   assert.ok(updateMode, 'precondition: the conductor derives an updateMode order');
-  const files = mutate(SKILL, UPDATE_ORDER, REVERSED);
+  const files = mutateLoad(UPDATE_ORDER, REVERSED);
   const f = run(files, hookClampedKeys(conductor), hookClampedDefaults(conductor), onlyBoard);
   assert.ok(f.some((m) => /no clamp order was derived for `updateMode`/.test(m)), f.join('\n'));
   assert.ok(!f.some((m) => /no clamp order was derived from the conductor/.test(m)), 'one key missing is the per-key finding, not the all-missing one');
@@ -148,4 +160,25 @@ test('t29 #2: an order that SAFER_ENUM states after a nested brace is not derive
   assert.ok(!('updateMode' in hookClampedOrders(nested)), 'the pattern stops at the first closing brace');
   const f = run(realFiles(), hookClampedKeys(nested), hookClampedDefaults(nested), hookClampedOrders(nested));
   assert.ok(f.some((m) => /no clamp order was derived for `updateMode`/.test(m)), f.join('\n'));
+});
+
+// 28b: ONE source per rail across the load set. The canonical clause lives in references/rails.md ("## Always"); a second copy in ANY load-set file is a
+// finding. The planted clause is built in memory from the real line, so the fixture is a temp copy by construction and nothing under the tree is written.
+const CLAUSE = realFiles().find((f) => f.rel === 'skills/coalboard/references/rails.md').text.split('\n').find((l) => /\bABSENT\b/.test(l) && /safer-value-wins/i.test(l));
+
+test('28b RED-FIRST one-source: the same clamp-aware clause planted in SKILL.md AND in rails.md is a finding (the gate counts across the load set)', () => {
+  const planted = realFiles().map((f) => (f.rel === SKILL ? { ...f, text: `${f.text}\n${CLAUSE}\n` } : f));
+  const f = run(planted);
+  assert.ok(f.some((m) => /exactly ONE canonical clamp-aware clause.*found 2/.test(m)), f.join('\n'));
+});
+
+test('28b mutant m1: deleting the Always section from references/rails.md leaves the load set with no canonical clause', () => {
+  const removed = realFiles().map((f) => (f.rel === 'skills/coalboard/references/rails.md' ? { ...f, text: withoutSection(f.text, '## Always') } : f));
+  const f = run(removed);
+  assert.ok(f.some((m) => /exactly ONE canonical clamp-aware clause.*found 0/.test(m)), f.join('\n'));
+});
+
+test('28b mutant m4: a second copy of the clamp clause in references/steps.md is a finding', () => {
+  const second = realFiles().map((f) => (f.rel === 'skills/coalboard/references/steps.md' ? { ...f, text: `${f.text}\n${CLAUSE}\n` } : f));
+  assert.ok(run(second).some((m) => /exactly ONE canonical clamp-aware clause.*found 2/.test(m)), 'a second copy in steps.md went unnamed');
 });

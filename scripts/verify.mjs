@@ -594,6 +594,7 @@ check('factory config valid against schema', () => {
       rs: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'run-safety.mjs')).href),
       sr: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'seat-rights.mjs')).href),
       ss: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'source-set.mjs')).href),
+      ls: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'load-set.mjs')).href),
     };
   } catch (e) { rsLoadError = e; }
   if (rsLoadError) {
@@ -611,6 +612,10 @@ check('factory config valid against schema', () => {
     const srFindings = rsMods.sr.checkSeatRights({ skillText: rsFiles[0].text, agentDefs });
     if (srFindings.length === 0) check(`seat rights: the ${agentDefs.length} agent defs equal the Seat-permissions ledger (no seat gained a right)`, () => null);
     else srFindings.forEach((m, i) => check(`seat rights: finding ${i + 1}/${srFindings.length}`, () => m));
+    // 28b: the load set (SKILL.md plus the two references read before Step 0) is named once here, and its References rows are checked.
+    const lsFindings = rsMods.ls.checkLoadSet(rsFiles);
+    if (lsFindings.length === 0) check('load set: SKILL.md, references/steps.md and references/rails.md are read before Step 0 (each a MANDATORY row of the References ledger)', () => null);
+    else lsFindings.forEach((m, i) => check(`load set: finding ${i + 1}/${lsFindings.length}`, () => m));
     const ssFindings = rsMods.ss.checkSourceSet({ files: rsFiles });
     if (ssFindings.length === 0) check('source set: every ledger row is read by an actor that already holds the right, and the duty reaches the seats, Step 1 and GATE 1', () => null);
     else ssFindings.forEach((m, i) => check(`source set: finding ${i + 1}/${ssFindings.length}`, () => m));

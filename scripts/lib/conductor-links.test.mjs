@@ -292,7 +292,9 @@ for (const [name, rel, legacy] of SHAPES) {
 // An anchor catches deletion and reword, never reversal (verify.mjs / clamp-prose style); the rule's strength is prose, not a guarantee.
 for (const [label, rel] of [['source', ['skills', 'coalboard', 'SKILL.md']], ['dist', ['plugin', 'skills', 'coalboard', 'SKILL.md']]]) {
   test(`SKILL.md (${label}) carries the link rule for .coalboard/ reads, writes and deletes and the by-name memory cleanup`, () => {
-    const body = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel), 'utf8');
+    // 28b: the anchors follow the text into the load set of the same tree (SKILL.md, references/steps.md, references/rails.md), source or dist alike.
+    const base = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel.slice(0, -1));
+    const body = ['SKILL.md', 'references/steps.md', 'references/rails.md'].map((f) => fs.readFileSync(path.join(base, f), 'utf8')).join('\n');
     for (const anchor of ['a mitigation you follow, never a guarantee', 'before the first read, write or delete under', 'resolve `<project root>` to its real path', 'AT or BELOW `<project root>/.coalboard`', 'never one taken from a link', 'touch NOTHING and tell the user', 'then `rmdir` (never recursive)', 'remove the files THIS run created there, by name, then `rmdir` the directory only if it is a real directory and not a link', 'never `rm -r`, never a trailing-slash or `*` remove', '(removed by name)', 'if `rmdir` refuses, leave the directory and say so', 'node scripts/apply-target.mjs <project root> <each target>', 'a REFUSE target (one of four reasons: a link, outside the project, unresolvable, or `name`, a trailing dot or space or a drive prefix)', 'so "apply all" never covers it', 'write only OK targets', 'a local process that plants a link in that gap is outside what the check stops','write NO live file and courier the fixes']) {
       assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
     }

@@ -1,0 +1,32 @@
+# CoalBoard — the standing rails
+
+The rules every step obeys, whatever the lane: what MAIN may do with its own grants, and the config and always-on rules read before any step runs.
+
+## Grants & denials (CLASSIFY-BLOCK — declared)
+The Seat-permissions ledger in SKILL.md governs what a SEAT gets. This one governs what MAIN itself needs to run the Steps, and what happens when one is denied.
+
+| class | step it powers | grant | on denial |
+|---|---|---|---|
+| read | reading the TARGET, the merged config, and every MANDATORY reference before any spawn or write (P8) | `Read`·`Grep`·`Glob` | refuse before scanning — say the target/config/reference could not be read; never proceed on an unread target, never report a scan that didn't happen (an unreadable TARGET specifically routes through F12's own fall-back, not a fresh branch here) |
+| write | staging to `proposed/`, the report/post-mortem, the `.coalboard/memory/` net, the one project-config key (GATE 2's `fableConsent:"always"`) | `Write`·`Edit` (+ `Bash`/`PowerShell` for the delete half — Claude Code: no native delete tool) | report the write as DENIED, not absent — a blocked stage never reads as "nothing to apply", a blocked delete never reads as `stop`'s own P13 disposition; courier the intended content (the fix, the report, the persisted key) to the human instead. The delete specifically needs `Bash`/`PowerShell` — denied alone (Write/Edit still granted), report the delete as denied too, never a silent stale `proposed/`. |
+| execute | steps.md Step 2 · 4.2's ground-truth runs (steps.md Step 2's objective checks + steps.md Step 4.2's compile/test/SAST/ground-truth/formal gates against the TARGET — main runs them, never delegated) | `Bash`/`PowerShell` | denied → no domain/ground-truth gate can run — an unverifiable tail (F10): "could not verify — human decision," carried into GATE 3's digest, never a fake green (extend SAST's own already-optional model-review fallback, never silently skip a gate and report clean) |
+| spawn | steps.md Step 1's lens fan-out + steps.md Step 3's sub4 tiebreak | `Agent`/`Task` (Claude Code) · `define_subagent` (Antigravity) | degrade to the existing F7 inline-self collapse, but SAY it: name the denial (not merely near-budget), name which seats never ran, carry the gap into GATE 3's digest as NOT-CHECKED — never a silent single-perspective answer worn as a converged board |
+| network | steps.md Step 1's `data`/sub1 seat — the ONLY seat with fetch; main itself never fetches directly, except A1-A3's read-only alert GET through its `execute` grant (`references/source-set.md`) | `WebFetch`/`WebSearch`, `data` seat only | the seat's existing NOT-CHECKED honesty rule already carries this: a fetch denial reads exactly like an unreachable source — declare it NOT-CHECKED (`references/lens-prompts.md`'s own "couldn't verify" = a gap, never clean), never fill the gap from training memory |
+
+A denial reaches the WORKER as a visible message and propagates NO further — not to the dispatcher, not as a catchable condition. Every row above states a branch or an explicit death; a step that dies says so in the output. Never report a denied step as done, skipped, or clean.
+
+## Always
+Honor the MERGED config — global `~/.claude/.coalboard.json` overlaid by the project config found per Configure's read order (the EXECUTING agent's own dir wins first, then the fixed fallback order, then legacy — see README Configure; project wins per key) — **EXCEPT `coalboardMode`/`updateMode`: safer-value-wins (hooks-safety.md §9). A project may QUIETEN either but never escalate past an EXPLICIT global value (`coalboardMode` ranks `off`<`ask`<`auto`; `updateMode` ranks `off`<`remind`<`ask`<`auto`; a project value above the global one in that order is clamped down to the global one) — and an unset global counts as its schema default (`ask`), never as "no preference to defend." **A value that is not one of the key's listed values (`coalboardMode`: `off`/`ask`/`auto`; `updateMode`: `off`/`remind`/`ask`/`auto`; letter case is ignored, so `"OFF"` is `off`) counts as ABSENT — a project's falls back to the global value, a global's to the default `ask` — never as a synonym for a listed value. The same unknown-value rule binds every other config key YOU read (a project's out-of-set value is absent, a global's reads as the schema default): `fableConsent` (`ask`/`always`/`never`, default `ask`) and `applyConsent` (a boolean, default `true`) in particular. Those two are NOT clamped (a bare project value is the user's own persisted choice; hooks-safety.md §9 names them out of the hook's reach), so you apply the unknown-value rule to them and claim nothing more.** This binds YOUR OWN read of the merged config here, not only the hook's — steps.md Step 0 (GATE 1) decides ask-vs-auto from this value.** The `rigor` preset (`nasa|high|standard|relaxed`, **def `standard`** — the factory value) sets exactly these defaults; any explicit key overrides — **the preset LOCKS NOTHING:**
+
+| preset-set key | relaxed | standard | high | nasa |
+|---|---|---|---|---|
+| `adversaryLens` | off | off | on | on |
+| `contestedRound` | off | off | on | on |
+| `tier2Verify` | off | off | on | on |
+| `qaStrictness` | standard | standard | strict | strict |
+| `observerOnMaxStakes` | off | off | off | on |
+| `diversifyModels` (INERT on CC) | off | off | off | on |
+| `applyConsent` | off (P3 still bars auto) | on | on | on |
+
+Keys the preset does NOT vary state their def inline where they are used (`consensusThreshold` 80 · `maxRounds` 1 · `fuzzTimeboxSeconds` 60 · ...). **`nasa` = the strictest PRESET (trust-nothing · adversary searches for a falsifying case · sub4 even on consensus · all domain + ground-truth gates · the human signs off), NOT a claim of NASA 10⁻⁹ / 0.01-defects-KLOC reliability** (NASA-inspired in structure, not in numbers). **Consent-gate every spend** — never convene silently. **Respond in the user's language** (translate prose, technical terms verbatim). Every option/consent uses the platform's question-box (Claude Code `AskUserQuestion`; a numbered text menu where none). **Surfaced output = DECISIONS + RESULTS only, terse:** the internal mechanics — reading the lens-prompt template, filling placeholders, arming/cleaning the memory net, the contract steps — run SILENTLY; NEVER narrate them to the user (a "Convening — first I must read the template + arm the memory net" line is over-talk). The user sees the consent gate, a one-line running status, the digest, the result — never the board's internal procedure.
+

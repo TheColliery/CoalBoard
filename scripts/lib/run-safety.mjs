@@ -35,6 +35,7 @@
 // probe command is right on a given platform (version-sensitive; the reference says so).
 // FOURTH TENSE: an edit that reverses a sentence and keeps its anchor words is not caught.
 import { parseSeatLedger, shellHolders } from './seat-rights.mjs';
+import { loadSetFiles } from './load-set.mjs';
 
 const IDS = ['S1', 'S2', 'S3', 'S4', 'S5'];
 const NEVERS = ['N1', 'N2'];
@@ -62,8 +63,10 @@ export function checkRunSafety({ files }) {
 
   const rows = parseSafeguardLedger(ref.text);
   for (const id of [...IDS, ...NEVERS]) if (!rows[id]) findings.push(`run-safety.md has no ${id} row`);
+  // 28b: the Grants table (the `execute` class) and Step 4.2 live in the LOAD SET (references/rails.md, references/steps.md); the seat ledger stays in SKILL.md.
+  const loadText = loadSetFiles(files).map((f) => f.text).join('\n');
   const ledger = parseSeatLedger(skill.text);
-  const actors = [...new Set([...shellHolders(ledger), ...(/^\|\s*execute\s*\|/m.test(skill.text) ? ['main'] : [])])];
+  const actors = [...new Set([...shellHolders(ledger), ...(/^\|\s*execute\s*\|/m.test(loadText) ? ['main'] : [])])];
   if (!actors.includes('main')) findings.push('SKILL.md has no `execute` grant class for main: the main-runs half of the duty has nothing to bind');
   if (actors.length < 3) findings.push(`expected at least 3 run-capable actors (main + 2 shell seats), derived ${actors.length}: ${actors.join(', ')}`);
 
@@ -194,9 +197,9 @@ export function checkRunSafety({ files }) {
     [/everything else is chat, bar the post-run folder the last bullet names/, 'SKILL.md On-disk ledger heading must point at the post-run folder its last bullet names'],
     [/the one thing a `stop` does not remove/, 'SKILL.md On-disk ledger must say a stop does not remove the post-run folder'],
   ]) if (!re.test(skill.text)) findings.push(msg);
-  const step42 = skill.text.split('\n').find((l) => /Verify — YOU run it/.test(l));
-  if (!step42) findings.push('SKILL.md Step 4.2 (the verify line) was not found');
-  else needs(step42, 'SKILL.md Step 4.2', true); // main reads the reference, so `S1-S5` names the range
+  const step42 = loadText.split('\n').find((l) => /Verify — YOU run it/.test(l));
+  if (!step42) findings.push('Step 4.2 (the verify line) was not found in the load set (references/steps.md)');
+  else needs(step42, 'Step 4.2 (references/steps.md)', true); // main reads the reference, so `S1-S5` names the range
   const refRow = skill.text.split('\n').find((l) => l.startsWith('|') && /references\/run-safety\.md/.test(l));
   if (!refRow) findings.push('SKILL.md References table has no row for references/run-safety.md');
   else if (!/MANDATORY/.test(refRow)) findings.push('SKILL.md lists references/run-safety.md but not as MANDATORY at its moment');

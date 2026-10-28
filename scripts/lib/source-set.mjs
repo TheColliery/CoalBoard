@@ -17,6 +17,7 @@
 // request form is flagged unverified in the reference and re-checked live by the data seat).
 // FOURTH TENSE: an edit that reverses a sentence and keeps its anchor words is not caught.
 import { parseSeatLedger } from './seat-rights.mjs';
+import { loadSetFiles } from './load-set.mjs';
 
 const CLASSES = ['alerts', 'catalogue', 'live-db', 'posix-seat'];
 const strip = (c) => c.replace(/\*\*/g, '').trim();
@@ -94,13 +95,14 @@ export function checkSourceSet({ files }) {
     if (!lines.some((l) => /^- \*\*sub1/.test(l) && /source-set\.md/.test(l))) findings.push('the sub1 (data) role line does not point at the L rows of references/source-set.md');
   } else findings.push('lens-prompts.md not supplied to the source-set gate');
 
-  const sl = skill.text.split('\n');
-  if (!sl.some((l) => !l.startsWith('|') && /references\/source-set\.md/.test(l) && /A1-A3/.test(l) && /NOT-CHECKED/.test(l))) findings.push('SKILL.md Step 1 has no rail that builds the alert brief (A1-A3) and names an unreachable source NOT-CHECKED');
+  // 28b: Step 1, GATE 1's TARGET block and the Grants network row live in the LOAD SET (references/steps.md, references/rails.md); the References row stays in SKILL.md.
+  const sl = loadSetFiles(files).flatMap((f) => f.text.split('\n'));
+  if (!sl.some((l) => !l.startsWith('|') && /references\/source-set\.md/.test(l) && /A1-A3/.test(l) && /NOT-CHECKED/.test(l))) findings.push('Step 1 has no rail that builds the alert brief (A1-A3) and names an unreachable source NOT-CHECKED');
   if (!sl.some((l) => /\(1\) the TARGET/.test(l) && /source-set\.md/.test(l))) findings.push("GATE 1's TARGET block does not list the source set reachable this run");
   const net = sl.find((l) => l.startsWith('| network |'));
-  if (!net) findings.push('SKILL.md Grants table has no network row');
+  if (!net) findings.push('the Grants table (references/rails.md) has no network row');
   else if (!/A1-A3/.test(net)) findings.push("the Grants network row says main never fetches but does not name A1-A3, main's one read-only exception");
-  const refRow = sl.find((l) => l.startsWith('|') && /references\/source-set\.md/.test(l));
+  const refRow = skill.text.split('\n').find((l) => l.startsWith('|') && /references\/source-set\.md/.test(l));
   if (!refRow) findings.push('SKILL.md References table has no row for references/source-set.md');
   else if (!/MANDATORY/.test(refRow)) findings.push('SKILL.md lists references/source-set.md but not as MANDATORY at its moment');
   return findings;

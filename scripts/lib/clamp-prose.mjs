@@ -14,6 +14,7 @@
 // WHAT IT DOES NOT BIND: that a model obeys the clause. It is prose, enforced below probability 1 (hooks-safety
 // section 9, "a clamp written in prose is a mitigation, not a fix"); the gate only stops a read site from being
 // written without the qualifier, and the clause from drifting off the schema and the hook.
+import { loadSetFiles, LOAD_SET } from './load-set.mjs';
 const AGENT_READ_CONSENT_KEYS = ['fableConsent', 'applyConsent'];
 
 // Keys the hook clamps: the object keys of `const SAFER_ENUM = { ... }` in the conductor source.
@@ -46,10 +47,10 @@ export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaul
   const keys = [...clampedKeys, ...AGENT_READ_CONSENT_KEYS];
   if (clampedKeys.length === 0) findings.push('no hook-clamped keys were derived (conductor SAFER_ENUM not found): the prose cannot be checked against the hook');
 
-  const skill = files.find((f) => f.rel === 'skills/coalboard/SKILL.md');
-  const canonicalLines = skill ? skill.text.split('\n').filter(isCanonical) : [];
+  // 28b: the clause is counted across the LOAD SET (SKILL.md plus the references every lane reads before Step 0), so a second copy in any of them is a finding.
+  const canonicalLines = loadSetFiles(files).flatMap((f) => f.text.split('\n').filter(isCanonical));
   if (canonicalLines.length !== 1) {
-    findings.push(`skills/coalboard/SKILL.md must carry exactly ONE canonical clamp-aware clause (a line holding both ABSENT and safer-value-wins); found ${canonicalLines.length}`);
+    findings.push(`the load set (${LOAD_SET.join(', ')}) must carry exactly ONE canonical clamp-aware clause (a line holding both ABSENT and safer-value-wins); found ${canonicalLines.length}`);
   } else {
     const clause = canonicalLines[0];
     // The absent/default RULE itself (LOW-2): keys and enum values were bound, but "a global's to `auto`" read as green.
@@ -99,7 +100,7 @@ export function checkClampProse({ files, schemaEnums, clampedKeys, clampedDefaul
         const reads = [...line.matchAll(new RegExp(`(^|[^A-Za-z0-9_])${key}(?=[^A-Za-z0-9_]|$)`, 'g'))]
           .filter((m) => { const at = m.index + m[1].length; return !/\bpersist/i.test(line.slice(Math.max(0, at - 60), at)); });
         if (reads.length === 0) continue;
-        if (!/\bmerged\b/i.test(line)) findings.push(`${rel}:${i + 1} reads \`${key}\` without saying it is the MERGED, clamp-aware value (SKILL.md "Always")`);
+        if (!/\bmerged\b/i.test(line)) findings.push(`${rel}:${i + 1} reads \`${key}\` without saying it is the MERGED, clamp-aware value (references/rails.md "Always")`);
       }
     });
   }
