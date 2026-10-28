@@ -2,6 +2,19 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.8.11] - 2026-10-28
+
+Antigravity support is stated as partial, as measured today
+
+The board's Antigravity status is corrected. Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's body is 51,244 bytes, so the instructions for steps 1 to 4 never reach it. The 2026-06-22 end-to-end validation predates that growth and no longer holds. Claude Code is unchanged.
+
+### Changed
+- **The Antigravity claim is corrected everywhere it appears.** The README badge, install section and debate paragraph, CONTRIBUTING, the SKILL.md frontmatter and capability note, `references/platform-antigravity.md`, and both `plugin.json` and `marketplace.json` descriptions now say Antigravity is partial, with the measurement (agy 1.4.8, 2026-10-27). The Claude Code validation is unchanged.
+- **The GATE 3 text in SKILL.md says what a refused target is.** A target on a network share, a path that starts with two separators, is refused as outside the project. A refused target is named with the text the checker prints, never a path resolved on disk, and no live file is written for it. A refused link is reported with its own target text, not its resolved path.
+
+### Fixed
+- **The apply-target checker never resolves a refused target on disk.** Network-share targets are refused on their text before any file-system call, and a link is reported by its target text. — test: scripts/lib/apply-target.test.mjs
+
 ## [2.8.10] - 2026-10-27
 
 The five board seat agents now pass Antigravity's agent validator.

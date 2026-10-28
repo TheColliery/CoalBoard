@@ -12,7 +12,7 @@
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/TheColliery/CoalBoard?utm_source=oss&utm_medium=github&utm_campaign=TheColliery%2FCoalBoard&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-validated-brightgreen)
-![Antigravity](https://img.shields.io/badge/Antigravity-validated-brightgreen)
+![Antigravity](https://img.shields.io/badge/Antigravity-partial-yellow)
 ![Cursor](https://img.shields.io/badge/Cursor-works_with-blue)
 ![Codex](https://img.shields.io/badge/Codex-works_with-blue)
 ![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-works_with-blue)
@@ -65,7 +65,7 @@ It **improves** correctness; it does **not** claim a defect rate or a reliabilit
 
 ## 🤖 Compatibility
 
-**Validated end-to-end: Claude Code + Antigravity** (Antigravity: 2026-06-22, a self-run validation — not third-party-audited). Claude Code additionally auto-activates via hooks and gets the cheap-lenses / premium-judge cost discount — both Claude-Code-only bonuses.
+**Claude Code: validated end-to-end. Antigravity: partial.** Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's body is 51,244 bytes, so the instructions for steps 1 to 4 never reach it (measured 2026-10-27, agy 1.4.8). The end-to-end validation of 2026-06-22 predates that growth and no longer holds. Claude Code additionally auto-activates via hooks and gets the cheap-lenses / premium-judge cost discount — both Claude-Code-only bonuses.
 
 Every other concurrent-subagent platform (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, …) **works with** CoalBoard — the board is a plain, platform-neutral skill ([`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md)) that convenes via your platform's own native subagent tool, so it should run there. That support is design-documented, not run end-to-end by us — re-verify subagent support before trusting it, and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues). See Install below for the exact steps per platform.
 
@@ -78,7 +78,7 @@ claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-**Antigravity** — *validated end-to-end (2026-06-22), self-run — not third-party-audited*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
+**Antigravity** — *partial (measured 2026-10-27, agy 1.4.8): the skill installs and starts, but steps 1 to 4 never reach the model, see above*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
 
 ```powershell
 git clone https://github.com/TheColliery/CoalBoard.git --depth 1
@@ -88,9 +88,9 @@ Copy-Item -Recurse CoalBoard/skills/coalboard "$env:USERPROFILE\.gemini\config\s
 Remove-Item -Recurse -Force CoalBoard   # optional cleanup
 ```
 
-Start a new Antigravity session; `coalboard` appears in the skills list. From 2.8.10 the five seat agents (`agents/cb-*.md`) declare `tools:` as a YAML list, so `agy plugin validate` reads all five; that is the instrument, run on a temporary copy of the built plugin with a root `plugin.json` added, and the skill-folder route above is unchanged. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (CoalBoard ships no Antigravity hook wire, and Antigravity's model-pick is a define-time-only field CB doesn't set — the lenses run the parent model).
+Expect today: the skill installs and starts, but Antigravity loads only the first 24,000 bytes of it, so steps 1 to 4 never reach the model; use Claude Code for the full board. Start a new Antigravity session; `coalboard` appears in the skills list. From 2.8.10 the five seat agents (`agents/cb-*.md`) declare `tools:` as a YAML list, so `agy plugin validate` reads all five; that is the instrument, run on a temporary copy of the built plugin with a root `plugin.json` added, and the skill-folder route above is unchanged. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (CoalBoard ships no Antigravity hook wire, and Antigravity's model-pick is a define-time-only field CB doesn't set — the lenses run the parent model).
 
-**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — **works with** CoalBoard) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VALIDATED on Claude Code and Antigravity** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues).
+**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — **works with** CoalBoard) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is cross-agent by design; it is VALIDATED on Claude Code and PARTIAL on Antigravity (see above)** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues).
 
 ## Commands
 

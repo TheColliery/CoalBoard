@@ -1,6 +1,6 @@
-# CoalBoard on Antigravity (verified 2026-06-22)
+# CoalBoard on Antigravity (partial, measured 2026-10-27)
 
-> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. Validated end-to-end on AG (Claude Opus 4.6) — a self-run validation, not third-party-audited: 3 read-only-leaf lenses → invoke parallel → judge → reap; decontamination clean.
+> Loaded ON-DEMAND when running the board on Antigravity. The SKILL.md flow is UNCHANGED — this only maps the platform-agnostic contract to AG's tools + the verified caveats. The 2026-06-22 end-to-end validation (Claude Opus 4.6, self-run, not third-party-audited: 3 read-only-leaf lenses → invoke parallel → judge → reap) predates the body's growth and no longer holds. Measured 2026-10-27 with agy 1.4.8: Antigravity loads only the first 24,000 bytes of a SKILL.md body, and CoalBoard's body is 51,244 bytes, so the instructions for steps 1 to 4 never reach it; the skill installs and starts.
 
 ## Tool mapping (Claude Code → Antigravity)
 | step | Claude Code | Antigravity |
@@ -20,4 +20,4 @@
 - **AG has hooks** (a 5-event engine with a real blocking contract) — **CoalBoard ships no wire into them**, so the AG board stays MANUAL-invoke (no auto-trigger conductor).
 
 ## Degrade
-A platform with no read-only/leaf toggle OR no reap tool → fall back to the SKILL's conservative path (fewer workers, sequential, flag UNVERIFIED). AG has both → full board.
+A platform with no read-only/leaf toggle OR no reap tool → fall back to the SKILL's conservative path (fewer workers, sequential, flag UNVERIFIED). AG has both, so the tool mapping above applies; the instructions that reach it are only the first 24,000 bytes of SKILL.md (see the note at the top).
