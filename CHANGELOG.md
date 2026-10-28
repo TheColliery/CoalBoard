@@ -6,7 +6,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 The whole skill now loads on Antigravity, measured on 2026-10-29
 
-The skill's load layout changed so that Antigravity's 24,000-byte load reaches Step 4 and every standing rail. The SKILL.md body is 21,128 bytes, down from 51,554.
+The skill's load layout changed so that Antigravity's 24,000-byte load reaches Step 4 and every standing rail. The SKILL.md body is 21,044 bytes, down from 51,554.
 
 ### Changed
 - **The steps and the standing rails move to references.** The steps (Step 0 to Step 4, Memory & resume, Modes) move to `references/steps.md`, and Grants & denials and Always move to `references/rails.md`. Both are MANDATORY before Step 0 on every lane, and the References ledger lists 8 MANDATORY. The text moved byte for byte; nothing was reworded except location pointers.
