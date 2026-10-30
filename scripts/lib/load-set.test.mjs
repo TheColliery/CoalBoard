@@ -122,3 +122,11 @@ test('every standing rail heading (Memory & resume, Modes, Grants & denials, Alw
   const counts = ['## Memory & resume', '## Modes', '## Grants & denials', '## Always'].map((h) => realFiles().filter((f) => LOAD_SET.includes(f.rel)).flatMap((f) => f.text.split('\n')).filter((l) => l.startsWith(h)).length);
   assert.deepEqual(counts, [1, 1, 1, 1]);
 });
+
+// 29b-c1 (T-28b-1): the ## The steps line must name "every lane" as well as "before Step 0". x1 keeps "before Step 0" and narrows the rest to the manual lane.
+test('x1: the ## The steps line narrowed to "on the manual lane only" is a finding (the phrase must name every lane, not only before Step 0)', () => {
+  const x1 = withText(realFiles(), SKILL_REL, (t) => t.replace('in full before Step 0, on every lane and in every mode.', 'in full before Step 0, on the manual lane only.')).find((f) => f.rel === SKILL_REL);
+  assert.ok(x1.text.includes('on the manual lane only'), 'the x1 mutation changed nothing');
+  const f = checkAntigravityLoad(x1);
+  assert.ok(f.some((m) => /## The steps does not name references\/rails\.md and references\/steps\.md as MANDATORY before Step 0, every lane/.test(m)), f.join('\n'));
+});

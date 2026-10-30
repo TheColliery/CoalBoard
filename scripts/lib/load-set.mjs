@@ -21,7 +21,8 @@ export function loadSetFiles(files) {
 // re-measures it rather than editing it here.
 export const ANTIGRAVITY_BODY_CAP = 24000;
 const STEPS_HEADING = '## The steps';
-const STEPS_MANDATORY = (line) => /MANDATORY/.test(line) && /before Step 0/.test(line) && LOAD_REFS.every((r) => line.includes(r));
+// The line must say every lane as well as before Step 0 (29b-c1, T-28b-1): the ledger rows already carry "MANDATORY before Step 0, every lane".
+const STEPS_MANDATORY = (line) => /MANDATORY/.test(line) && /before Step 0/.test(line) && /every lane/.test(line) && LOAD_REFS.every((r) => line.includes(r));
 
 // SKILL.md's body: the file minus its frontmatter block, the same bytes agy reads.
 function bodyOf(text) {
@@ -41,7 +42,7 @@ export function checkAntigravityLoad(skill) {
     const offset = Buffer.byteLength(body.slice(0, at + 1), 'utf8');
     if (offset >= ANTIGRAVITY_BODY_CAP) findings.push(`${STEPS_HEADING} begins at body byte ${offset}, past the ${ANTIGRAVITY_BODY_CAP}-byte load: Antigravity never reads it`);
     const section = body.slice(at + 1).split('\n## ')[0];
-    if (!section.split('\n').some(STEPS_MANDATORY)) findings.push(`${STEPS_HEADING} does not name references/rails.md and references/steps.md as MANDATORY before Step 0`);
+    if (!section.split('\n').some(STEPS_MANDATORY)) findings.push(`${STEPS_HEADING} does not name references/rails.md and references/steps.md as MANDATORY before Step 0, every lane`);
   }
   return findings;
 }

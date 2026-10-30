@@ -33,6 +33,7 @@ const TESTS = [
   'scripts/lib/clamp-prose.test.mjs',
   'scripts/lib/run-safety.test.mjs',
   'scripts/lib/load-set.test.mjs',
+  'scripts/lib/reference-inventory.test.mjs',
   'scripts/lib/source-set.test.mjs',
   'scripts/lib/link-check.test.mjs',
   'scripts/lib/release-shape.test.mjs',

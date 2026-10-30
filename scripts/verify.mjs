@@ -595,6 +595,7 @@ check('factory config valid against schema', () => {
       sr: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'seat-rights.mjs')).href),
       ss: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'source-set.mjs')).href),
       ls: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'load-set.mjs')).href),
+      ri: await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'reference-inventory.mjs')).href),
     };
   } catch (e) { rsLoadError = e; }
   if (rsLoadError) {
@@ -616,6 +617,15 @@ check('factory config valid against schema', () => {
     const lsFindings = rsMods.ls.checkLoadSet(rsFiles);
     if (lsFindings.length === 0) check('load set: SKILL.md, references/steps.md and references/rails.md are read before Step 0 (each a MANDATORY row of the References ledger, each heading once)', () => null);
     else lsFindings.forEach((m, i) => check(`load set: finding ${i + 1}/${lsFindings.length}`, () => m));
+    // 29b-c1 (CR-2): each shipped reference keeps the level-2 headings the reference inventory snapshots, and the reap rail's anchor holds, on source AND dist.
+    const distRefDir = path.join(root, 'plugin', 'skills', 'coalboard', 'references');
+    const distRefs = fs.existsSync(distRefDir) ? fs.readdirSync(distRefDir).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `plugin/skills/coalboard/references/${f}`, text: fs.readFileSync(path.join(distRefDir, f), 'utf8') })) : [];
+    const riFindings = [
+      ...rsMods.ri.checkReferenceInventory(rsFiles, 'skills/coalboard/'),
+      ...(distRefs.length ? rsMods.ri.checkReferenceInventory(distRefs, 'plugin/skills/coalboard/') : ['plugin/skills/coalboard/references/ is missing (the dist check reports it)']),
+    ];
+    if (riFindings.length === 0) check('reference inventory: every shipped reference keeps its level-2 headings (source and dist), and the reap rail anchor holds', () => null);
+    else riFindings.forEach((m, i) => check(`reference inventory: finding ${i + 1}/${riFindings.length}`, () => m));
     // INSPECT 28b F1: the Antigravity load facts the 2.9.0 claim rests on, checked on the source AND on the built dist (the body cap, the steps pointer, the MANDATORY line).
     const distSkillRel = 'plugin/skills/coalboard/SKILL.md';
     const distSkillPath = path.join(root, ...distSkillRel.split('/'));
