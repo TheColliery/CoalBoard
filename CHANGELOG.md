@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.1] - 2026-10-30
+
+The Antigravity reference again carries its reap rule and tool map
+
+### Fixed
+- **`references/platform-antigravity.md` again carries the tool mapping, the verified caveats and the degrade section.** 2.9.0 cut the file to its header and one degrade sentence, which dropped the mandatory `manage_subagents kill_all` reap instruction for Antigravity. The 2.8.11 text is restored, with one pointer changed to `steps.md Step 1`.
+
+### Changed
+- **The Antigravity claim now says what ran.** README and CONTRIBUTING state the 2026-10-29 load check, and that the debate itself last ran on Antigravity on 2026-06-22.
+
 ## [2.9.0] - 2026-10-29
 
 The whole skill now loads on Antigravity, measured on 2026-10-29
