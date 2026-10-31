@@ -2,7 +2,7 @@
 
 > Loaded on an "ask CB" pick (SKILL.md Entry) — or when the user explicitly asks for the board's opinion on a decision (that explicit ask + a shown ~cost = the same consent). Output = an OPINION summary whose VERDICT is the user's DEFAULT to adopt or override — never a binding ruling, never staged work. The error-not-allowed lane (its lens set, tier ladder, benchmark) is a SEPARATE lane this file does not modify — the deliberate divergences are NAMED at the bottom.
 
-**No TARGET, no steps.md Step 0.** This lane never runs SKILL.md's numbered Steps — it reasons from the DECISION FRAME below, never a repo/file/audit scope; GATE 1's form here is the pick itself (the Consent-gates ledger), never the Step-0 chat render/box.
+**No TARGET, no steps.md Step 0.** This lane never runs steps.md's numbered Steps — it reasons from the DECISION FRAME below, never a repo/file/audit scope; GATE 1's form here is the pick itself (the Consent-gates ledger), never the Step-0 chat render/box.
 
 ## Frame the question (before any spawn)
 - Write the **DECISION FRAME**: the question verbatim, the real constraints, and the candidate options as the user saw them. If the asker (you or the user) already holds a leaning/proposal, mark it **PROPOSAL** — it changes the seat contracts below.

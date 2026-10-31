@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.2] - 2026-10-31
+
+The opinion lane points at the steps file where the steps now live
+
+### Fixed
+- **The opinion lane reference names the steps file.** It says the lane never runs the numbered Steps of `references/steps.md`, where they moved in 2.9.0.
+
 ## [2.9.1] - 2026-10-30
 
 The Antigravity reference again carries its reap rule and tool map
