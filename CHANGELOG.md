@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.3] - 2026-10-31
+
+Antigravity is marked validated (load only) after a board run
+
+### Changed
+- **The Antigravity claim now says what was measured.** A full board run on a synthetic target, on 2026-10-31 with agy 1.4.12, spawned the three default lenses as read-only leaves, synthesized and staged its fixes, but could not run the verify step, because headless agy refuses the shell permission. The four labels that said validated (the README badge, the SKILL.md description, and the two plugin descriptions) now read validated (load only). The 2026-10-29 load check and the 2026-06-22 run stand as dated.
+
+### Fixed
+- **The opinion lane names what it borrows from the steps file.** Its sentence that the lane never runs the numbered Steps now says it borrows only the seat rules and the lens-session line that the file names.
+
 ## [2.9.2] - 2026-10-31
 
 The opinion lane points at the steps file where the steps now live

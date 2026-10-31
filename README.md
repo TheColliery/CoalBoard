@@ -12,7 +12,7 @@
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/TheColliery/CoalBoard?utm_source=oss&utm_medium=github&utm_campaign=TheColliery%2FCoalBoard&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-validated-brightgreen)
-[![Antigravity: validated, measured 2026-10-29](https://img.shields.io/badge/Antigravity-validated-brightgreen)](skills/coalboard/references/platform-antigravity.md)
+[![Antigravity: validated (load only); 2026-10-31 board run](https://img.shields.io/badge/Antigravity-validated%20(load%20only)-brightgreen)](skills/coalboard/references/platform-antigravity.md)
 ![Cursor](https://img.shields.io/badge/Cursor-works_with-blue)
 ![Codex](https://img.shields.io/badge/Codex-works_with-blue)
 ![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-works_with-blue)
@@ -65,7 +65,7 @@ It **improves** correctness; it does **not** claim a defect rate or a reliabilit
 
 ## 🤖 Compatibility
 
-**Claude Code: validated end-to-end.** Antigravity: validated (2026-10-29, agy 1.4.8, a self-run headless check, not third-party-audited). The whole skill now loads: the SKILL.md body is 21,047 bytes, under Antigravity's 24,000-byte load, and a report-only `/coalboard` probe that asked for the mandatory references read them and reached the Step 4 text, with every rail read. This was a report-only load check, not a full board run. The 2.8.10 and 2.8.11 bodies (51,244 and 51,554 bytes) did not fit; 2.9.0 moved the steps and the standing rails into references. Claude Code additionally auto-activates via hooks and gets the cheap-lenses / premium-judge cost discount — both Claude-Code-only bonuses.
+**Claude Code: validated end-to-end.** Antigravity: validated (load only). The skill loads and reaches Step 4: measured 2026-10-29 with agy 1.4.8 (a self-run headless check, not third-party-audited), the SKILL.md body is 21,047 bytes, under Antigravity's 24,000-byte load, and a report-only `/coalboard` probe that asked for the mandatory references read them and reached the Step 4 text. On 2026-10-31 (agy 1.4.12, a self-run check) a full board run on a synthetic target spawned the three default lenses as read-only leaves, synthesized and staged its fixes, but could not run the verify step, because headless agy refuses the shell permission. The last run with every step was on 2026-06-22. The 2.8.10 and 2.8.11 bodies (51,244 and 51,554 bytes) did not fit; 2.9.0 moved the steps and the standing rails into references. Claude Code additionally auto-activates via hooks and gets the cheap-lenses / premium-judge cost discount — both Claude-Code-only bonuses.
 
 Every other concurrent-subagent platform (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, …) **works with** CoalBoard — the board is a plain, platform-neutral skill ([`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md)) that convenes via your platform's own native subagent tool, so it should run there. That support is design-documented, not run end-to-end by us — re-verify subagent support before trusting it, and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues). See Install below for the exact steps per platform.
 
@@ -78,7 +78,7 @@ claude plugin marketplace add TheColliery/CoalBoard
 claude plugin install coalboard@coalboard
 ```
 
-**Antigravity** — *validated (2026-10-29, agy 1.4.8, a self-run check): the whole skill loads and reaches Step 4, see above*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
+**Antigravity** — *validated (load only): the skill loads and reaches Step 4 (2026-10-29); a board run on 2026-10-31 staged its fixes but could not run verify, see above*. Antigravity has no plugin manager: a skill is installed by copying its folder into a customizations root, which Antigravity auto-discovers at session start (no install command, no manifest, no registration):
 
 ```powershell
 git clone https://github.com/TheColliery/CoalBoard.git --depth 1
@@ -90,7 +90,7 @@ Remove-Item -Recurse -Force CoalBoard   # optional cleanup
 
 Start a new Antigravity session; `coalboard` appears in the skills list. From 2.8.10 the five seat agents (`agents/cb-*.md`) declare `tools:` as a YAML list, so `agy plugin validate` reads all five; that is the instrument, run on a temporary copy of the built plugin with a root `plugin.json` added, and the skill-folder route above is unchanged. The board's AG tool-mapping (read-only-leaf lenses via `define_subagent`, mandatory `kill_all` reap) is in [`references/platform-antigravity.md`](skills/coalboard/references/platform-antigravity.md). The conductor hook + cost-tiering stay CC-only (CoalBoard ships no Antigravity hook wire, and Antigravity's model-pick is a define-time-only field CB doesn't set — the lenses run the parent model).
 
-**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — **works with** CoalBoard) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is platform-agnostic: it is VALIDATED end-to-end on Claude Code; on Antigravity the debate last ran end-to-end on 2026-06-22, and the 2.9.0 skill load was re-checked on 2026-10-29 (a report-only load check, see above)** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues).
+**Other concurrent-subagent platforms** (Cursor, Codex, Gemini CLI, Cline, Copilot, Amp, Goose, … — **works with** CoalBoard) — the board is a plain skill: point your agent at [`skills/coalboard/SKILL.md`](skills/coalboard/SKILL.md) (the contract is platform-neutral; it convenes via your platform's native subagent tool). Gemini CLI's parallel subagents are now first-party official (`/agents`) — business Standard/Enterprise plans only (individual tiers lost access 2026-06-18). There is no one-command installer, and the conductor hook + cost-tiering are CC-only. **The DEBATE structure is platform-agnostic: it is VALIDATED end-to-end on Claude Code; on Antigravity the debate last ran end-to-end on 2026-06-22, the skill load was re-checked on 2026-10-29, and a board run on 2026-10-31 could not run verify (validated, load only; see above)** — every other named platform is design-supported only (capability documented first-party, nothing run), so re-verify subagent support on yours and report what you find at [Issues](https://github.com/TheColliery/CoalBoard/issues).
 
 ## Commands
 
