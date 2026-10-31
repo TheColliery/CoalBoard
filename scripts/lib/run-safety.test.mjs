@@ -413,3 +413,11 @@ test('u2 (R2-LOW-2): the icacls page is a WRAPPED link in S3 (angle brackets), s
   assert.ok(s3.includes('(<' + LEARN + '>,'), 'the bare URL is wrapped as <...>');
   assert.ok(cites(s3, LEARN), 'the wrapped link is still cited as a whole link token');
 });
+
+// 29e T-29e-2 (n8): the execute row's grant cell narrowed to Read. The row's first cell still reads "execute", so the old first-cell test kept main as a shell actor.
+test('T-29e-2: a narrowed execute grant cell is a finding: main counts as a shell actor only when the grant cell names Bash or PowerShell', () => {
+  const narrowed = mutateLoad('| `Bash`/`PowerShell` | denied → no domain', '| `Read` | denied → no domain');
+  const f = checkRunSafety({ files: narrowed });
+  assert.ok(f.some((m) => /the Grants table \(references\/rails\.md\) has no `execute` grant class for main/.test(m)), f.join('\n'));
+  assert.deepEqual(checkRunSafety({ files: realFiles() }), []);
+});

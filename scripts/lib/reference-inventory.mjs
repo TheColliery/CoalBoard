@@ -84,8 +84,11 @@ export const REAP_RAIL = { file: 'platform-antigravity.md', terms: ['manage_suba
 export const REFERENCE_ROWS = [
   { file: 'platform-antigravity.md', label: '| reap (no-zombie) |', terms: ['manage_subagents', 'kill_all', '(MANDATORY)'] },
   { file: 'platform-antigravity.md', label: '| spawn a lens |', terms: ['enable_write_tools=false', 'enable_subagent_tools=false'] },
-  { file: 'platform-antigravity.md', label: '| read-only + leaf |', terms: ['TOOL-LEVEL'] },
+  { file: 'platform-antigravity.md', label: '| read-only + leaf |', terms: ['TOOL-LEVEL', 'ABSENT from the sub'] },
 ];
+// 29e T-29e-1: every pinned term is read from the row's ANTIGRAVITY cell (the third and last cell), never the whole line. The Claude Code cell of the
+// read-only row also says TOOL-LEVEL, so a whole-line pin held a weakened Antigravity cell. All three rows put their terms in the Antigravity cell.
+const REFERENCE_ROW_CELLS = 3;
 
 // The inventory's own findings. files: [{ rel, text }] under prefix (skills/coalboard/ for source, plugin/skills/coalboard/ for dist).
 export function checkReferenceInventory(files, prefix) {
@@ -107,7 +110,10 @@ export function checkReferenceInventory(files, prefix) {
     if (!found) continue; // a missing file is already one finding in the heading loop above
     const line = found.text.split('\n').find((l) => l.startsWith(row.label));
     if (!line) { findings.push(`${rel} has no table row ${row.label} (a rail row the inventory pins)`); continue; }
-    for (const term of row.terms) if (!line.includes(term)) findings.push(`${rel} row ${row.label} lost ${term}`);
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length !== REFERENCE_ROW_CELLS) { findings.push(`${rel} row ${row.label} has ${cells.length} cells, not the ${REFERENCE_ROW_CELLS} of step | Claude Code | Antigravity`); continue; }
+    const antigravity = cells[REFERENCE_ROW_CELLS - 1];
+    for (const term of row.terms) if (!antigravity.includes(term)) findings.push(`${rel} row ${row.label} lost ${term} in its Antigravity cell`);
   }
   return findings;
 }

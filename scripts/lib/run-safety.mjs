@@ -66,7 +66,10 @@ export function checkRunSafety({ files }) {
   // 28b: the Grants table (the `execute` class) and Step 4.2 live in the LOAD SET (references/rails.md, references/steps.md); the seat ledger stays in SKILL.md.
   const loadText = loadSetFiles(files).map((f) => f.text).join('\n');
   const ledger = parseSeatLedger(skill.text);
-  const actors = [...new Set([...shellHolders(ledger), ...(/^\|\s*execute\s*\|/m.test(loadText) ? ['main'] : [])])];
+  // T-29e-2: main runs the ground-truth gates only when the execute row's GRANT cell (the third cell) names a shell; a narrowed grant cell does not count.
+  const executeRow = loadText.split('\n').find((l) => /^\|\s*execute\s*\|/.test(l)) || '';
+  const grantCell = executeRow.split('|').slice(1, -1).map((c) => c.trim())[2] || '';
+  const actors = [...new Set([...shellHolders(ledger), ...(/\b(Bash|PowerShell)\b/.test(grantCell) ? ['main'] : [])])];
   if (!actors.includes('main')) findings.push('the Grants table (references/rails.md) has no `execute` grant class for main: the main-runs half of the duty has nothing to bind');
   if (actors.length < 3) findings.push(`expected at least 3 run-capable actors (main + 2 shell seats), derived ${actors.length}: ${actors.join(', ')}`);
 

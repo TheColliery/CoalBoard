@@ -102,3 +102,12 @@ test('x4: the tool-mapping table body deleted, heading and reap lines kept, name
   assert.ok(f.some((m) => m.includes('| read-only + leaf |')), f.join('\n'));
   assert.ok(!f.some((m) => m.includes('| reap (no-zombie) |')), 'the reap row is kept by x4, so it must not be a finding: ' + f.join('\n'));
 });
+
+// 29e T-29e-1 (y3): the Antigravity cell of the read-only row loses TOOL-LEVEL and ABSENT, while the Claude Code cell keeps TOOL-LEVEL. Only a pin on the
+// Antigravity cell can fail it, so the Claude Code cell's copy of the term must not satisfy the check.
+test('y3: the AG cell of the read-only row loses TOOL-LEVEL (the Claude Code cell keeps it) is a finding on that row and its Antigravity cell', () => {
+  const weak = withText(treeFiles(SRC), `${SRC}references/${ANTIGRAVITY}`, (t) => t.replace('**TOOL-LEVEL** — the write/spawn tools are ABSENT from the sub', 'PROMPT-LEVEL — the sub keeps its write/spawn tools'));
+  const f = checkReferenceInventory(weak, SRC);
+  assert.ok(f.some((m) => m.includes('| read-only + leaf |') && m.includes('Antigravity cell') && m.includes('TOOL-LEVEL')), f.join('\n'));
+  assert.ok(f.some((m) => m.includes('| read-only + leaf |') && m.includes('ABSENT from the sub')), f.join('\n'));
+});
