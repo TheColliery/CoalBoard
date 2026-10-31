@@ -79,6 +79,14 @@ export const REFERENCE_HEADINGS = {
 // The reap rail's content anchor: platform-antigravity.md carries these terms on ONE line (the reap instruction that CR-2 found missing).
 export const REAP_RAIL = { file: 'platform-antigravity.md', terms: ['manage_subagents', 'kill_all'] };
 
+// L2 (29e): the table rows a rail stands on, pinned by their label and their load-bearing content, not by a heading or one anchor line. A row that
+// is missing, or that has lost one of its terms, is a finding naming the file and the row label. The labels are the first cell of each row.
+export const REFERENCE_ROWS = [
+  { file: 'platform-antigravity.md', label: '| reap (no-zombie) |', terms: ['manage_subagents', 'kill_all', '(MANDATORY)'] },
+  { file: 'platform-antigravity.md', label: '| spawn a lens |', terms: ['enable_write_tools=false', 'enable_subagent_tools=false'] },
+  { file: 'platform-antigravity.md', label: '| read-only + leaf |', terms: ['TOOL-LEVEL'] },
+];
+
 // The inventory's own findings. files: [{ rel, text }] under prefix (skills/coalboard/ for source, plugin/skills/coalboard/ for dist).
 export function checkReferenceInventory(files, prefix) {
   const findings = [];
@@ -92,6 +100,14 @@ export function checkReferenceInventory(files, prefix) {
   const reap = files.find((f) => f.rel === `${prefix}references/${REAP_RAIL.file}`);
   if (reap && !reap.text.split('\n').some((l) => REAP_RAIL.terms.every((t) => l.includes(t)))) {
     findings.push(`${prefix}references/${REAP_RAIL.file} has no line holding ${REAP_RAIL.terms.join(' and ')} (the reap rail, CR-2)`);
+  }
+  for (const row of REFERENCE_ROWS) {
+    const rel = `${prefix}references/${row.file}`;
+    const found = files.find((f) => f.rel === rel);
+    if (!found) continue; // a missing file is already one finding in the heading loop above
+    const line = found.text.split('\n').find((l) => l.startsWith(row.label));
+    if (!line) { findings.push(`${rel} has no table row ${row.label} (a rail row the inventory pins)`); continue; }
+    for (const term of row.terms) if (!line.includes(term)) findings.push(`${rel} row ${row.label} lost ${term}`);
   }
   return findings;
 }

@@ -14,7 +14,11 @@ const refDir = path.join(root, 'skills', 'coalboard', 'references');
 const read = (p) => fs.readFileSync(p, 'utf8');
 const SRC = 'skills/coalboard/';
 const DIST = 'plugin/skills/coalboard/';
-const treeFiles = (prefix) => fs.readdirSync(refDir).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `${prefix}references/${f}`, text: read(path.join(refDir, f)) }));
+// The prefix picks the tree: skills/coalboard/ (source) or plugin/skills/coalboard/ (dist). Reading source for both would make the dist leg blind (29e T-29c2-2).
+const treeFiles = (prefix) => {
+  const dir = path.join(root, ...prefix.split('/'), 'references');
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => ({ rel: `${prefix}references/${f}`, text: read(path.join(dir, f)) }));
+};
 const withText = (files, rel, fn) => files.map((f) => (f.rel === rel ? { ...f, text: fn(f.text) } : f));
 const ANTIGRAVITY = 'platform-antigravity.md';
 const V290 = [
@@ -73,4 +77,28 @@ test('the reap anchor is a single line holding both terms, and the file it names
   assert.deepEqual(REAP_RAIL.terms, ['manage_subagents', 'kill_all']);
   const onOneLine = read(path.join(refDir, ANTIGRAVITY)).split('\n').some((l) => REAP_RAIL.terms.every((t) => l.includes(t)));
   assert.ok(onOneLine);
+});
+
+// 29e L2: the table rows the rails stand on. Each mutant below keeps the one-line anchor (or a heading) intact, so only the row pin can fail it.
+const dropRow = (text, label) => text.split('\n').filter((l) => !l.startsWith(label)).join('\n');
+
+test('m3b: the reap table row deleted alone (the Zombies caveat keeps the anchor) is a finding on the reap row label', () => {
+  const cut = withText(treeFiles(SRC), `${SRC}references/${ANTIGRAVITY}`, (t) => dropRow(t, '| reap (no-zombie) |'));
+  const f = checkReferenceInventory(cut, SRC);
+  assert.ok(f.some((m) => m.includes('platform-antigravity.md') && m.includes('| reap (no-zombie) |')), f.join('\n'));
+  assert.ok(!f.some((m) => m.includes('has no line holding')), 'the anchor must still hold, so only the row pin fails: ' + f.join('\n'));
+});
+
+test('x3: the reap row keeps both terms but drops (MANDATORY) is a finding naming the row and the lost term', () => {
+  const soft = withText(treeFiles(SRC), `${SRC}references/${ANTIGRAVITY}`, (t) => t.replace('`kill_all` (MANDATORY)', '`kill_all`'));
+  const f = checkReferenceInventory(soft, SRC);
+  assert.ok(f.some((m) => m.includes('| reap (no-zombie) |') && m.includes('(MANDATORY)')), f.join('\n'));
+});
+
+test('x4: the tool-mapping table body deleted, heading and reap lines kept, names the spawn and read-only rows as lost', () => {
+  const body = withText(treeFiles(SRC), `${SRC}references/${ANTIGRAVITY}`, (t) => t.split('\n').filter((l) => !(l.startsWith('|') && !l.includes('kill_all'))).join('\n'));
+  const f = checkReferenceInventory(body, SRC);
+  assert.ok(f.some((m) => m.includes('| spawn a lens |')), f.join('\n'));
+  assert.ok(f.some((m) => m.includes('| read-only + leaf |')), f.join('\n'));
+  assert.ok(!f.some((m) => m.includes('| reap (no-zombie) |')), 'the reap row is kept by x4, so it must not be a finding: ' + f.join('\n'));
 });

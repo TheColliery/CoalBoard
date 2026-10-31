@@ -67,7 +67,7 @@ export function checkRunSafety({ files }) {
   const loadText = loadSetFiles(files).map((f) => f.text).join('\n');
   const ledger = parseSeatLedger(skill.text);
   const actors = [...new Set([...shellHolders(ledger), ...(/^\|\s*execute\s*\|/m.test(loadText) ? ['main'] : [])])];
-  if (!actors.includes('main')) findings.push('SKILL.md has no `execute` grant class for main: the main-runs half of the duty has nothing to bind');
+  if (!actors.includes('main')) findings.push('the Grants table (references/rails.md) has no `execute` grant class for main: the main-runs half of the duty has nothing to bind');
   if (actors.length < 3) findings.push(`expected at least 3 run-capable actors (main + 2 shell seats), derived ${actors.length}: ${actors.join(', ')}`);
 
   for (const id of IDS) {
