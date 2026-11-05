@@ -1,5 +1,5 @@
 // Dev-only lib (16f wave 2, CWK2-042): the parent folder of a config write is made ONLY after the chain from the project root is judged, and the target file itself
-// is never written through a link. scripts/ never reaches plugin/ (build-plugin.mjs copies skills, hooks, commands, agents and plugin.json only), so nothing here ships.
+// is never written through a link. scripts/ never reaches plugin/ (build-plugin.mjs copies skills, hooks, commands, agents, plugin.json and the plugin README only), so nothing here ships.
 //
 // THE CLASS (found by CoalLedger, ruled by the chief 16e; the exemplar is CoalLedger's mkdirRepoParents in scripts/lib/repo-fs.mjs, commits 31a1c3f and ed36168, ported with
 // its semantics unchanged): `fs.mkdirSync(path.dirname(writePath), { recursive: true })` ran BEFORE anything judged the path, so a `.claude` junction (Windows) or symlink (POSIX)

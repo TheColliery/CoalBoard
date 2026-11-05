@@ -1,5 +1,5 @@
 // Dev-only test helper (16e, CWK2-041): the TEARDOWN removal of a temp project that ran git. scripts/ never reaches plugin/ (build-plugin.mjs copies skills, hooks,
-// commands, agents and plugin.json only), so nothing here ships; the shipped code never imports it.
+// commands, agents, plugin.json and the plugin README only), so nothing here ships; the shipped code never imports it.
 //
 // THE CLASS. Windows refuses to remove a directory a live process holds as its cwd. When spawnSync kills Git for Windows' launcher (cmd\git.exe) on a timeout,
 // on ENOBUFS, or on a stdin error, the real git.exe the launcher started lives on with its cwd inside the test project, and spawnSync cannot wait for a

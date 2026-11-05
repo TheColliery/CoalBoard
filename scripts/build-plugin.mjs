@@ -5,7 +5,7 @@
 // runs only when the file is invoked directly.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { DIST_DOCS } from './lib/dist-docs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,8 +38,13 @@ export function buildDist(distRoot = DIST, srcRoot = ROOT) {
   return distRoot;
 }
 
-const isMain = process.argv[1] !== undefined && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
-if (isMain) {
+// Both sides through realpath: Node resolves import.meta.url to the real file, while argv keeps the path it was typed through, so a junction or
+// symlink would make the build a silent no-op (exit 0). scripts/lib/link-check.mjs carries the same guard (29bo M1).
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try { return fs.realpathSync.native(process.argv[1]) === fs.realpathSync.native(fileURLToPath(import.meta.url)); } catch { return false; }
+}
+if (isMainModule()) {
   buildDist();
   console.log('plugin/ dist built (skills + hooks + commands + agents + plugin.json + README) from source.');
 }

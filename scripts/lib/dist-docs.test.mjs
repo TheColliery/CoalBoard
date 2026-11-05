@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { DIST_DOCS, DOC_MIN_WORDS, docWords, distDocSource, checkDistDocs } from './dist-docs.mjs';
 import { buildDist } from '../build-plugin.mjs';
 import { removeTree } from './test-teardown.mjs';
@@ -94,4 +96,64 @@ test('buildDist refuses a missing README source BEFORE it removes the old dist, 
   fs.writeFileSync(path.join(distRoot, 'keep.txt'), 'old dist');
   assert.throws(() => buildDist(distRoot, srcRoot), /plugin-src\/README\.md is missing or not a file/);
   assert.equal(fs.readFileSync(path.join(distRoot, 'keep.txt'), 'utf8'), 'old dist');
+});
+
+// L3: a CRLF-only checkout of the same text is not stale (dist-compare's filesEqual, the room's content helper).
+test('L3: a CRLF-only difference from the source is not stale', (t) => {
+  const { srcRoot, distRoot } = fixture(t, { src: good + '\n', dist: good + '\r\n' });
+  assert.deepEqual(checkDistDocs(distRoot, srcRoot), []);
+});
+
+// L4: the fence rule follows the markdown spec: a fence closes on the same kind, at least the opener's length, and nothing else on the line.
+test('L4: a tilde fence is code, so its words do not count', () => {
+  assert.equal(docWords(words(10) + '\n~~~\n' + words(50, 'c') + '\n~~~\n'), 10);
+});
+
+test('L4: a fence closes only on a run of its own kind at least as long as its opener', () => {
+  assert.equal(docWords('one two three\n````md\n```js\na b c d e f g h i j\n```\n````\nfour five'), 5);
+});
+
+test('L4: an info-string line inside a fence does not close it', () => {
+  assert.equal(docWords('one\n```\nc1 c2 c3\n```js\nc4 c5\n```\ntwo'), 2);
+});
+
+// M1: the build must run when invoked through a link (junction), not only by its direct path. Fixture under os.tmpdir(), torn down.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+function buildFixture(t) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-buildlink-'));
+  t.after(() => removeTree(tmp));
+  fs.mkdirSync(path.join(tmp, 'scripts', 'lib'), { recursive: true });
+  fs.copyFileSync(path.join(HERE, '..', 'build-plugin.mjs'), path.join(tmp, 'scripts', 'build-plugin.mjs'));
+  for (const f of ['dist-docs.mjs', 'dist-compare.mjs']) fs.copyFileSync(path.join(HERE, f), path.join(tmp, 'scripts', 'lib', f));
+  for (const d of ['skills', 'hooks', 'commands', 'agents']) { fs.mkdirSync(path.join(tmp, d, 'x'), { recursive: true }); fs.writeFileSync(path.join(tmp, d, 'x', 'f.md'), 'x\n'); }
+  fs.mkdirSync(path.join(tmp, '.claude-plugin'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, '.claude-plugin', 'plugin.json'), '{}\n');
+  fs.mkdirSync(path.join(tmp, 'plugin-src'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'plugin-src', 'README.md'), good + '\n');
+  return tmp;
+}
+
+test('M1 control: the build run by its direct path writes plugin/README.md', (t) => {
+  const tmp = buildFixture(t);
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.readFileSync(path.join(tmp, 'plugin', 'README.md'), 'utf8'), good + '\n');
+});
+
+test('M1 RED-FIRST: the build run through a junction still builds, given an absolute argv', (t) => {
+  const tmp = buildFixture(t);
+  const link = path.join(tmp, 'linked');
+  try { fs.symlinkSync(path.join(tmp, 'scripts'), link, 'junction'); } catch (e) { t.skip(`no junction on this volume (${e.code})`); return; }
+  const r = spawnSync(process.execPath, [path.join(link, 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'README.md')), 'the build through a junction did nothing: ' + r.stdout);
+});
+
+test('M1 RED-FIRST: the build run with a relative argv from inside the junction still builds', (t) => {
+  const tmp = buildFixture(t);
+  const link = path.join(tmp, 'linked');
+  try { fs.symlinkSync(path.join(tmp, 'scripts'), link, 'junction'); } catch (e) { t.skip(`no junction on this volume (${e.code})`); return; }
+  const r = spawnSync(process.execPath, ['build-plugin.mjs'], { cwd: link, encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'README.md')), 'the relative build through a junction did nothing: ' + r.stdout);
 });
