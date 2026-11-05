@@ -1,6 +1,6 @@
 # CoalBoard plugin
 
-CoalBoard is a consensus and debate board for hard, error-sensitive tasks. It convenes several independent lenses in parallel on a task that matches its triggers, on an explicit `/coalboard`, or when you pick "ask CB" from the opinion lane. A judge synthesizes their findings on inputs it has checked. Any proposed change is staged in `.coalboard/proposed/`, and a file in your project changes only after you approve it at the disposition step.
+CoalBoard is a consensus and debate board for hard, error-sensitive tasks. It convenes several independent lenses in parallel on a task that matches its triggers, on an explicit `/coalboard`, or when you pick "ask CB" from the opinion lane. A judge synthesizes their findings on inputs it has checked. Any proposed change is staged in `.coalboard/proposed/`, and a staged fix reaches your files only after you approve it at the disposition step.
 
 Its limits:
 
@@ -42,6 +42,7 @@ The hook sends nothing and opens no connection. Each of these happens only in th
 - **The update check** runs `git ls-remote` against this repository on GitHub, and it is read-only. It runs through `/coalboard:update`. Under `updateMode: ask` (the default) the agent offers the check when one is due, and the read happens only if you accept. Under `auto` it runs when due, without asking again. Under `remind` it makes no network call, and the agent only tells you a check is due. Under `off` nothing is printed and no check runs. Whichever mode you pick, the update is applied only by `claude plugin update coalboard@coalboard`, which you run.
 - **A board run's data lens** (`agents/cb-data.md`) holds `WebFetch` and `WebSearch`, so it reads public pages from your agent.
 - **The opinion lane's realtime seat** holds shell and fetch access, and it reads live sources to measure what is now.
+- **The opinion lane's reality seat** holds shell access, with no fetch, and it runs commands to demonstrate what breaks.
 - **The adversary and feeling seats** (`agents/cb-adversary.md`, `agents/cb-feeling.md`) hold `Bash`. They may run commands to test a claim, under run safety.
 - **The main agent** reads the target's own open code-scanning, Dependabot and secret-scanning alert lists with a read-only GitHub request, using whatever read access your environment already has. The secret-scanning request asks GitHub not to return the secret value.
 - **Lenses** are subagents of your agent, on your account, under your platform's permission gate. The plugin calls no model API and holds no key.
@@ -60,7 +61,7 @@ The policy is in [PRIVACY.md](https://github.com/TheColliery/CoalBoard/blob/main
 ## Example uses
 
 1. **`/coalboard` on a hard problem.** The board convenes lenses on the task and returns a judged verdict. It stages any fix in `.coalboard/proposed/`, and asks for your decision before anything reaches a live file.
-2. **`/coalboard` on a named file or a whole repository, as an audit.** It runs the audit procedure, with its scope confirmed first, and writes a report to `.coalboard/reports/`. It changes no live file.
+2. **`/coalboard` on a named file or a whole repository, as an audit.** It runs the audit procedure, with its scope confirmed first, and writes a report to `.coalboard/reports/`. It changes no live file unless you choose to apply a fix.
 3. **The opinion lane ("ask CB").** When the agent is about to ask you to settle a decision, it can offer an "ask CB" option, marked with its cost. Choosing it convenes the lenses on that decision. It writes no file, and it never convenes on its own.
 4. **`/coalboard:stats`.** It prints a table of this session's boards, lenses, verdicts and staged changes, with approximate token spend. It changes no file.
 5. **`/coalboard:update`.** It checks for a newer tagged version and offers the update. It installs nothing.

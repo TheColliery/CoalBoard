@@ -103,7 +103,7 @@ check('plugin/ dist has no orphan (every dist file has an in-sync source)', () =
   return walk(distRoot);
 });
 
-// 29bo (CWK3-001): the plugin README is a dist copy of plugin-src/README.md, present, byte-equal and at the directory word floor.
+// 29bo (CWK3-001): the plugin README is a dist copy of plugin-src/README.md, present, equal in content and at the directory word floor.
 check('plugin/README.md is in sync with plugin-src and meets the directory minimum', () => {
   const findings = checkDistDocs(path.join(root, 'plugin'), root);
   return findings.length ? findings.join('; ') : null;
