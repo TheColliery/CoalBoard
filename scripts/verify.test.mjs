@@ -247,7 +247,7 @@ test('CWK-079 non-locality: a shape-rejected citation under a gitignored root is
 test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an absent root under the bare feed; the injection-site feed and the real gate are immune', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-pointer-lonecr-'));
   try {
-    for (const d of ['scripts', 'skills', 'hooks', 'plugin', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
+    for (const d of ['scripts', 'skills', 'hooks', 'plugin', 'plugin-src', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
       const src = path.join(root, d);
       if (fs.existsSync(src)) fs.cpSync(src, path.join(tmp, d), { recursive: true });
     }
@@ -316,7 +316,7 @@ test('verify.mjs pointer gate FIX 2: a lone-CR .gitignore line false-matches an 
 // passes, so the FAIL below is the plant and nothing else.
 function censusTree(plant) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-census-'));
-  for (const d of ['scripts', 'skills', 'hooks', 'plugin', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
+  for (const d of ['scripts', 'skills', 'hooks', 'plugin', 'plugin-src', '.claude-plugin', 'commands', 'agents', 'platform-configs']) {
     const src = path.join(root, d);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(tmp, d), { recursive: true });
   }
@@ -326,6 +326,56 @@ function censusTree(plant) {
   if (plant) fs.writeFileSync(path.join(tmp, 'scripts', 'lib', 'zz-planted.mjs'), 'spawnSync(' + "'git'" + ", ['status'], { cwd: '.', env: process.env });" + NL);
   return tmp;
 }
+// 29bo (CWK3-001): plugin/README.md is the dist copy of plugin-src/README.md. Each RED-FIRST leg plants one defect in a copy of the tree and
+// asserts the gate names it; the control proves an unplanted copy has no plugin README finding.
+function docTree() {
+  const tmp = censusTree(false);
+  fs.mkdirSync(tmp + '-home', { recursive: true });
+  return tmp;
+}
+function runVerifyIn(tmp) {
+  const w = witness(tmp + '-home');
+  const r = spawnSync(process.execPath, [...w.args, path.join(tmp, 'scripts', 'verify.mjs')], { cwd: tmp, env: { ...process.env, ...sandboxVars(tmp + '-home') }, encoding: 'utf8', timeout: VERIFY_TIMEOUT_MS, killSignal: KILL });
+  assertSandboxed(w, tmp + '-home', 'the plugin README verify run');
+  return r;
+}
+test('29bo RED-FIRST: a stale plugin/README.md makes the verify gate FAIL, naming the file', (t) => {
+  const tmp = docTree();
+  t.after(() => removeTree(tmp));
+  t.after(() => removeTree(tmp + '-home'));
+  fs.appendFileSync(path.join(tmp, 'plugin', 'README.md'), 'a stale line' + NL);
+  const r = runVerifyIn(tmp);
+  assert.match(r.stdout, /FAIL plugin\/README\.md is in sync.*plugin\/README\.md is stale vs plugin-src\/README\.md/, r.stdout);
+  assert.notEqual(r.status, 0, 'a stale dist README fails the gate');
+});
+test('29bo RED-FIRST: a plugin-src README under 40 words makes the verify gate FAIL, stating the count', (t) => {
+  const tmp = docTree();
+  t.after(() => removeTree(tmp));
+  t.after(() => removeTree(tmp + '-home'));
+  const short = 'CoalBoard runs one short consensus board for a single task.' + NL; // 10 words
+  fs.writeFileSync(path.join(tmp, 'plugin-src', 'README.md'), short);
+  fs.writeFileSync(path.join(tmp, 'plugin', 'README.md'), short);
+  const r = runVerifyIn(tmp);
+  assert.match(r.stdout, /FAIL plugin\/README\.md is in sync.*plugin-src\/README\.md has 10 words outside code blocks; the directory minimum is 40/, r.stdout);
+  assert.notEqual(r.status, 0, 'a thin plugin README fails the gate');
+});
+test('29bo RED-FIRST: a missing plugin/README.md makes the verify gate FAIL, naming the file', (t) => {
+  const tmp = docTree();
+  t.after(() => removeTree(tmp));
+  t.after(() => removeTree(tmp + '-home'));
+  fs.rmSync(path.join(tmp, 'plugin', 'README.md'), { force: true });
+  const r = runVerifyIn(tmp);
+  assert.match(r.stdout, /FAIL plugin\/README\.md is in sync.*plugin\/README\.md is missing/, r.stdout);
+  assert.notEqual(r.status, 0, 'a missing dist README fails the gate');
+});
+test('29bo control: an unplanted tree has no plugin README finding', (t) => {
+  const tmp = docTree();
+  t.after(() => removeTree(tmp));
+  t.after(() => removeTree(tmp + '-home'));
+  const r = runVerifyIn(tmp);
+  assert.doesNotMatch(r.stdout, /FAIL plugin\/README\.md/, r.stdout);
+  assert.doesNotMatch(r.stdout, /FAIL plugin\/ dist has no orphan.*README/, r.stdout);
+});
 test('CWK-136 RED-FIRST: planting env: process.env on a git spawn makes the verify gate FAIL, naming the file', (t) => {
   const tmp = censusTree(true);
   t.after(() => removeTree(tmp));

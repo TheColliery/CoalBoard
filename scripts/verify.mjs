@@ -12,6 +12,7 @@ import { checkConfigKeys } from './lib/config-keys.mjs';
 import { checkPointers, pointerCandidates, looksPathShaped, DEFAULT_SURFACE_PLAN, collectSurfaces, applyCheckIgnoreProbe } from './lib/pointer-check.mjs';
 import { deriveRootSets } from './lib/derive-roots.mjs';
 import { gitEnv } from './lib/git-env.mjs';
+import { checkDistDocs, distDocSource } from './lib/dist-docs.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -93,13 +94,19 @@ check('plugin/ dist has no orphan (every dist file has an in-sync source)', () =
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) { const r = walk(abs); if (r) return r; continue; }
       const rel = path.relative(distRoot, abs).replace(/\\/g, '/');
-      const src = path.join(root, rel);
+      const src = path.join(root, distDocSource(rel) ?? rel); // plugin/README.md is built from plugin-src/README.md (29bo)
       if (!fs.existsSync(src)) return `plugin/${rel} is a dist ORPHAN (no source) — it would ship unverified`;
       if (!filesEqual(src, abs)) return `plugin/${rel} differs from source — run scripts/build-plugin.mjs`;
     }
     return null;
   };
   return walk(distRoot);
+});
+
+// 29bo (CWK3-001): the plugin README is a dist copy of plugin-src/README.md, present, byte-equal and at the directory word floor.
+check('plugin/README.md is in sync with plugin-src and meets the directory minimum', () => {
+  const findings = checkDistDocs(path.join(root, 'plugin'), root);
+  return findings.length ? findings.join('; ') : null;
 });
 
 check('conductor inline detect lists match trigger.mjs (no silent drift)', () => {
