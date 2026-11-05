@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.4] - 2026-11-05
+
+The plugin folder gets its own README, and the scan record moves to 2.9.3
+
+### Added
+- **The installed plugin ships its own README.** It says what the plugin is and its limits, the install lines the marketplace and the probes support, what the two hooks read, write and print, what is fetched or sent, the data policy, example uses, the three commands and where to report a problem.
+
+### Changed
+- **The Last scan record now covers the v2.9.3 dist.** SECURITY.md carries the v2.9.3 scan: 95/100, 17 findings, none a defect, with the one new finding read as a false positive and the static coverage stated as partial. The v2.9.2 record moved to the earlier records.
+
 ## [2.9.3] - 2026-10-31
 
 The Antigravity claim reads validated (load only) after a board run
