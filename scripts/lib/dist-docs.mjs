@@ -35,20 +35,31 @@ export function distDocSource(dst) {
   return entry ? entry.src : null;
 }
 
-// Findings as strings (empty when clean). The source is checked for presence and for the word floor; the dist for presence and content equality.
-export function checkDistDocs(distRoot, srcRoot) {
+// The read errors that mean "no file here": a missing path, a path through a file, or a directory where a file belongs. Any other read error is a fault and stays loud.
+const NOT_A_FILE = new Set(['ENOENT', 'ENOTDIR', 'EISDIR']);
+
+// Findings as strings (empty when clean). Each file is read once, inside a try, rather than checked first (CodeQL js/file-system-race, alert #13): a path that
+// vanishes or turns into a directory between a check and a read would otherwise throw out of the gate. A source that vanishes between its two reads is
+// reported against the dist; the gate fails either way. `read` is injectable for the tests only.
+export function checkDistDocs(distRoot, srcRoot, { read = fs.readFileSync } = {}) {
   const findings = [];
   for (const { src, dst } of DIST_DOCS) {
     const srcAbs = path.join(srcRoot, ...src.split('/'));
     const dstAbs = path.join(distRoot, dst);
-    if (!fs.existsSync(srcAbs) || !fs.statSync(srcAbs).isFile()) {
+    let text;
+    try { text = read(srcAbs, 'utf8'); } catch (e) {
+      if (!NOT_A_FILE.has(e.code)) throw e;
       findings.push(`${src} is missing; the plugin README has no source`);
       continue;
     }
-    const n = docWords(fs.readFileSync(srcAbs, 'utf8'));
+    const n = docWords(text);
     if (n < DOC_MIN_WORDS) findings.push(`${src} has ${n} words outside code blocks; the directory minimum is ${DOC_MIN_WORDS}`);
-    if (!fs.existsSync(dstAbs)) findings.push(`plugin/${dst} is missing; run scripts/build-plugin.mjs`);
-    else if (!filesEqual(srcAbs, dstAbs)) findings.push(`plugin/${dst} is stale vs ${src}; run scripts/build-plugin.mjs`);
+    try {
+      if (!filesEqual(srcAbs, dstAbs)) findings.push(`plugin/${dst} is stale vs ${src}; run scripts/build-plugin.mjs`);
+    } catch (e) {
+      if (!NOT_A_FILE.has(e.code)) throw e;
+      findings.push(`plugin/${dst} is missing; run scripts/build-plugin.mjs`);
+    }
   }
   return findings;
 }

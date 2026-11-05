@@ -104,6 +104,37 @@ test('L3: a CRLF-only difference from the source is not stale', (t) => {
   assert.deepEqual(checkDistDocs(distRoot, srcRoot), []);
 });
 
+// CodeQL js/file-system-race (alert #13): each file is read once, inside a try. A directory or a vanished file is the "missing" finding; any other read error
+// stays loud. The injected reader proves the mapping, since a real fs cannot be raced from a test.
+test('a directory at the source path reads as missing, not as a crash', (t) => {
+  const { srcRoot, distRoot } = fixture(t);
+  fs.rmSync(path.join(srcRoot, 'plugin-src', 'README.md'));
+  fs.mkdirSync(path.join(srcRoot, 'plugin-src', 'README.md'));
+  const f = checkDistDocs(distRoot, srcRoot);
+  assert.equal(f.length, 1, f.join('\n'));
+  assert.match(f[0], /plugin-src\/README\.md is missing/);
+});
+
+test('RED-FIRST: a directory at the dist path reads as missing, not as a crash', (t) => {
+  const { srcRoot, distRoot } = fixture(t, { skipDist: true });
+  fs.mkdirSync(path.join(distRoot, 'README.md'));
+  const f = checkDistDocs(distRoot, srcRoot);
+  assert.equal(f.length, 1, f.join('\n'));
+  assert.match(f[0], /plugin\/README\.md is missing/);
+});
+
+test('RED-FIRST: a source read that fails with EISDIR reads as missing', (t) => {
+  const { srcRoot, distRoot } = fixture(t);
+  const read = () => { const e = new Error('EISDIR: illegal operation on a directory'); e.code = 'EISDIR'; throw e; };
+  assert.deepEqual(checkDistDocs(distRoot, srcRoot, { read }), ['plugin-src/README.md is missing; the plugin README has no source']);
+});
+
+test('RED-FIRST: a source read that fails with any other code stays loud', (t) => {
+  const { srcRoot, distRoot } = fixture(t);
+  const read = () => { const e = new Error('EACCES: permission denied'); e.code = 'EACCES'; throw e; };
+  assert.throws(() => checkDistDocs(distRoot, srcRoot, { read }), { code: 'EACCES' });
+});
+
 // L4: the fence rule follows the markdown spec: a fence closes on the same kind, at least the opener's length, and nothing else on the line.
 test('L4: a tilde fence is code, so its words do not count', () => {
   assert.equal(docWords(words(10) + '\n~~~\n' + words(50, 'c') + '\n~~~\n'), 10);
@@ -130,12 +161,17 @@ function buildFixture(t) {
   fs.writeFileSync(path.join(tmp, '.claude-plugin', 'plugin.json'), '{}\n');
   fs.mkdirSync(path.join(tmp, 'plugin-src'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'plugin-src', 'README.md'), good + '\n');
+  fs.mkdirSync(path.join(tmp, 'home'), { recursive: true });
   return tmp;
 }
 
+// CodeRabbit t284: the build CLI runs with HOME and the temp variables inside the fixture, never the real profile. The smallest local equivalent of
+// verify.test.mjs's sandboxVars, which is not exported.
+const sandboxEnv = (home) => ({ ...process.env, HOME: home, USERPROFILE: home, TMPDIR: home, TMP: home, TEMP: home });
+
 test('M1 control: the build run by its direct path writes plugin/README.md', (t) => {
   const tmp = buildFixture(t);
-  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000 });
+  const r = spawnSync(process.execPath, [path.join(tmp, 'scripts', 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000, env: sandboxEnv(path.join(tmp, 'home')) });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.readFileSync(path.join(tmp, 'plugin', 'README.md'), 'utf8'), good + '\n');
 });
@@ -144,7 +180,7 @@ test('M1 RED-FIRST: the build run through a junction still builds, given an abso
   const tmp = buildFixture(t);
   const link = path.join(tmp, 'linked');
   try { fs.symlinkSync(path.join(tmp, 'scripts'), link, 'junction'); } catch (e) { t.skip(`no junction on this volume (${e.code})`); return; }
-  const r = spawnSync(process.execPath, [path.join(link, 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000 });
+  const r = spawnSync(process.execPath, [path.join(link, 'build-plugin.mjs')], { encoding: 'utf8', timeout: 120000, env: sandboxEnv(path.join(tmp, 'home')) });
   assert.equal(r.status, 0, r.stderr);
   assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'README.md')), 'the build through a junction did nothing: ' + r.stdout);
 });
@@ -153,7 +189,7 @@ test('M1 RED-FIRST: the build run with a relative argv from inside the junction 
   const tmp = buildFixture(t);
   const link = path.join(tmp, 'linked');
   try { fs.symlinkSync(path.join(tmp, 'scripts'), link, 'junction'); } catch (e) { t.skip(`no junction on this volume (${e.code})`); return; }
-  const r = spawnSync(process.execPath, ['build-plugin.mjs'], { cwd: link, encoding: 'utf8', timeout: 120000 });
+  const r = spawnSync(process.execPath, ['build-plugin.mjs'], { cwd: link, encoding: 'utf8', timeout: 120000, env: sandboxEnv(path.join(tmp, 'home')) });
   assert.equal(r.status, 0, r.stderr);
   assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'README.md')), 'the relative build through a junction did nothing: ' + r.stdout);
 });
