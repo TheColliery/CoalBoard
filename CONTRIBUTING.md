@@ -24,7 +24,7 @@ node scripts/test.mjs     # runs the zero-dependency test suite: each test file 
 ```
 
 ### Development Rules
-* **Rebuild the dist after a source change:** edit `skills/`, `hooks/`, `commands/`, `scripts/lib/`, or the manifest, then `node scripts/build-plugin.mjs` to re-sync `plugin/` (verify fails on a stale dist).
+* **Rebuild the dist after a source change:** edit `skills/`, `hooks/`, `commands/`, `scripts/lib/`, `plugin-src/`, or the manifest, then `node scripts/build-plugin.mjs` to re-sync `plugin/` (verify fails on a stale dist).
 * **`config-schema.mjs` is the single source of truth** for every `.coalboard.json` key — `verify.mjs` validates the factory config against it.
 * **Keep the conductor Phoenix-pure:** zero dependencies, fail-silent (wrap in try/catch, never exit non-zero), no network, no spawn, no NUL byte.
 * **Add unit tests:** every shared helper gets a `*.test.mjs`; the conductor change gets a hermetic spawn test. Register new files in `scripts/test.mjs` (the runner fails on an unlisted orphan and on a file whose only result line names the file). Open: the runner has no per-file test-count floor, so a test that exits 0 after another test already passed reads as a pass with the tests that completed.
@@ -53,6 +53,7 @@ CoalBoard is **cross-agent** — it runs on any platform with concurrent subagen
 |---|---|
 | `skills/coalboard/SKILL.md` | The board contract (the load-bearing prompt). |
 | `scripts/lib/` | Core logic: `config-schema`, `trigger` (AND-gate), `rigor` (preset), `secrets` (scrubber), `link-check` (repo-internal link/anchor gate). |
+| `plugin-src/README.md` | Source of the plugin folder's README; `build-plugin.mjs` copies it to `plugin/README.md`. |
 | `scripts/` | Tool scripts: `build-plugin.mjs`, `verify.mjs`, `test.mjs`. |
 | `hooks/coalboard-conductor.js` | Phoenix-pure conductor hook (SessionStart + UserPromptSubmit). Auto-synced by the build. |
 | `plugin/` | Generated Claude Code plugin distribution. |
