@@ -44,7 +44,7 @@ function sandbox(t) {
     fs.rmSync(outside, { recursive: true, force: true });
     assert.ok(survived, 'cleanup of the sandbox removed the outside root content: a link was followed');
   });
-  return { base, proj, outside, realProj: fs.realpathSync.native(proj) };
+  return { base, proj, outside, realProj: fs.realpathSync.native(proj), fp: proj.split(path.sep).join('/') }; // fp: the root as a JSON file writes it (no backslash)
 }
 const touch = (p, text = 'x') => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); };
 const link = (target, at, type) => { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.symlinkSync(target, at, type); };
@@ -523,3 +523,205 @@ test('28a: a link is refused as link without a resolve of the link path (the lin
   const hit = resolved(tr).filter((p) => p === path.join(s.realProj, 'ln.js') || p === path.join(s.proj, 'ln.js'));
   assert.deepEqual(hit, [], `the checker resolved the refused link: ${hit.join(', ')}`);
 });
+
+// ---- 29ck: the FILE form. The targets come from a JSON file the agent writes, so no target crosses a shell. Every refusal exits 2 with one stderr line
+// that never echoes the file's content; an accepted file answers exactly as the positional form does on the same target.
+const targetsFile = (s, body, name = 'targets.json') => { const f = path.join(s.base, name); fs.writeFileSync(f, body); return f; };
+const oneLine = (text) => text.trim().split('\n').length === 1;
+
+test('29ck: the file form answers the same OK line as the positional form on the same target', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  const pos = run(s, [s.proj, 'a.js']);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a.js'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, pos.stdout);
+});
+
+test('29ck: the file form refuses a link target with the same line as the positional form', (t) => {
+  if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+  const s = sandbox(t);
+  link(s.outside, path.join(s.proj, 'dir'), 'junction');
+  const pos = run(s, [s.proj, 'dir/x.js']);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['dir/x.js'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.equal(r.stdout, pos.stdout);
+});
+
+test('29ck: the file form refuses a name that ends in a dot, with the same line as the positional form', (t) => {
+  const s = sandbox(t);
+  const pos = run(s, [s.proj, 'foo.']);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['foo.'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.equal(r.stdout, pos.stdout);
+});
+
+test('29ck: a relative --targets-file path resolves against the process cwd', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a.js'] }));
+  const r = run(s, ['--targets-file', 'targets.json']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'OK a.js\n');
+});
+
+test('29ck: a UTF-8 byte-order mark at the start of the file is stripped once and the file is read', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  const f = targetsFile(s, '﻿' + JSON.stringify({ root: s.fp, targets: ['a.js'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'OK a.js\n');
+});
+
+const NOT_TEXT = String.fromCharCode(0xfffd);
+const BAD_BODIES = [
+  ['a parse failure', (s) => '{"root": SECRETMARK}', 'not valid JSON'],
+  ['a top level array', () => '[]', 'wrong shape'],
+  ['a string root', (s) => JSON.stringify({ root: 5, targets: ['a.js'] }), 'wrong shape'],
+  ['an empty targets array', (s) => JSON.stringify({ root: s.fp, targets: [] }), 'wrong shape'],
+  ['a non-string target', (s) => JSON.stringify({ root: s.fp, targets: [1] }), 'wrong shape'],
+  ['a missing targets key', (s) => JSON.stringify({ root: s.fp }), 'wrong shape'],
+  ['a leading U+FFFD', (s) => NOT_TEXT + JSON.stringify({ root: s.fp, targets: ['a.js'] }), 'U+FFFD'],
+];
+for (const [label, body, fragment] of BAD_BODIES) {
+  test('29ck: a file with ' + label + ' is refused, exit 2, one stderr line that names the problem, and the content is never echoed', (t) => {
+    const s = sandbox(t);
+    const f = targetsFile(s, body(s));
+    const r = run(s, ['--targets-file', f]);
+    assert.equal(r.status, 2, r.stdout);
+    assert.equal(r.stdout, '');
+    assert.ok(oneLine(r.stderr), r.stderr);
+    assert.ok(r.stderr.includes(fragment), 'the refusal does not name the problem: ' + r.stderr);
+    assert.ok(!r.stderr.includes('SECRETMARK') && !r.stderr.includes(s.proj), r.stderr);
+  });
+}
+
+test('29ck: a file over 1 MiB is refused before it is parsed, exit 2, one stderr line', (t) => {
+  const s = sandbox(t);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a.js'], pad: 'x'.repeat(1024 * 1024 + 16) }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+});
+
+test('29ck: a targets file that is a file link is refused (lstat), exit 2, and the link target is not read', (t) => {
+  if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
+  const s = sandbox(t);
+  const real = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a.js'] }), 'real.json');
+  const f = path.join(s.base, 'linked.json');
+  link(real, f, 'file');
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+});
+
+test('29ck: a targets path that is a directory is refused, exit 2, one stderr line', (t) => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.join(s.base, 'dirlike.json'));
+  const r = run(s, ['--targets-file', path.join(s.base, 'dirlike.json')]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+  assert.ok(r.stderr.includes('not a regular file'), r.stderr);
+});
+
+test('29ck: a targets path that does not exist is refused, exit 2, one stderr line', (t) => {
+  const s = sandbox(t);
+  const r = run(s, ['--targets-file', path.join(s.base, 'missing.json')]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+});
+
+test('29ck: --targets-file takes no other argument, exit 2', (t) => {
+  const s = sandbox(t);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a.js'] }));
+  const r = run(s, ['--targets-file', f, s.proj]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+});
+
+test('29ck: only ONE byte-order mark is stripped; a second one is not valid JSON and is refused', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  const f = targetsFile(s, '﻿﻿' + JSON.stringify({ root: s.fp, targets: ['a.js'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.ok(oneLine(r.stderr), r.stderr);
+});
+
+test('29ck: the file form answers one line per target, the same lines as the positional form, for several targets in order', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a.js'));
+  touch(path.join(s.proj, 'sub', 'b.js'));
+  const targets = ['a.js', 'sub/b.js', 'nope/../x.js', 'c.js.'];
+  const pos = run(s, [s.proj, ...targets]);
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 1, r.stdout);
+  assert.equal(lines(r).length, targets.length);
+  assert.equal(r.stdout, pos.stdout);
+});
+
+// ---- 29ck bounce 2: any backslash in the file's raw text is refused, because a JSON escape decodes to a name the writer did not mean, and steps.md writes
+// forward slashes. Each leg puts one backslash form beside a junction; the forms are built in code.
+const BSLASH = String.fromCharCode(92);
+const RAW_BACKSLASHES = [
+  ['a unicode escape above the control range', BSLASH + 'u0085'],
+  ['a doubled backslash, which a writer would send for one', BSLASH + BSLASH],
+];
+for (const [label, esc] of RAW_BACKSLASHES) {
+  test('29ck: a file target with ' + label + ' is refused, exit 2, one stderr line naming forward slashes', (t) => {
+    if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+    const s = sandbox(t);
+    link(s.outside, path.join(s.proj, 'lnk'), 'junction');
+    const f = targetsFile(s, '{"root":' + JSON.stringify(s.fp) + ',"targets":["lnk' + esc + 'ew.js"]}');
+    const r = run(s, ['--targets-file', f]);
+    assert.equal(r.status, 2, r.stdout);
+    assert.equal(r.stdout, '');
+    assert.ok(oneLine(r.stderr), r.stderr);
+    assert.ok(r.stderr.includes('forward slashes'), r.stderr);
+  });
+}
+
+test('29ck: a root with a control character in it is refused by name, exit 2, one stderr line', (t) => {
+  const s = sandbox(t);
+  const f = targetsFile(s, '{"root":' + JSON.stringify(s.fp + String.fromCharCode(10)) + ',"targets":["a.js"]}');
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 2, r.stdout);
+  assert.equal(r.stdout, '');
+  assert.ok(oneLine(r.stderr), r.stderr);
+  assert.ok(r.stderr.includes('control character'), r.stderr);
+});
+
+test('29ck: a file target with a space in its name is OK in the file form', (t) => {
+  const s = sandbox(t);
+  touch(path.join(s.proj, 'a b.js'));
+  const f = targetsFile(s, JSON.stringify({ root: s.fp, targets: ['a b.js'] }));
+  const r = run(s, ['--targets-file', f]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'OK a b.js\n');
+});
+
+// ---- 29ck bounce 1: a JSON escape that becomes a control character in a path is refused. The escape is valid JSON, so the parser accepts it and the
+// checker would judge a different name from the one the agent meant. Each leg puts the escape in a target beside a junction; the escape is built in code.
+const BS = String.fromCharCode(92);
+const CONTROL_ESCAPES = [
+  ['a newline', BS + 'n'], ['a tab', BS + 't'], ['a carriage return', BS + 'r'], ['a backspace', BS + 'b'],
+  ['a form feed', BS + 'f'], ['a unicode escape for LF', BS + 'u000a'], ['a unicode escape for DEL', BS + 'u007f'],
+];
+for (const [label, esc] of CONTROL_ESCAPES) {
+  test('29ck: a file target with ' + label + ' in it is refused, exit 2, one stderr line, and no path is judged', (t) => {
+    if (SKIP_DIR) { t.skip(SKIP_DIR); return; }
+    const s = sandbox(t);
+    link(s.outside, path.join(s.proj, 'lnk'), 'junction');
+    const f = targetsFile(s, '{"root":' + JSON.stringify(s.fp) + ',"targets":["lnk' + esc + 'ew.js"]}');
+    const r = run(s, ['--targets-file', f]);
+    assert.equal(r.status, 2, r.stdout);
+    assert.equal(r.stdout, '');
+    assert.ok(oneLine(r.stderr), r.stderr);
+    assert.ok(r.stderr.includes('control character'), r.stderr); // the decoded check names the cause, ahead of the raw-text backslash check
+  });
+}

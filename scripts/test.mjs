@@ -20,6 +20,7 @@ const TESTS = [
   'scripts/lib/conductor.test.mjs',
   'scripts/lib/conductor-links.test.mjs',
   'scripts/lib/apply-target.test.mjs',
+  'scripts/lib/shell-slot.test.mjs',
   'scripts/hooks-exec-form.test.mjs',
   'scripts/lib/ladder.test.mjs',
   'scripts/lib/dist-compare.test.mjs',

@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.5] - 2026-11-06
+
+Hardens how the apply checker receives its targets
+
+### Security
+- **The apply checker reads its targets from a file, so no target crosses a shell.** The checker now reads the project root and its targets from a JSON file the agent writes with its file tool, and the skill's steps use that form. The checker refuses a link, a file over 1 MiB, a wrong shape, a control character or a backslash. Upgrade.
+
+### Added
+- A test holds every shipped text to no value slot on a shell line.
+
 ## [2.9.4] - 2026-11-05
 
 The plugin folder gets its own README, and the scan record moves to 2.9.3

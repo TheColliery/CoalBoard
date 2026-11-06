@@ -51,7 +51,7 @@ The hook sends nothing and opens no connection. Each of these happens only in th
 
 The policy is in [PRIVACY.md](https://github.com/TheColliery/CoalBoard/blob/main/PRIVACY.md). In short:
 
-- **What is stored.** Under `.coalboard/` in the project: `proposed/` (staged fixes), `reports/` (audit reports and post-mortems) and `memory/` (a worker's resume checkpoint). The skill tells the agent to delete `memory/` when each run ends. The code sets no retention for `proposed/` and `reports/`, so they stay until you delete them.
+- **What is stored.** Under `.coalboard/` in the project: `proposed/` (staged fixes), `reports/` (audit reports and post-mortems) and `memory/` (a worker's resume checkpoint and the apply checker's target list). The skill tells the agent to delete `memory/` when each run ends. The code sets no retention for `proposed/` and `reports/`, so they stay until you delete them.
 - **Run safety.** A command that runs against your target works on a lab clone outside your home folder, which the skill instructs the agent to remove when the run ends. A file the run changed in your project is restored from a backup. Its post-run version is first saved to `<run-id>.post-run/`, a folder beside the run directory under the lab root. The folder is restricted to your user, and it may hold a secret. It is kept after the run for you to reconcile and delete, and the report names its path.
 - **Project config.** One key, `fableConsent`, is written to the project config, and only when you answer "always, this project" at the real-money prompt.
 - **Who can read it.** Anyone with access to your user account or the project folder. The code sets no further access control.

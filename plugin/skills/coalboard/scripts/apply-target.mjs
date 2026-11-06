@@ -3,7 +3,11 @@
 // A target path in a cloned repo can itself be, or pass through, a planted symlink or junction, so an approved diff that names the LINK path would
 // land on the link's target, which can sit outside the project. Lexical containment does not stop a link (node/runtime.md section 4), so this walks
 // the path with lstat and canonicalizes with realpath.native. It is a CLI, not a hook: it FAILS LOUD (hooks-safety.md section 1.0). Zero-dependency, Node 22+.
-//   node apply-target.mjs <project-root> <target> [<target>...]      a target is relative to the root, or absolute
+//   node apply-target.mjs --targets-file <path>      THE FORM TO USE: the targets come from a JSON file the agent writes with its file tool, so no target
+//     crosses a shell. The file is UTF-8 JSON, one leading U+FEFF stripped, at most 1 MiB, a regular file
+//     (never a link): {"root": "<project root>", "targets": ["<target>", ...]} with a string root and a non-empty array of strings. A refusal exits 2 with one
+//     stderr line naming the problem and never the content. A relative path resolves against the cwd. The output and exit codes below are the same for both forms.
+//   node apply-target.mjs <project-root> <target> [<target>...]      the positional form, for a caller that builds argv with no shell; a target is relative to the root, or absolute
 //   stdout: one line per target, "OK <target>" or "REFUSE <target> <reason> <real path or ->"   reason: link | outside | unresolvable | name
 //   the last field: the real path where the walk resolved one (the final containment check); the RAW target text for outside (28a: a refused outside target is never resolved); the link's own target text for link (read, never followed); - otherwise
 //   exit: 0 every target OK, 1 any target refused, 2 usage error
@@ -17,7 +21,34 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const USAGE = 'usage: node apply-target.mjs <project-root> <target> [<target>...]\n  prints OK <target> or REFUSE <target> <link|outside|unresolvable|name> <real path or -> per target; exit 0 all OK, 1 any refused, 2 usage error\n  report a problem at https://github.com/TheColliery/CoalBoard/issues\n';
+const USAGE = 'usage: node apply-target.mjs --targets-file <path>   (the file form: a JSON file {"root": "<project root>", "targets": ["<target>", ...]}; no target crosses a shell)\n       node apply-target.mjs <project-root> <target> [<target>...]   (the positional form, for a caller with no shell)\n  prints OK <target> or REFUSE <target> <link|outside|unresolvable|name> <real path or -> per target; exit 0 all OK, 1 any refused, 2 usage error\n  report a problem at https://github.com/TheColliery/CoalBoard/issues\n';
+const TARGETS_MAX_BYTES = 1024 * 1024;
+
+// 29ck: the file form. Every refusal is a plain message (one stderr line, the caller adds the prefix); none echoes the file's content.
+class TargetsRefused extends Error {}
+const refuseFile = (msg) => { throw new TargetsRefused(msg); };
+const hasControl = (s) => [...s].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f);
+function readTargetsFile(file) {
+  let st;
+  try { st = fs.lstatSync(file); } catch (e) { refuseFile(e && e.code === 'ENOENT' ? 'the targets file does not exist' : 'the targets file could not be read'); }
+  if (st.isSymbolicLink()) refuseFile('the targets file is a link');
+  if (!st.isFile()) refuseFile('the targets file is not a regular file');
+  if (st.size > TARGETS_MAX_BYTES) refuseFile('the targets file is over 1 MiB');
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch { refuseFile('the targets file could not be read'); }
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  if (text.charCodeAt(0) === 0xfffd) refuseFile('the targets file starts with U+FFFD, so it is not UTF-8 text');
+  let doc;
+  try { doc = JSON.parse(text); } catch { refuseFile('the targets file is not valid JSON'); }
+  const shaped = doc !== null && typeof doc === 'object' && !Array.isArray(doc) && typeof doc.root === 'string'
+    && Array.isArray(doc.targets) && doc.targets.length > 0 && doc.targets.every((t) => typeof t === 'string');
+  if (!shaped) refuseFile('the targets file has the wrong shape: an object with a string root and a non-empty array of string targets');
+  // A JSON escape can parse to a control character that the path then carries: the checker would judge a name the agent did not write.
+  if (hasControl(doc.root) || doc.targets.some(hasControl)) refuseFile('the targets file holds a control character in a path, so no path is judged');
+  // Any backslash in the raw text is refused, not only the escapes the decoded check names: a JSON escape decodes to a name the writer did not mean.
+  if (text.includes(String.fromCharCode(92))) refuseFile('the targets file holds a backslash, so write paths with forward slashes');
+  return doc;
+}
 const SPLIT = path.sep === '\\' ? /[\\/]+/ : /\/+/;
 
 const clean = (s) => String(s).replace(/\p{Cc}/gu, '?'); // a target is untrusted text printed back: one line per target
@@ -120,7 +151,15 @@ function main(argv) {
     } catch { process.stderr.write('apply-target: the plugin manifest could not be read\n'); return 2; }
   }
   let args = argv;
-  if (args[0] === '--') args = args.slice(1);
+  if (args[0] === '--targets-file') {
+    if (args.length !== 2) { process.stderr.write('apply-target: --targets-file takes one path and no other argument\n'); return 2; }
+    let doc;
+    try { doc = readTargetsFile(path.resolve(args[1])); } catch (e) {
+      process.stderr.write(`apply-target: ${e instanceof TargetsRefused ? e.message : 'the targets file could not be read'}\n`);
+      return 2;
+    }
+    args = [doc.root, ...doc.targets];
+  } else if (args[0] === '--') args = args.slice(1);
   else if (args[0] && args[0].startsWith('-')) { process.stderr.write(`apply-target: unknown flag ${clean(args[0])}\n${USAGE}`); return 2; }
   if (args.length < 2) { process.stderr.write(USAGE); return 2; }
   const [rootArg, ...targets] = args;
