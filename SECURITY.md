@@ -53,7 +53,7 @@ CoalBoard is evaluated against [NVIDIA SkillSpector](https://github.com/NVIDIA/s
 * **Finding classes:**
   * RA1 Self-Modification ×12—the consent-gated self-update text in `commands/update.md`, `hooks/coalboard-conductor.js` and the plugin `README.md`: the hook only schedules and never networks, and the agent offers the platform's own `claude plugin update`.
   * EA2 Autonomous Decision Making ×5—the user-configured standing-consent modes, whose default is `ask`, and the rule that Fable never seats in the opinion lane.
-  * P6 Direct Prompt Extraction ×2—the words "footprint rule" and "output rule" in prose, matched as a print rule.
+  * P6 Direct Prompt Extraction ×2—the words "footprint rule" and "output rule" in prose, matched as an order to print or output rules.
   * BH1 Bundled hooks can execute when matching lifecycle events occur ×1—the scanner's standing note that `hooks/hooks.json` registers hooks.
 * **Coverage:** partial, 19 of 24 files fully inspected (79.2%). `hooks/coalboard-conductor.js` hit the scanner's parse limit (a security-relevant expression it could not fully resolve), `hooks/hooks.json` is opaque to it, and `SKILL.md`, `lens-prompts.md` and `references/steps.md` carry its `obfuscated_instruction_text` exception, so the scan did not clear those five.
 
