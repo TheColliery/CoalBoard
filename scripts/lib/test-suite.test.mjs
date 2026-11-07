@@ -14,6 +14,8 @@ const FILES = {
   'bad.test.mjs': "import { test } from 'node:test'; import assert from 'node:assert/strict';\ntest('bad one', () => assert.equal(1, 2));\n",
   // exits 0 before a test registers: the runner prints "# pass 1" and exits 0, byte for byte like a pass (Node 24.19, UMB2-026)
   'vacuous.test.mjs': "import { test } from 'node:test';\nprocess.exit(0);\ntest('never registered', () => {});\n",
+  // a real pass beside a skipped leg: green, and the skipped leg must be NAMED before the summary (29da, the canon wave-run's skippedLines)
+  'skip.test.mjs': "import { test } from 'node:test';\ntest('real check', () => {});\ntest('a skipped leg', { skip: 'capability probe' }, () => {});\n",
 };
 
 function repoWith(t, names, extraOnDisk = []) {
@@ -46,6 +48,17 @@ test('RED-FIRST 09a: a file that exits 0 before its tests registered is VACUOUS 
   assert.equal(r.code, 1, 'a vacuous file turns the suite red');
   assert.match(r.out, /VACUOUS scripts\/vacuous\.test\.mjs: /);
   assert.match(r.out, /pass 1 · fail 0 .* vacuous 1 \(scripts\/vacuous\.test\.mjs\) .* RED/);
+});
+
+test('29da RED-FIRST: a run with a skipped test prints SKIPPED <file>: <JSON name> before the summary line, and stays green', async (t) => {
+  const repo = repoWith(t, ['skip.test.mjs']);
+  const r = await suite(repo, ['scripts/skip.test.mjs']);
+  assert.equal(r.code, 0, r.out + r.err);
+  const lines = r.out.split('\n');
+  const named = lines.findIndex((l) => l === 'SKIPPED scripts/skip.test.mjs: "a skipped leg"');
+  const summary = lines.findIndex((l) => /^wave-run: /.test(l));
+  assert.ok(named >= 0, 'the skipped leg is named: ' + r.out);
+  assert.ok(summary > named, 'the SKIPPED line comes before the summary line: ' + r.out);
 });
 
 test('a failing file is red and named; the green file beside it is still counted', async (t) => {

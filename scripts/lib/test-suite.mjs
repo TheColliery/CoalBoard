@@ -17,7 +17,7 @@
 // roster does not list (it would silently never run). Node builtins plus ./wave-run.mjs only (Phoenix #2).
 import fs from 'node:fs';
 import path from 'node:path';
-import { runWaves, STATUS } from './wave-run.mjs';
+import { runWaves, skippedLines, STATUS } from './wave-run.mjs';
 
 // The roster against the disk, both directions. Returns the problems (empty = in sync).
 export function driftProblems(repo, tests, dirs = ['scripts', 'scripts/lib']) {
@@ -54,6 +54,7 @@ export async function runSuite({ repo, tests, limits, env = process.env, serial 
     out(`${r.status} ${r.name}: ${r.reason}`);
     if (r.stdout || r.stderr) err(`--- ${r.name} (${r.status}) ---\n${r.stdout ?? ''}${r.stderr ?? ''}`);
   }
+  for (const line of skippedLines(run.results)) out(line);
   out(run.summary.line);
   return run.exitCode;
 }
