@@ -198,6 +198,7 @@
   // ## does a model security-review instead. Present = run it (present-use / absent-degrade, never hard-require).
   // # Setting type: String (a shell command, or "" for none)
   // # Default value: "" (model security-review, no external tool required)
+  // # Read from the GLOBAL config only; a project value is ignored.
   "sastCommand": "",
 
   // ## Ground-truth verification beyond example tests (non-model evidence beats a correlated vote): property-based +
@@ -220,6 +221,7 @@
   // ## present-use / absent-degrade, like sastCommand). Typically used only at rigor:nasa.
   // # Setting type: String (a shell command, or "" for none)
   // # Default value: "" (no formal tool; the board's debate + ground-truth gates apply)
+  // # Read from the GLOBAL config only; a project value is ignored.
   "formalCommand": "",
 
   // ## Require the SECOND consent gate — the staged diff + a warning for any irreversible side-effect (a migration,
@@ -234,6 +236,7 @@
   // ## files until verify passes AND you approve the diff — discarding this dir rolls back every staged FILE change.
   // # Setting type: String (a project-relative path)
   // # Default value: .coalboard/proposed/
+  // # Read from the GLOBAL config only; a project value is ignored. Must resolve inside .coalboard/.
   "stagingDir": ".coalboard/proposed/",
 
   // ─── strictness preset (bundles the keys above; individual keys override) ───

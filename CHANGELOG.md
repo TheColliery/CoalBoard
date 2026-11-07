@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.6] - 2026-11-07
+
+Keeps a project's config from moving where fixes are staged or which external checks run
+
+### Security
+- **A project config can no longer move where fixes are staged or which external checks run.** The keys `sastCommand`, `formalCommand` and `stagingDir` are now read from the user's global config only; a project value for any of them is ignored. The staging folder must sit inside `.coalboard/`, and a staged or memory file that is a link is never written through.
+
 ## [2.9.5] - 2026-11-06
 
 Hardens how the apply checker receives its targets
