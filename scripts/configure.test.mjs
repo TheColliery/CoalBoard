@@ -126,6 +126,57 @@ test('configure (R16e L1): a refused gateless write over a MALFORMED config crea
     assert.strictEqual(fs.existsSync(GLOBAL_TARGET(sb.home) + '.bak'), false, 'a refused write creates no .bak');
   } finally { clean(sb); }
 });
+// 29cx: sastCommand, formalCommand and stagingDir are read from the GLOBAL config only, so a project write of any of them is refused before anything is
+// written: one stderr line naming --global, exit 1, and the project file (or its absence) unchanged. --global still writes them.
+const GLOBAL_ONLY_FLAGS = [['--sastCommand', 'a-sast-tool'], ['--formalCommand', 'a-formal-tool'], ['--stagingDir', '.coalboard/staged/']];
+for (const [flag, value] of GLOBAL_ONLY_FLAGS) {
+  test(`configure (29cx): ${flag} written to the PROJECT config is refused: exit 1, one stderr line naming --global, nothing written`, () => {
+    const sb = sandbox();
+    try {
+      const r = run([flag, value], sb);
+      assert.strictEqual(r.status, 1, 'exit 1: ' + r.stdout + r.stderr);
+      assert.ok(/--global/.test(r.stderr), 'the refusal names --global: ' + r.stderr);
+      assert.strictEqual(r.stderr.trim().split('\n').length, 1, 'exactly one stderr line: ' + r.stderr);
+      assert.strictEqual(fs.existsSync(PROJECT_TARGET(sb.proj)), false, 'no project file is created');
+    } finally { clean(sb); }
+  });
+
+  test(`configure (29cx): ${flag} over an EXISTING project config leaves that file byte-equal`, () => {
+    const sb = sandbox();
+    try {
+      const before = '{\n  "language": "en"\n}\n';
+      fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+      fs.writeFileSync(PROJECT_TARGET(sb.proj), before);
+      const r = run([flag, value], sb);
+      assert.strictEqual(r.status, 1, 'exit 1: ' + r.stdout + r.stderr);
+      assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), before, 'the project file is byte-equal');
+    } finally { clean(sb); }
+  });
+
+  test(`configure (29cx): ${flag} over a MALFORMED project config is refused before any .bak is made, and the file is byte-equal`, () => {
+    const sb = sandbox();
+    try {
+      const before = '{ "language": ';
+      fs.mkdirSync(path.dirname(PROJECT_TARGET(sb.proj)), { recursive: true });
+      fs.writeFileSync(PROJECT_TARGET(sb.proj), before);
+      const r = run([flag, value], sb);
+      assert.strictEqual(r.status, 1, 'exit 1: ' + r.stdout + r.stderr);
+      assert.strictEqual(fs.existsSync(PROJECT_TARGET(sb.proj) + '.bak'), false, 'no .bak is written');
+      assert.strictEqual(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'), before, 'the malformed file is byte-equal');
+    } finally { clean(sb); }
+  });
+
+  test(`configure (29cx): ${flag} with --global still writes the GLOBAL config`, () => {
+    const sb = sandbox();
+    try {
+      const r = run(['--global', flag, value], sb);
+      assert.strictEqual(r.status, 0, 'exit 0: ' + r.stdout + r.stderr);
+      const key = flag.slice(2);
+      assert.strictEqual(JSON.parse(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8'))[key], value);
+    } finally { clean(sb); }
+  });
+}
+
 test('configure: --global writes .claude/.coalboard.json under HOME, not the project own-dir path', () => {
   const sb = sandbox();
   try {
@@ -263,18 +314,26 @@ test(`configure: every one of the ${SETTABLE.length} CLI-settable keys round-tri
     // One combined invocation (all 28 flags in one process) -- proves the
     // parser handles the full flag set together, not just one key in
     // isolation, and is far cheaper than 28 separate spawns.
+    // 29cx: the three global-only keys (sastCommand, formalCommand, stagingDir) are refused in a project write, so they round-trip through --global
+    // in their own run; every other key still goes through the project layer in one run.
+    const GLOBAL_ONLY = new Set(['sastCommand', 'formalCommand', 'stagingDir']);
     const args = [];
+    const globalArgs = [];
     const expected = {};
     for (const spec of SETTABLE) {
       const { arg, expect } = representativeValue(spec);
-      args.push(`--${spec.key}`, arg);
+      (GLOBAL_ONLY.has(spec.key) ? globalArgs : args).push(`--${spec.key}`, arg);
       expected[spec.key] = expect;
     }
     const r = run(args, sb);
-    assert.strictEqual(r.status, 0, `expected exit 0 driving all ${SETTABLE.length} keys at once, stderr: ${r.stderr}`);
+    assert.strictEqual(r.status, 0, `expected exit 0 driving the project keys at once, stderr: ${r.stderr}`);
+    const rg = run(['--global', ...globalArgs], sb);
+    assert.strictEqual(rg.status, 0, `expected exit 0 driving the global-only keys, stderr: ${rg.stderr}`);
     const cfg = JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'));
+    const gcfg = JSON.parse(fs.readFileSync(GLOBAL_TARGET(sb.home), 'utf8'));
     for (const spec of SETTABLE) {
-      assert.deepStrictEqual(cfg[spec.key], expected[spec.key], `key '${spec.key}' (type ${spec.type}) did not round-trip: wrote ${JSON.stringify(expected[spec.key])}, read back ${JSON.stringify(cfg[spec.key])}`);
+      const got = GLOBAL_ONLY.has(spec.key) ? gcfg[spec.key] : cfg[spec.key];
+      assert.deepStrictEqual(got, expected[spec.key], `key '${spec.key}' (type ${spec.type}) did not round-trip: wrote ${JSON.stringify(expected[spec.key])}, read back ${JSON.stringify(got)}`);
     }
   } finally { clean(sb); }
 });

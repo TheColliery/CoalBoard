@@ -283,6 +283,7 @@ function main() {
   // deliberately excluded -- a nested map cannot be expressed by one CLI value,
   // so --lensTiers must read as "unrecognized option", never as a silent no-op
   // or a broken single-value assignment.
+  const GLOBAL_ONLY_KEYS = new Set(['sastCommand', 'formalCommand', 'stagingDir']);
   const flagMap = new Map();
   for (const spec of CONFIG_SCHEMA) {
     if (spec.noFlag) continue;
@@ -295,6 +296,11 @@ function main() {
     if (!spec) {
       console.error(`Error: Unrecognized option '${args[i]}'`);
       printHelp();
+      process.exit(1);
+    }
+    // 29cx: the command and path keys are read from the global config only, so a project write of one is refused before anything is written.
+    if (!isGlobal && GLOBAL_ONLY_KEYS.has(spec.key)) {
+      console.error(`Error: ${spec.key} is read from the global config only; write it with --global`);
       process.exit(1);
     }
     const parsed = parseValue(spec, args[++i]);

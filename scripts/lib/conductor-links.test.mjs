@@ -288,6 +288,28 @@ for (const [name, rel, legacy] of SHAPES) {
   });
 }
 
+// 29cx: the reader's text for the path and command keys, global only, and the staged-write rule. Pinned in the source and the dist copy alike.
+for (const [label, rel] of [['source', ['skills', 'coalboard']], ['dist', ['plugin', 'skills', 'coalboard']]]) {
+  test(`29cx (${label}): rails.md states that sastCommand, formalCommand and stagingDir are read from the global config only, with the staging containment and fallback`, () => {
+    const base = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel);
+    const body = fs.readFileSync(path.join(base, 'references', 'rails.md'), 'utf8');
+    for (const anchor of [
+      'A second EXCEPT: `sastCommand`, `formalCommand` and `stagingDir` are read from the user\'s GLOBAL config only; a project value for any of them is ignored.',
+      '`stagingDir` must also resolve inside `<project root>/.coalboard/`',
+      'falls back to `.coalboard/proposed/`, and the digest says so in one line.',
+    ]) {
+      assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
+    }
+  });
+
+  test(`29cx (${label}): steps.md refuses a non-regular file at a staged or memory name: never written through, touch nothing, tell the user`, () => {
+    const base = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', ...rel);
+    const body = fs.readFileSync(path.join(base, 'references', 'steps.md'), 'utf8');
+    const anchor = 'A file in `.coalboard/memory/` or `stagingDir` that exists as anything but a regular file is never written through; touch nothing and tell the user.';
+    assert.ok(body.includes(anchor), `missing anchor: ${anchor}`);
+  });
+}
+
 // ---- the prose half (SKILL.md's on-disk ledger): a MITIGATION the agent follows, anchored so deletion or drift fails loud.
 // An anchor catches deletion and reword, never reversal (verify.mjs / clamp-prose style); the rule's strength is prose, not a guarantee.
 for (const [label, rel] of [['source', ['skills', 'coalboard', 'SKILL.md']], ['dist', ['plugin', 'skills', 'coalboard', 'SKILL.md']]]) {
