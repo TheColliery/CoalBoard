@@ -55,13 +55,13 @@ const TESTS = [
 ];
 
 // A finite clock (testing.md, Determinism): a hung test would otherwise hold a runner for the 6 h job default. The NUMBERS are this room's own, sized from its measured suite:
-// TEST_TIMEOUT_MS is per test (measured 2026-10-02, 327 tests serial, 60.3 s whole suite: the slowest single test took 4.5 s, so 60 s is ~13x that, wide enough for a slower
-// runner, a macOS box or a Windows 8.3 TEMP, and still a hard stop). FILE_CLOCK_MS ends ONE file at its own wall clock (its tree is killed and the file is FAIL; measured 2026-10-09 with 23 files
+// TEST_TIMEOUT_MS is per test on Node 24 and later, but Node 22 applies it to the WHOLE file, and the canon's wave-run row (.github SKILL-REPO-PATTERN.md) asks for at least 120 s:
+// its wave-run.test.mjs runs 46 to 57 s whole on a loaded box. The slowest single test here took 4.5 s (measured 2026-10-02), so 120 s is still a hard stop. FILE_CLOCK_MS ends ONE file at its own wall clock (its tree is killed and the file is FAIL; measured 2026-10-09 with 23 files
 // in waves: the slowest file, secret-scan.test.mjs, took 51 s and the next, secret-gate.test.mjs, 40 s, so 300 s is ~6x), so a hang
 // before the first test, which --test-timeout never reaches, no longer waits for the whole run. SUITE_TIMEOUT_MS bounds the whole run at ~10x the measured serial suite time; every roster file runs inside it.
 // The heap cap rides the child's NODE_OPTIONS (scripts/lib/node-options.mjs EXTENDS the caller's, except that a caller's cap above 2048 is replaced by 2048: the zone's ninth
 // amendment, a runaway test child once took the box down), so every process a test starts inherits it.
-const TEST_TIMEOUT_MS = 60000;
+const TEST_TIMEOUT_MS = 120000;
 const FILE_CLOCK_MS = 300000;
 const SUITE_TIMEOUT_MS = 600000;
 
