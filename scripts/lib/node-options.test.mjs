@@ -3,10 +3,13 @@
 // --enable-source-maps, a bigger heap). childNodeOptions() EXTENDS it with the heap cap instead.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { childNodeOptions, HEAP_CAP_FLAG } from './node-options.mjs';
+import { removeTree } from './test-teardown.mjs';
 
 test('no caller value: the child gets the heap cap alone', () => {
   assert.equal(childNodeOptions(undefined), HEAP_CAP_FLAG);
@@ -59,10 +62,12 @@ test('the cap the suite is held to stays 2048 MiB (AGENTS.md hard-won lessons: a
 
 // The wiring, end to end: the real runner entry, asked what it WOULD hand its child (no suite is run).
 // This is the leg the old code failed: the child's value replaced the caller's.
-test('scripts/test.mjs hands its child the CALLER\'s NODE_OPTIONS plus the cap', () => {
+test('scripts/test.mjs hands its child the CALLER\'s NODE_OPTIONS plus the cap', (t) => {
   const runner = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-node-options-'));
+  t.after(() => removeTree(dir));
   const run = (callerValue) => {
-    const env = { ...process.env };
+    const env = { ...process.env, HOME: dir, USERPROFILE: dir, TEMP: dir, TMP: dir, TMPDIR: dir };
     if (callerValue === undefined) delete env.NODE_OPTIONS; else env.NODE_OPTIONS = callerValue;
     const r = spawnSync(process.execPath, [runner, '--print-child-options'], { encoding: 'utf8', env, timeout: 30000 });
     assert.equal(r.status, 0, r.stderr);

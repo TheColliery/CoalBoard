@@ -24,16 +24,14 @@ import { removeTree } from './lib/test-teardown.mjs';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGIN = path.join(repo, 'plugin');
 const AGY_TIMEOUT_MS = 120000;
-// 28a (T-27c-1, CodeRabbit t213 CR-1): every profile and temp variable that agy may read or write is pointed at one sandbox. The eight are the set the
-// reviewer measured in 27c: with all of them sandboxed, agy --version and agy plugin validate both exit 0 with 5 agents and 0 errors.
-const AGY_SANDBOX_KEYS = ['HOME', 'USERPROFILE', 'TEMP', 'TMP', 'TMPDIR', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME'];
 
 test('agy validate: the built plugin has no error finding and every agent loads', (t) => {
   // One sandbox, made BEFORE the first agy spawn; the probe and the validate spawn both run with it, and every other variable (PATH included) is kept.
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-agy-validate-env-'));
   t.after(() => removeTree(sandbox));
-  const agyEnv = { ...process.env };
-  for (const k of AGY_SANDBOX_KEYS) agyEnv[k] = sandbox;
+  // 28a (T-27c-1, CodeRabbit t213 CR-1): every profile and temp variable agy may read or write points at the one sandbox. The eight are the set the
+  // reviewer measured in 27c: with all of them sandboxed, agy --version and agy plugin validate both exit 0 with 5 agents and 0 errors.
+  const agyEnv = { ...process.env, HOME: sandbox, USERPROFILE: sandbox, TEMP: sandbox, TMP: sandbox, TMPDIR: sandbox, APPDATA: sandbox, LOCALAPPDATA: sandbox, XDG_CONFIG_HOME: sandbox };
 
   // Skip ONLY when agy is absent; a probe that hangs or fails is a failure (27b round 2).
   const probe = probeAgy({ timeoutMs: AGY_TIMEOUT_MS, env: agyEnv });
