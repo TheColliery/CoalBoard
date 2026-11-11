@@ -26,9 +26,10 @@ name: Coverage
 # PRIOR report standing (stale, never corrupt), the same class as codeql.yml. The
 # comparison baseline comes from the push-to-main run, so both triggers are needed.
 #
-# Every step after the checkout is gated on scripts/test.mjs existing (the checkout is not, it is cheap and the
-# gate reads the tree): a bare "Use this template" click has no scripts/ yet, and this job then skips cleanly,
-# never red.
+# Every step after the checkout is gated on scripts/test.mjs existing (the gate this template's ci.yml Test step uses; a room whose
+# ci.yml gates differently keeps the two in step; the
+# checkout is not, it is cheap and the gate reads the tree): a bare "Use this template" click has no scripts/ yet,
+# and this job then skips cleanly, never red.
 
 on:
   push:
@@ -54,9 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # This job pushes nothing, so the workflow token has no business staying in .git/config for the
+          # rest of the job, readable by every later step (SKILL-REPO-PATTERN.md, Layer 5).
+          persist-credentials: false
           # The PR HEAD commit, not the merge commit, so coverage line numbers map onto the diff.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false # pushes nothing
       - name: Set up Node (skips cleanly until scripts/test.mjs exists)
         if: hashFiles('scripts/test.mjs') != ''
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

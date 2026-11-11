@@ -6,7 +6,7 @@
 // re-arms the census on it, and git-spawn-room.test.mjs fails a pin that matches no bytes and a pin whose file passes without it. Each file below is a byte-equal copy
 // of an org template (SERIES-CANON "Secret scan": scanner parity measures it), so the room cannot route its git spawns through gitEnv() without breaking that parity;
 // the real fix belongs to the canon (the .github deputy). Why each stays, quoted from the canon census run with no pin (09b: the scanner test left the list, the Bankfire source's
-// bd328f2 copy a0319dcd reads a checked env; the secret gate is the one carrier the census still refuses unpinned, re-measured 2026-10-09 against canon 13f8d95c):
+// bd328f2 copy a0319dcd reads a checked env; the secret gate is the one carrier the census still refuses unpinned, re-measured 2026-11-12 against canon 05269bf (blob 4bf977178dff, re-copied in 29eb; the unpinned census still refuses scripts/secret-gate.mjs:62 and :67 "env: holds process.env without gitEnv()"); before that, 2026-10-09 against canon 13f8d95c):
 import fs from 'node:fs';
 import path from 'node:path';
 import { collectScriptsMjs, scanGitSpawns } from './git-env-census.mjs';
@@ -14,8 +14,8 @@ import { collectScriptsMjs, scanGitSpawns } from './git-env-census.mjs';
 export const PINS = [
   {
     rel: 'scripts/secret-gate.mjs',
-    blob: '856956a1cca6f716e5507f6c23ac90ed34cbbe5f',
-    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at both spawns and the name cannot vouch for it (F42).',
+    blob: '4bf977178dffc6045af9ff2bae4ed78273fcc80c',
+    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at both spawns and the name cannot vouch for it (F42).',
   },
 ];
 
