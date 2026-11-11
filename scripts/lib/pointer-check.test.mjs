@@ -490,7 +490,7 @@ function preFixLogic(ci) {
 //   (status-only) git drained stdin or spawnSync finished writing first -> { status: 129, error: undefined }
 //   (error-set)   git exited first -> spawnSync's write fails (EPIPE on POSIX, EOF on Windows) ->
 //                 { error: <set>, status: 129 } -- MEASURED here: status is STILL 129 alongside the error,
-//                 not null; since r24c (CWK2-060) classifyCheckIgnoreResult reads a pipe code beside a non-0/1 exit as that exit, so this shape names exit 129 too.
+//                 not null; the status decides first (29eb), so this shape names exit 129 too.
 // Both are non-0/1 runs the gate must fail closed on. The old test pinned only the first spelling
 // (/exited 129/), so it was a coin flip that only landed on the second shape under load. The invariant is
 // asserted below over BOTH shapes, keyed on WHICH one occurred (never an ||-regex that would also pass if the
@@ -499,25 +499,12 @@ function preFixLogic(ci) {
 function assertFailClosedVerdict(ci) {
   const verdict = classifyCheckIgnoreResult(ci);
   assert.equal(verdict.ok, false, 'a non-0/1 real git run is a FAIL in BOTH terminal shapes -- this leg never branches');
-  // r24c (CWK2-060): a pipe code beside a non-0/1 integer status is the child ANSWERING, so the verdict names its exit.
-  // Before r24c this helper asserted the spawn-error branch for every error-set shape, which encoded the defect's
-  // message as the expected verdict. Any other error-set pairing (ENOENT, a pipe beside 0, 1 or no status) stays on
-  // the spawn-error branch below.
-  const pipeBesideExit = Boolean(ci.error) && (ci.error.code === 'EPIPE' || ci.error.code === 'EOF')
-    && Number.isInteger(ci.status) && ci.status !== 0 && ci.status !== 1;
-  if (pipeBesideExit) {
-    assert.match(verdict.message, new RegExp('exited ' + ci.status),
-      'pipe error beside a real exit: the message names the exit status, got: ' + verdict.message);
-    assert.doesNotMatch(verdict.message, /failed to spawn/, 'pipe error beside a real exit must take the exit-status branch');
-  } else if (ci.error) {
-    assert.ok(verdict.message.includes('failed to spawn: ' + ci.error.message),
-      'error-set shape: the message names the spawn error itself, got: ' + verdict.message);
-    assert.doesNotMatch(verdict.message, /exited/, 'error-set shape must take the spawn-error branch, not the exit-status one');
-  } else {
-    assert.match(verdict.message, new RegExp('exited ' + ci.status),
-      'status-only shape: the message names the exit status, got: ' + verdict.message);
-    assert.doesNotMatch(verdict.message, /failed to spawn/, 'status-only shape must take the exit-status branch, not the spawn-error one');
-  }
+  // 29eb: the status decides first. A real non-0/1 exit names the exit whether or not a write-side error sits beside it
+  // (the pipe race of r24c), so both terminal shapes take the exit-status branch and no shape reads as a spawn failure.
+  assert.ok(Number.isInteger(ci.status) && ci.status !== 0 && ci.status !== 1, 'fixture precondition: a real non-0/1 integer status');
+  assert.match(verdict.message, new RegExp('exited ' + ci.status),
+    'a real non-0/1 exit names the exit status, got: ' + verdict.message);
+  assert.doesNotMatch(verdict.message, /failed to spawn/, 'a real non-0/1 exit must take the exit-status branch, not the spawn-error one');
   return verdict;
 }
 
@@ -611,9 +598,31 @@ test('classifyCheckIgnoreResult: a genuine spawn error (git missing) is a FAIL n
 
 // r24c (CWK2-060): git exits BEFORE it reads stdin (a core.bare=true repo refuses at once with 128) while spawnSync
 // is still writing `input`, so spawnSync returns BOTH a pipe error (EPIPE on POSIX, EOF on Windows) AND the real
-// status. The child answered, so its exit is the verdict. Any other pairing stays fail-closed. Keyed on error.code.
+// status. The child answered, so its exit is the verdict (the status decides first, 29eb). A pipe error beside 0 or 1 is a partial answer.
 const brokenPipe = (code, status, stderr = '') => ({ error: Object.assign(new Error('spawnSync git ' + code), { code }), status, stdout: '', stderr });
 const NO_WORK_TREE = 'fatal: this operation must be run in a work tree' + NL;
+
+// 29eb RED-FIRST: status 0 or 1 beside a pipe write error is a PARTIAL answer. It fails, the message says the answer may
+// be partial, and it never reads as a spawn failure or as clean. Red on the pre-29eb order, which named a spawn failure.
+test('classifyCheckIgnoreResult: 29eb -- status 0 with an EPIPE error fails as a PARTIAL answer, never "failed to spawn" and never clean', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 0));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /exited 0 but the stdin write failed \(spawnSync git EPIPE\) -- the answer may be partial/);
+  assert.doesNotMatch(v.message, /failed to spawn/);
+});
+
+test('classifyCheckIgnoreResult: 29eb -- status 1 with an EOF error fails as a PARTIAL answer, never "failed to spawn" and never clean', () => {
+  const v = classifyCheckIgnoreResult(brokenPipe('EOF', 1));
+  assert.equal(v.ok, false);
+  assert.match(v.message, /exited 1 but the stdin write failed \(spawnSync git EOF\) -- the answer may be partial/);
+  assert.doesNotMatch(v.message, /failed to spawn/);
+});
+
+test('classifyCheckIgnoreResult: 29eb -- status null with an error is the spawn failure, and a signal is named', () => {
+  const v = classifyCheckIgnoreResult({ error: new Error('spawnSync git ETIMEDOUT'), status: null, signal: 'SIGTERM', stdout: '', stderr: '' });
+  assert.equal(v.ok, false);
+  assert.match(v.message, /failed to spawn \(signal SIGTERM\): spawnSync git ETIMEDOUT/);
+});
 
 test('classifyCheckIgnoreResult: r24c -- EPIPE beside status 128 names the EXIT, not a spawn failure (POSIX pipe race)', () => {
   const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 128, NO_WORK_TREE));
@@ -634,23 +643,23 @@ test('classifyCheckIgnoreResult: r24c -- a pipe error with empty stderr names th
   assert.equal(v.message, 'git check-ignore --stdin exited 128 -- cannot tell which cited roots are gitignored');
 });
 
-test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 0 stays "failed to spawn" (input may not have reached git)', () => {
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 0 fails closed as a partial answer (input may not have reached git)', () => {
   const v = classifyCheckIgnoreResult(brokenPipe('EPIPE', 0));
   assert.equal(v.ok, false);
-  assert.match(v.message, /failed to spawn: spawnSync git EPIPE/);
+  assert.match(v.message, /the answer may be partial/);
 });
 
-test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 1 stays "failed to spawn" (git may have stopped reading)', () => {
+test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside status 1 fails closed as a partial answer (git may have stopped reading)', () => {
   const v = classifyCheckIgnoreResult(brokenPipe('EOF', 1));
   assert.equal(v.ok, false);
-  assert.match(v.message, /failed to spawn: spawnSync git EOF/);
+  assert.match(v.message, /the answer may be partial/);
 });
 
-test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a NON-pipe error beside status 128 stays "failed to spawn" (ENOENT is not the child answering)', () => {
+test('classifyCheckIgnoreResult: 29eb -- a NON-pipe error beside status 128 names the EXIT, git\'s own answer (status decides first)', () => {
   const v = classifyCheckIgnoreResult(brokenPipe('ENOENT', 128, NO_WORK_TREE));
   assert.equal(v.ok, false);
-  assert.match(v.message, /failed to spawn: spawnSync git ENOENT/);
-  assert.doesNotMatch(v.message, /exited 128/);
+  assert.match(v.message, /exited 128 -- fatal: this operation must be run in a work tree/);
+  assert.doesNotMatch(v.message, /failed to spawn/);
 });
 
 test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside NO status stays "failed to spawn"', () => {
@@ -659,14 +668,14 @@ test('classifyCheckIgnoreResult: r24c FAIL-CLOSED -- a pipe error beside NO stat
   assert.match(v.message, /failed to spawn: spawnSync git EPIPE/);
 });
 
-// r25a (CWK2-061): the classifier keys on error.code, never error.message. One leg per pipe word, so a mutant that
+// r25a (CWK2-061): the classifier never reads error.message (29eb: nor error.code, the status decides). One leg per pipe word, so a mutant that
 // reads the word from the message (M9 EPIPE, M13 EOF) is killed by name, not only by the pipe-code legs above.
 for (const word of ['EPIPE', 'EOF']) {
-  test(`classifyCheckIgnoreResult: CWK2-061 FAIL-CLOSED -- a "${word}" word in error.message with a non-pipe error.code stays "failed to spawn" (keyed on the code, never the message)`, () => {
-    const v = classifyCheckIgnoreResult({ error: Object.assign(new Error(`write ${word}`), { code: 'ENOENT' }), status: 128, stdout: '', stderr: NO_WORK_TREE });
+  test(`classifyCheckIgnoreResult: CWK2-061 FAIL-CLOSED -- a "${word}" word in error.message beside a clean status 0 with a non-pipe error.code is a PARTIAL answer, never clean (the message word is never read)`, () => {
+    const v = classifyCheckIgnoreResult({ error: Object.assign(new Error(`write ${word}`), { code: 'ENOENT' }), status: 0, stdout: '', stderr: '' });
     assert.equal(v.ok, false);
-    assert.match(v.message, new RegExp(`failed to spawn: write ${word}`));
-    assert.doesNotMatch(v.message, /exited 128/);
+    assert.match(v.message, /the answer may be partial/);
+    assert.doesNotMatch(v.message, /failed to spawn/);
   });
 }
 
