@@ -31,7 +31,7 @@
 
 ## ⚖️ What it is
 
-On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board of diverse epistemic lenses to debate the task, a judge to synthesize on verified inputs, and you to sign off before anything touches your files. On Claude Code, a session with no user to answer convenes nothing and applies nothing, whatever `coalboardMode` says: the conductor decides that at session start from `CLAUDE_CODE_SESSION_ATTENDED`, an environment variable Claude Code sets, undocumented by the vendor and version-bound (any value other than `1`, or none, reads as no user).
+On an **error-not-allowed** task — security/crypto, a DB/financial migration, high-precision math/physics — and **only with your consent**, CoalBoard convenes a board of diverse epistemic lenses to debate the task, a judge to synthesize on verified inputs, and you to sign off before anything touches your files. On Claude Code, the conductor reads `CLAUDE_CODE_SESSION_ATTENDED` at session start (an environment variable Claude Code sets, undocumented by the vendor and version-bound; any value other than `1`, or none, reads as no user) and tells the agent that no user can answer, so the agent convenes nothing and applies nothing, whatever `coalboardMode` says. The hook decides which line the agent gets; the agent follows it, so this is an instruction, not an enforced block.
 
 Three doors in — every one behind your consent:
 
@@ -109,7 +109,7 @@ Everything is tunable in `.coalboard.json` — a global `~/.claude/.coalboard.js
 | Key | Default | What it does |
 |---|---|---|
 | `rigor` | `standard` | Strictness preset (`relaxed` \| `standard` \| `high` \| `nasa`) — sets defaults for the knobs below; any explicit key overrides it |
-| `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene, never offer "ask CB" — the board's master switch; with no user to answer this session, nothing convenes whatever this says) |
+| `coalboardMode` | `ask` | Convene behavior on a detected critical task: `ask` (per-instance consent + cost estimate) \| `auto` (convene without asking) \| `off` (never convene, never offer "ask CB" — the board's master switch; with no user to answer this session, the start line tells the agent to convene nothing, whatever this says: an instruction it follows, not an enforced block) |
 | `triggerConfidence` | `90` | Semantic-classifier confidence (0-100) a task must clear to count as critical — higher = fewer false triggers, more false-negatives (the manual `/coalboard` is the safety valve) |
 | `lenses` | `data, truth, feeling` | The active epistemic lenses (each `data` \| `truth` \| `feeling`) — the decorrelation mechanism; all three are the floor for error-not-allowed work |
 | `fableConsent` | `ask` | Consent to seat **Fable** (the `fable` alias, Fable 5.1 — the top lens rung — within the separate weekly Fable limit on Max, then usage credits if they are on, can bill to usage credits on other plans and seat tiers) at `high`/`nasa`: `ask` (a consent box before the fable seats, showing the exact count + a ~est cost) \| `always` (seat without asking) \| `never` (always fall to the highest non-fable tier). `relaxed`/`standard` never seat fable |
