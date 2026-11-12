@@ -4,10 +4,10 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.9.8] - 2026-11-12
 
-The fable alias is named as Claude Code's default Fable, and the consent rate note carries its source and date
+The fable alias is named as the default Fable, with a dated rate
 
 ### Fixed
-- The shipped text named the `fable` alias as Fable 5.1 at $10 / $50 per Mtok. Since Claude Code v2.1.321 (2026-11-09) the alias resolves to Fable 5.2 at $8 / $40. The README, the configure help, the config template and the Claude Code reference now name the alias as the default Fable model, and the consent ask's rate note points to the vendor's rate as read on a date.
+- The shipped text named the `fable` alias as Fable 5.1 at $10 / $50 per Mtok. Since Claude Code v2.1.321 (2026-11-09) the alias resolves to Fable 5.2 at $8 / $40. The README, the configure help, the config template and the Claude Code reference now name the alias as the default Fable model, and the consent box shows the rate with the date it was read.
 
 ## [2.9.7] - 2026-11-12
 
