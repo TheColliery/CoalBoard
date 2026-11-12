@@ -106,15 +106,24 @@ for (const hook of SURFACES) {
     }
   });
 
-  test(`${hook}: the update stamp is written and no temp file survives the write (T-29eb-2)`, (t) => {
+  test(`${hook}: the update stamp is replaced by a rename, never written in place, and no temp file survives (T-29eb-2)`, (t) => {
     const sb = sandbox(t);
     writeGlobal(sb, { updateMode: 'auto' });
+    const dir = path.join(sb.home, '.claude', 'coal', 'coalboard');
+    fs.mkdirSync(dir, { recursive: true });
+    // The stamp is a HARD LINK to a sibling that holds an OLD timestamp. An in-place write goes through the link and changes the sibling;
+    // a rename replaces the stamp's directory entry and leaves the sibling alone. The old value also makes the check due.
+    const SIBLING_VALUE = '1000';
+    const sibling = path.join(dir, 'sibling');
+    fs.writeFileSync(sibling, SIBLING_VALUE);
+    fs.linkSync(sibling, path.join(dir, 'update-check'));
+    const before = Date.now();
     const r = run(hook, sb, '0', { hook_event_name: 'SessionStart' });
     assertClean(r);
-    const dir = path.join(sb.home, '.claude', 'coal', 'coalboard');
-    const names = fs.readdirSync(dir);
-    assert.deepEqual(names.filter((n) => n !== 'update-check'), [], `a temp file survived the stamp write: ${names}`);
+    assert.equal(fs.readFileSync(sibling, 'utf8'), SIBLING_VALUE, 'the stamp was written in place through its link (the sibling changed): a rename must replace the entry instead');
     const stamp = Number(fs.readFileSync(path.join(dir, 'update-check'), 'utf8'));
-    assert.ok(Number.isFinite(stamp) && stamp > 0 && stamp <= Date.now(), `the stamp holds a timestamp: ${stamp}`);
+    assert.ok(Number.isFinite(stamp) && stamp >= before && stamp <= Date.now(), `the stamp holds a fresh timestamp: ${stamp}`);
+    const names = fs.readdirSync(dir);
+    assert.deepEqual(names.filter((n) => n !== 'update-check' && n !== 'sibling'), [], `a temp file survived the stamp write: ${names}`);
   });
 }
