@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.7] - 2026-11-12
+
+Without a user to answer, the board convenes nothing
+
+### Fixed
+- The conductor now decides at session start whether a user can answer, from `CLAUDE_CODE_SESSION_ATTENDED` (only the value `1` counts as attended; any other value, or none, reads as no user). With no user, the session-start line says the board is not convened and nothing is applied, whatever `coalboardMode` says. The per-prompt line points at that line, and the skill's P2, F9, F12 and Step 0 text follow it. Before this, the rule rested on the model judging whether a user was present.
+- The update-check stamp is written temp-then-rename, so an interrupted write cannot leave a torn stamp behind.
+
 ## [2.9.6] - 2026-11-07
 
 Keeps a project's config from moving where fixes are staged or which external checks run
