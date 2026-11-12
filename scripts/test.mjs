@@ -19,6 +19,7 @@ const TESTS = [
   'scripts/lib/lib.test.mjs',
   'scripts/lib/conductor.test.mjs',
   'scripts/lib/conductor-links.test.mjs',
+  'scripts/lib/conductor-attended.test.mjs',
   'scripts/lib/apply-target.test.mjs',
   'scripts/lib/shell-slot.test.mjs',
   'scripts/hooks-exec-form.test.mjs',
