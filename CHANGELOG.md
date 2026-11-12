@@ -10,6 +10,9 @@ Without a user to answer, the start line tells the agent not to convene
 - The conductor now decides at session start whether a user can answer, from `CLAUDE_CODE_SESSION_ATTENDED` (only the value `1` counts as attended; any other value, or none, reads as no user). With no user, the session-start line tells the agent that the board is not convened and nothing is applied, whatever `coalboardMode` says. The hook decides which line the agent gets; the agent follows it, so this is an instruction, not an enforced block. The per-prompt line points at that line, and the skill's P2, F9, F12 and Step 0 text follow it. Before this, the rule rested on the model judging whether a user was present.
 - The update-check stamp is written temp-then-rename, so an interrupted write cannot leave a torn stamp behind.
 
+### Changed
+- In a session no user can answer, the board is no longer run at all. Before, P2 and F9 allowed a report-only board run there under `auto`; now P2, F9 and Step 0 say the board is not convened and nothing is applied, and the agent says so in its output.
+
 ## [2.9.6] - 2026-11-07
 
 Keeps a project's config from moving where fixes are staged or which external checks run
