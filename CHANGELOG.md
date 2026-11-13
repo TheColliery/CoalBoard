@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.9] - 2026-11-14
+
+An advisory skill check runs on pull requests, and the skill names its author
+
+### Changed
+- An advisory Skill checks workflow (NVIDIA SkillEvaluator, keyless Tier 1) runs on pull requests only, never on a push to `main`. It is not a required check, and its security scan reports pattern matches on skill text as findings.
+- The skill's frontmatter names its author (`metadata.author`).
+
 ## [2.9.8] - 2026-11-12
 
 The fable alias is named as the default Fable, with a dated rate

@@ -37,6 +37,8 @@ Both checks the branch ruleset requires — `all-green` (CI) and `analyze (javas
 
 **So read the job summary, never the green tick alone.** Each check states which of three things happened — the path classifier failed (the check refuses), the suite ran (with its result), or there was nothing to run (naming the changed paths that produced that verdict). A summary saying nothing ran is not a clean bill of health. The two workflows exempt deliberately different path sets: CI still runs on a shipped markdown artifact, because `verify.mjs` checks dist-sync, while CodeQL skips all markdown, because it analyzes JS/TS.
 
+A third workflow, **Skill checks** (`.github/workflows/skill-checks.yml`), is advisory and is not a required check. It runs on pull requests only, never on a push to `main`. It runs NVIDIA SkillEvaluator's keyless Tier 1 scan over the skill text, and that scan reports pattern matches on skill text as findings, so a finding there is a prompt to read the line, not a verdict.
+
 ---
 
 ## 🖥️ Supported Platforms
