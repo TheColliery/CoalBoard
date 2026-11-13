@@ -50,7 +50,7 @@ CoalBoard is evaluated against [NVIDIA SkillSpector](https://github.com/NVIDIA/s
 * **Coverage:** partial, 18 of 24 files fully inspected (75%). Six are partial: `hooks/coalboard-conductor.js` and `skills/coalboard/scripts/apply-target.mjs` (the parser's limit on a security-relevant expression), `hooks/hooks.json` (opaque to it), and `SKILL.md`, `lens-prompts.md` and `references/steps.md` (its `obfuscated_instruction_text` exception).
 * **Not clearance:** a clean scanner run does not clear a behaviour defect. The scanner reads text; the v2.6.0 defect lived in behaviour.
 
-A separate advisory workflow, Skill checks (NVIDIA SkillEvaluator, keyless Tier 1), runs on pull requests only and reports its pattern matches as findings; it is not a SkillSpector scan and does not change the record below.
+A separate advisory workflow, Skill checks (NVIDIA SkillEvaluator, keyless Tier 1), runs on pull requests and when started by hand, and reports its pattern matches as findings; it does not change the record below.
 
 Earlier scans are in this file's git history. Scanning is event-driven (this repository's own version bump, or a genuinely new attack surface); this record names the last scan actually run.
 

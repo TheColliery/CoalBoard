@@ -4,10 +4,10 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.9.9] - 2026-11-14
 
-An advisory skill check runs on pull requests, and the skill names its author
+An advisory skill check runs on pull requests; the skill names its author
 
 ### Changed
-- An advisory Skill checks workflow (NVIDIA SkillEvaluator, keyless Tier 1) runs on pull requests only, never on a push to `main`. It is not a required check, and its security scan reports pattern matches on skill text as findings.
+- An advisory Skill checks workflow (NVIDIA SkillEvaluator, keyless Tier 1) runs on pull requests and when started by hand, never on a push to `main`. It is not a required check, and its security scan reports pattern matches on skill text as findings.
 - The skill's frontmatter names its author (`metadata.author`).
 
 ## [2.9.8] - 2026-11-12
