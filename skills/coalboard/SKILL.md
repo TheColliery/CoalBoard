@@ -2,6 +2,8 @@
 name: coalboard
 description: >-
   Consensus & debate board. AUTO-trigger = the error-not-allowed slice (security/crypto, DB/financial migrations, high-precision math, anything catastrophic-on-error); convened MANUALLY ("/coalboard") it generalizes to any hard problem in ANY domain worth several diverse perspectives. OPINION lane: about to ask the user to settle a decision → ADD an "ask CB" option (~4 lenses + judge); the pick IS the consent, never auto-convened. With the user's consent it convenes diverse epistemic lenses (empirical/source-grounded, formal, show-me skeptic) in PARALLEL; a judge synthesizes on VERIFIED inputs; an independent out-of-frame solver breaks ties; the human signs off. Bounded cost + zero-breakage (staging) — improves correctness, claims no reliability number. Off ~90% of the time. Triggers: "/coalboard", "convene the board", a critical-task signal, a CoalTipple hand-off. Cross-agent (verified: Claude Code; Antigravity validated (load only); others designed-for, unverified). Zero-dependency, offline, no API keys.
+metadata:
+  author: HetCreep <info@thecolliery.org>
 ---
 
 # CoalBoard
