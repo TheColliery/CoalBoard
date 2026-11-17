@@ -14,7 +14,7 @@ import { collectScriptsMjs, scanGitSpawns } from './git-env-census.mjs';
 export const PINS = [
   {
     rel: 'scripts/secret-gate.mjs',
-    blob: '33e8a4ae82683316832bbdc1100a56eabc65ee62',
+    blob: '0dd7e4e1f3ce9cf64a9a787836cf82ed47f95d44',
     why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at both spawns and the name cannot vouch for it (F42).',
   },
 ];
