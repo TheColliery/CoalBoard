@@ -32,6 +32,14 @@ async function suite(repo, tests) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
+test('each file prints its own wall time, so a CI log shows the slowest file', async (t) => {
+  const repo = repoWith(t, ['ok.test.mjs', 'skip.test.mjs']);
+  const r = await suite(repo, ['scripts/ok.test.mjs', 'scripts/skip.test.mjs']);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /^time scripts\/ok\.test\.mjs \d+\.\d s$/m);
+  assert.match(r.out, /^time scripts\/skip\.test\.mjs \d+\.\d s$/m);
+});
+
 test('a roster of passing files is green: exit 0, one summary line reconciled against the roster', async (t) => {
   const repo = repoWith(t, ['ok.test.mjs']);
   const r = await suite(repo, ['scripts/ok.test.mjs']);

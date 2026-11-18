@@ -57,13 +57,13 @@ const TESTS = [
 
 // A finite clock (testing.md, Determinism): a hung test would otherwise hold a runner for the 6 h job default. The NUMBERS are this room's own, sized from its measured suite:
 // TEST_TIMEOUT_MS is per test on Node 24 and later, but Node 22 applies it to the WHOLE file, and the canon's wave-run row (.github SKILL-REPO-PATTERN.md) asks for at least 120 s:
-// its wave-run.test.mjs runs 46 to 57 s whole on a loaded box. The slowest single test here took 4.5 s (measured 2026-10-02). On 2026-11-18 the canon secret-gate test at .github 78c53e6 was cut at 120 s on all three Node 22 CI legs (duration_ms 120026.6 windows, 120109.8 ubuntu, 120026.9 macos); its local time alone is 97.3 s on Node 26, so TEST_TIMEOUT_MS is set to FILE_CLOCK_MS: a per-test timeout never cuts a file before the file clock does. CI at 7e4ade4 passed the file at 300000 ms on every Node 22 leg; the whole test step took 294 s on windows node 22 (the slowest), so the file's own Node 22 time is above 120 s and at most 294 s, unmeasured alone. FILE_CLOCK_MS ends ONE file at its own wall clock (its tree is killed and the file is FAIL; measured 2026-10-09 with 23 files
-// in waves: the slowest file, secret-scan.test.mjs, took 51 s and the next, secret-gate.test.mjs, 40 s, so 300 s is ~6x), so a hang
+// its wave-run.test.mjs runs 46 to 57 s whole on a loaded box. The slowest single test here took 4.5 s (measured 2026-10-02). On 2026-11-18 the canon secret-gate test at .github 78c53e6 was cut at 120 s on all three Node 22 CI legs (duration_ms 120026.6 windows, 120109.8 ubuntu, 120026.9 macos); its local time alone is 97.3 s on Node 26, CI run 44299060104 (job 134783692932, windows node 22, commit 7e4ade4): the test step took 294 s and the job 318 s, so the file's own Node 22 time is above 120 s and at most 294 s, unmeasured alone. TEST_TIMEOUT_MS is 420000 (1.43x the step) and FILE_CLOCK_MS 480000 (above the per-test clock, so the per-test clock answers first); SUITE_TIMEOUT_MS 600000 stays above the file clock, and the CI job's timeout-minutes 15 (900 s) stays above the suite deadline plus setup. Same-file siblings, as data only: CoalLedger and CoalMine were cut at 240 s; CoalGob runs it under 400 s and 480 s, CoalWash under 420 s, both green. FILE_CLOCK_MS ends ONE file at its own wall clock (its tree is killed and the file is FAIL; measured 2026-10-09 with 23 files
+// in waves: the slowest file, secret-scan.test.mjs, took 51 s and the next, secret-gate.test.mjs, 40 s, measured 2026-10-09; test-suite.mjs prints each file's time since 29is), so a hang
 // before the first test, which --test-timeout never reaches, no longer waits for the whole run. SUITE_TIMEOUT_MS bounds the whole run at ~10x the measured serial suite time; every roster file runs inside it.
 // The heap cap rides the child's NODE_OPTIONS (scripts/lib/node-options.mjs EXTENDS the caller's, except that a caller's cap above 2048 is replaced by 2048: the zone's ninth
 // amendment, a runaway test child once took the box down), so every process a test starts inherits it.
-const TEST_TIMEOUT_MS = 300000;
-const FILE_CLOCK_MS = 300000;
+const TEST_TIMEOUT_MS = 420000;
+const FILE_CLOCK_MS = 480000;
 const SUITE_TIMEOUT_MS = 600000;
 
 async function main() {

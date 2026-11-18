@@ -144,7 +144,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]  # supported LTS only (24 Active, 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15 # measured max 72 s (windows, n=9, 2026-10-02); ~12x headroom
+    timeout-minutes: 15 # job 318 s on windows node 22 at 7e4ade4 (run 44299060104, job 134783692932; test step 294 s); 900/318 ~2.8x headroom
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

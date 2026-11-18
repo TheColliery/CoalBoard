@@ -42,9 +42,16 @@ export async function runSuite({ repo, tests, limits, env = process.env, serial 
     for (const p of problems) err(`test runner: ${p}`);
     return 1;
   }
+  // Per-file wall time (29is): the canon runWaves reports each file's start and exit; the room times a file here and prints it as the file finishes,
+  // so a CI log names the slowest file (a passing file prints no time of its own).
+  const started = new Map();
+  const onEvent = (ev) => {
+    if (ev.type === 'start') started.set(ev.file, Date.now());
+    else if (ev.type === 'exit' && started.has(ev.file)) out(`time ${ev.file} ${((Date.now() - started.get(ev.file)) / 1000).toFixed(1)} s`);
+  };
   let run;
   try {
-    run = await runWaves({ files: tests, cwd: repo, env, serial, ...limits });
+    run = await runWaves({ files: tests, cwd: repo, env, serial, onEvent, ...limits });
   } catch (e) {
     err(`test runner: the suite did not run — ${e && e.message ? e.message : 'error'}`);
     return 1;
