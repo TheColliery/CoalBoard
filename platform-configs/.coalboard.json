@@ -17,7 +17,7 @@
 
   // ## What happens when a critical (error-not-allowed) task is detected. EXPENSIVE (3-4 agents) → default ASK each
   // ## time. ask = per-instance consent (shows why-flagged + an est. token cost, you approve before the board runs);
-  // ## auto = standing opt-in (convene without asking); off = never convene (the board's master off-switch).
+  // ## auto = standing opt-in (convene without asking when a user can answer; with no session-start line, asks as ask does); off = never convene (the board's master off-switch).
   // # Setting type: String (ask, auto, off)
   // # Default value: ask
   "coalboardMode": "ask",

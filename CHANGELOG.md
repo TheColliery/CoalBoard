@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.10] - 2026-11-20
+
+With no session-start line, auto asks before it convenes
+
+### Fixed
+- Under `auto`, the skill's Step 0 said to convene without asking, and it named the session-start line only for the no-user case. With no session-start line in context, the board could convene without a question. The text now says: under `auto`, convene only when the session-start line says a user can answer; when no user can answer, do not convene; with no session-start line in context, render the consent box as under `ask`. The instruction is followed by the agent, not enforced. Writes were already behind the apply question (GATE 3), so no change was applied without a user.
+
 ## [2.9.9] - 2026-11-14
 
 An advisory skill check runs on pull requests; the skill names its author

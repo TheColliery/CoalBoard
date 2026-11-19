@@ -7,7 +7,7 @@ Its limits:
 - It aims to improve correctness. It claims no reliability number.
 - Cost is bounded by its own gates. Staging keeps proposed fixes out of your files until you approve them.
 - Run safety detects a file that a command changed during a run and restores it. It does not prevent the change, and it is not an operating-system sandbox.
-- It is off most of the time. Its default `coalboardMode` is `ask`, so it asks before convening; `auto` convenes without asking.
+- It is off most of the time. Its default `coalboardMode` is `ask`, so it asks before convening; `auto` convenes without asking when a user can answer; with no user it convenes nothing, and with no session-start line it asks, as `ask` does.
 - Cross-agent support as the manifest states it: verified on Claude Code; Antigravity validated (load only); other platforms designed for, not verified.
 
 ## Install
