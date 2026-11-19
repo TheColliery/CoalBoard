@@ -130,3 +130,11 @@ test('x1: the ## The steps line narrowed to "on the manual lane only" is a findi
   const f = checkAntigravityLoad(x1);
   assert.ok(f.some((m) => /## The steps does not name references\/rails\.md and references\/steps\.md as MANDATORY before Step 0, every lane/.test(m)), f.join('\n'));
 });
+
+// 29js (T-29jq-1): under auto, a missing session-start line renders the box as under ask (P2). The phrase must sit in the source and in the shipped copy.
+test('29js: references/steps.md and its plugin copy both say that with no session-start line the box renders as under ask', () => {
+  const PHRASE = 'when no session-start line is in context, render the box as under `ask`';
+  for (const rel of [STEPS, 'plugin/skills/coalboard/references/steps.md']) {
+    assert.ok(read(path.join(root, rel)).includes(PHRASE), `${rel} lacks the phrase: ${PHRASE}`);
+  }
+});
