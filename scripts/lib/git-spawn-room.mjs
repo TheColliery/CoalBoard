@@ -14,7 +14,7 @@ export const PINS = [
   {
     rel: 'scripts/secret-gate.mjs',
     blob: '2800aab9812999c8e4378164aaf0af7ebf1b119a',
-    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at its one spawn site, secret-gate.mjs:66 (measured 2026-11-19 at canon 90c1933), and the name cannot vouch for it (F42).',
+    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at secret-gate.mjs:66, one of its two git spawn sites (:66 and :108; the census flags only :66; measured 2026-11-19 at canon 90c1933), and the name cannot vouch for it (F42).',
   },
 ];
 
