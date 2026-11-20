@@ -390,8 +390,11 @@ function main() {
     // up this run.
     if (legacyPaths.includes(readPath) && writePath !== readPath) {
       // Never delete a file git tracks (the room's own CodeRabbit path instruction): it is recoverable from git, but the CLI must not be the one to remove it.
-      if (gitMayTrack(readPath)) console.log(`Kept ${readPath}: git tracks it (or could not say), so the migration does not delete it. Remove it with git rm once you agree.`);
-      else if (!legacyUnchanged(readPath, legacyRaw, legacyIdentity)) {
+      if (gitMayTrack(readPath)) {
+        console.log(`Kept ${readPath}: git tracks it (or could not say), so the migration does not delete it. Remove it with git rm once you agree.`);
+        // The new config was written above, so the migration happened; only the legacy file stays, for git.
+        console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
+      } else if (!legacyUnchanged(readPath, legacyRaw, legacyIdentity)) {
         // T-29km-1: the file changed since the read that seeded this migration (or cannot be re-read), so an edit made in
         // between is in neither file: keep it, exit 1, and say so. The new config is still written above.
         // RESIDUAL WINDOW: this check narrows the window, it does not close it; a change between the check and the rm below can still be lost.

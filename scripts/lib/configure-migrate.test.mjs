@@ -48,8 +48,10 @@ fs.readFileSync = function (p, ...rest) {
 syncBuiltinESMExports();
 `;
 
-function makeRoot() {
+// The cleanup is registered on the line after the root exists, before anything else can throw (scripts-quality §2).
+function makeRoot(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-migrate-'));
+  t.after(() => removeRoot(root));
   for (const d of ['home/proj', 'tmp']) fs.mkdirSync(path.join(root, d), { recursive: true });
   return root;
 }
@@ -87,8 +89,7 @@ function runConfigure(root, mode) {
 
 for (const mode of ['append', 'replace']) {
   test(`leg A (${mode}): a legacy config changed inside the read window is kept, the exit is non-zero and a kept line prints`, (t) => {
-    const root = makeRoot();
-    t.after(() => removeRoot(root));
+    const root = makeRoot(t);
     const { r, legacy } = runConfigure(root, mode);
     const out = `${r.stdout}\n${r.stderr}`;
     assert.equal(r.error, undefined, `spawn failed: ${r.error}`);
@@ -100,8 +101,7 @@ for (const mode of ['append', 'replace']) {
 }
 
 test('leg B (no change): an unchanged legacy config is still migrated and removed, exit 0', (t) => {
-  const root = makeRoot();
-  t.after(() => removeRoot(root));
+  const root = makeRoot(t);
   const { r, legacy, newCfg } = runConfigure(root, 'none');
   const out = `${r.stdout}\n${r.stderr}`;
   assert.equal(r.error, undefined, `spawn failed: ${r.error}`);

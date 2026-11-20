@@ -485,6 +485,7 @@ for (const [label, rel] of [['nested .claude/.coalboard.json', ['.claude', '.coa
       assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
       assert.ok(fs.existsSync(legacy), 'a file git tracks must not be deleted');
       assert.ok(/git tracks/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+      assert.ok(r.stdout.includes('Migrated the project config'), 'the new config was written, so the migration is announced even though git keeps the legacy file: ' + r.stdout);
       assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the migration still writes the new config');
     } finally { clean(sb); }
   });
