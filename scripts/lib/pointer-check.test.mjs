@@ -808,3 +808,11 @@ test('pointerCandidates: an ellipsis segment is a placeholder for a set, not a f
   assert.deepEqual(pointerCandidates('see `scripts/lib/...` and `scripts/lib/missing.mjs`.'), ['scripts/lib/missing.mjs']);
   assert.deepEqual(pointerCandidates('a parent step `../x/y.md` is not an ellipsis.'), ['../x/y.md']);
 });
+
+// T-29eb-1: a null status with no error and no signal is the unrecognized-shape spawn failure. Pinned by its text, so a
+// changed message fails here rather than passing unseen.
+test('classifyCheckIgnoreResult: a null status with no error and no signal names the unrecognized shape', () => {
+  const v = classifyCheckIgnoreResult({ status: null, signal: null, error: undefined, stdout: null, stderr: null });
+  assert.equal(v.ok, false);
+  assert.match(v.message, /no status and no error -- unrecognized shape$/);
+});
