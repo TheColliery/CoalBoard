@@ -161,6 +161,27 @@ function writeConfigAtomic(target, text) {
   }
 }
 
+// T-29km-1: the identity a file had at one moment (device, inode, size, mtime), or null when it cannot be read.
+function identityOf(p) {
+  try {
+    const s = fs.lstatSync(p);
+    return `${s.dev}:${s.ino}:${s.size}:${s.mtimeMs}`;
+  } catch {
+    return null;
+  }
+}
+
+// T-29km-1: true only when the file still holds the bytes the first read returned and still has the identity it had
+// then (a same-size replace changes the inode or the mtime, so bytes alone are not enough). A failed re-read counts as changed.
+function legacyUnchanged(p, bytes, identity) {
+  if (bytes === null || identity === null) return false;
+  try {
+    return fs.readFileSync(p, 'utf8') === bytes && identityOf(p) === identity;
+  } catch {
+    return false;
+  }
+}
+
 function printHelp() {
   const lines = [
     'CoalBoard Configurator Utility',
@@ -265,7 +286,10 @@ function main() {
   let malformed = false;
   // Read once via try/catch (no existsSync precheck) so there is no check-to-use gap.
   let rawConfig = null;
-  try { rawConfig = fs.readFileSync(readPath, 'utf8').replace(/^\uFEFF/, ''); } catch {}
+  // T-29km-1: the identity is taken before the read, so a change after it is caught by the check before the legacy delete.
+  let legacyRaw = null;
+  let legacyIdentity = null;
+  try { legacyIdentity = identityOf(readPath); legacyRaw = fs.readFileSync(readPath, 'utf8'); rawConfig = legacyRaw.replace(/^\uFEFF/, ''); } catch {}
   if (rawConfig !== null) {
     try {
       hadComments = rawConfig.includes('//');
@@ -367,8 +391,16 @@ function main() {
     if (legacyPaths.includes(readPath) && writePath !== readPath) {
       // Never delete a file git tracks (the room's own CodeRabbit path instruction): it is recoverable from git, but the CLI must not be the one to remove it.
       if (gitMayTrack(readPath)) console.log(`Kept ${readPath}: git tracks it (or could not say), so the migration does not delete it. Remove it with git rm once you agree.`);
-      else { try { fs.rmSync(readPath, { force: true }); } catch {} }
-      console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
+      else if (!legacyUnchanged(readPath, legacyRaw, legacyIdentity)) {
+        // T-29km-1: the file changed since the read that seeded this migration (or cannot be re-read), so an edit made in
+        // between is in neither file: keep it, exit 1, and say so. The new config is still written above.
+        // RESIDUAL WINDOW: this check narrows the window, it does not close it; a change between the check and the rm below can still be lost.
+        process.exitCode = 1;
+        console.warn(`Warning: ${readPath} changed while migrating (or cannot be re-read); kept it. The new config at ${writePath} does not include that change; merge it by hand, then remove ${readPath}.`);
+      } else {
+        try { fs.rmSync(readPath, { force: true }); } catch {}
+        if (!fs.existsSync(readPath)) console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
+      }
     }
     if (hadComments) {
       console.warn('Note: inline comments were stripped (this tool writes plain JSON). Every key stays documented in platform-configs/.coalboard.json.');

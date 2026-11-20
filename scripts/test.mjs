@@ -52,6 +52,7 @@ const TESTS = [
   'scripts/verify-release-shape.test.mjs',
   'scripts/front-door-links.test.mjs',
   'scripts/configure.test.mjs',
+  'scripts/lib/configure-migrate.test.mjs',
   'scripts/verify.test.mjs',
 ];
 
