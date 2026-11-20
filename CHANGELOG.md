@@ -7,7 +7,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 With no session-start line, auto asks before it convenes
 
 ### Fixed
-- Under `auto`, the skill's Step 0 said to convene without asking, and it named the session-start line only for the no-user case. With no session-start line in context, the board could convene without a question. The text now says: under `auto`, convene only when the session-start line says a user can answer; when no user can answer, do not convene; with no session-start line in context, render the consent box as under `ask`. The instruction is followed by the agent, not enforced. Writes were already behind the apply question (GATE 3), so no change was applied without a user.
+- Under `auto`, the skill's Step 0 said to convene without asking, and it named the session-start line only for the no-user case. With no session-start line in context, the board could convene without a question. The text now says: under `auto`, convene only when the session-start line says a user can answer; when no user can answer, do not convene; with no session-start line in context, render the consent box as under `ask`. The instruction is followed by the agent, not enforced. Writes were already behind the apply question (GATE 3), so no change was applied without a user. The fix was read by the reviewer and walked on three foreign-model rounds (33 of 33), but it is not verifiable by a run: a headless test agent cannot read the plugin's reference files unless it is given access to the plugin folder, so no test run reached the step that changed.
 
 ## [2.9.9] - 2026-11-14
 
