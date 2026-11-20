@@ -27,13 +27,15 @@ const SAME_SIZE_TEXT = '{"rigor":"nasa"}    \n'; // the same byte length, differ
 const PRELOAD = `import fs from 'node:fs';
 import path from 'node:path';
 import { syncBuiltinESMExports } from 'node:module';
-const target = path.resolve(process.env.CB_WITNESS_LEGACY);
+// Both sides are compared by their real path (the runner's 8.3 TEMP spelling and the long spelling name one file).
+const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
+const target = real(process.env.CB_WITNESS_LEGACY);
 const mode = process.env.CB_WITNESS_MODE;
 const origRead = fs.readFileSync;
 let fired = false;
 fs.readFileSync = function (p, ...rest) {
   const out = origRead.call(this, p, ...rest);
-  if (!fired && typeof p === 'string' && path.resolve(p) === target) {
+  if (!fired && typeof p === 'string' && real(p) === target) {
     fired = true;
     if (mode === 'append') fs.appendFileSync(target, ' ');
     if (mode === 'replace') {
