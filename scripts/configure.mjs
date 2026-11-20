@@ -161,22 +161,61 @@ function writeConfigAtomic(target, text) {
   }
 }
 
-// T-29km-1: the identity a file had at one moment (device, inode, size, mtime), or null when it cannot be read.
-function identityOf(p) {
+// T-29kw-1: read a config through ONE descriptor: open, fstat, the bytes read through that same descriptor, close. Returns
+// the text and the descriptor's identity (device, inode, size, mtime), or null when the file is not a readable regular file.
+// The identity is the seed the migration's delete is judged against (see legacyStillSeeded).
+function readLegacyWithIdentity(p) {
+  let fd;
   try {
-    const s = fs.lstatSync(p);
-    return `${s.dev}:${s.ino}:${s.size}:${s.mtimeMs}`;
+    fd = fs.openSync(p, 'r');
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) return null;
+    const buf = Buffer.alloc(st.size);
+    let got = 0;
+    while (got < st.size) {
+      const n = fs.readSync(fd, buf, got, st.size - got, got);
+      if (n === 0) break;
+      got += n;
+    }
+    return { text: buf.subarray(0, got).toString('utf8'), identity: { dev: st.dev, ino: st.ino, size: st.size, mtimeMs: st.mtimeMs } };
   } catch {
     return null;
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
   }
 }
 
-// T-29km-1: true only when the file still holds the bytes the first read returned and still has the identity it had
-// then (a same-size replace changes the inode or the mtime, so bytes alone are not enough). A failed re-read counts as changed.
-function legacyUnchanged(p, bytes, identity) {
-  if (bytes === null || identity === null) return false;
+// T-29kw-1: true only when the legacy file, opened again through ONE descriptor, still has the seed's identity and text,
+// and the NAME is that same regular file. A file that cannot be checked is not unchanged.
+// RESIDUAL WINDOW (stated, not closed): a change between the name's lstat and the rmSync is deleted with the file.
+function legacyStillSeeded(p, seed) {
+  if (!seed) return false;
+  const id = seed.identity;
+  let fd;
   try {
-    return fs.readFileSync(p, 'utf8') === bytes && identityOf(p) === identity;
+    fd = fs.openSync(p, 'r');
+    const st = fs.fstatSync(fd);
+    if (!st.isFile() || st.dev !== id.dev || st.ino !== id.ino || st.size !== id.size || st.mtimeMs !== id.mtimeMs) return false;
+    const buf = Buffer.alloc(st.size);
+    let got = 0;
+    while (got < st.size) {
+      const n = fs.readSync(fd, buf, got, st.size - got, got);
+      if (n === 0) break;
+      got += n;
+    }
+    if (buf.subarray(0, got).toString('utf8') !== seed.text) return false;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+  try {
+    const named = fs.lstatSync(p);
+    return named.isFile() && named.dev === id.dev && named.ino === id.ino;
   } catch {
     return false;
   }
@@ -284,12 +323,10 @@ function main() {
   let cfg = {};
   let hadComments = false;
   let malformed = false;
-  // Read once via try/catch (no existsSync precheck) so there is no check-to-use gap.
-  let rawConfig = null;
-  // T-29km-1: the identity is taken before the read, so a change after it is caught by the check before the legacy delete.
-  let legacyRaw = null;
-  let legacyIdentity = null;
-  try { legacyIdentity = identityOf(readPath); legacyRaw = fs.readFileSync(readPath, 'utf8'); rawConfig = legacyRaw.replace(/^\uFEFF/, ''); } catch {}
+  // Read once (no existsSync precheck, no check-to-use gap): one descriptor gives the text and the identity the migration's
+  // delete is judged against (T-29kw-1).
+  const legacySeed = readLegacyWithIdentity(readPath);
+  let rawConfig = legacySeed === null ? null : legacySeed.text.replace(/^\uFEFF/, '');
   if (rawConfig !== null) {
     try {
       hadComments = rawConfig.includes('//');
@@ -394,7 +431,7 @@ function main() {
         console.log(`Kept ${readPath}: git tracks it (or could not say), so the migration does not delete it. Remove it with git rm once you agree.`);
         // The new config was written above, so the migration happened; only the legacy file stays, for git.
         console.log(`Migrated the project config from ${readPath} to ${writePath}.`);
-      } else if (!legacyUnchanged(readPath, legacyRaw, legacyIdentity)) {
+      } else if (!legacyStillSeeded(readPath, legacySeed)) {
         // T-29km-1: the file changed since the read that seeded this migration (or cannot be re-read), so an edit made in
         // between is in neither file: keep it, exit 1, and say so. The new config is still written above.
         // RESIDUAL WINDOW: this check narrows the window, it does not close it; a change between the check and the rm below can still be lost.

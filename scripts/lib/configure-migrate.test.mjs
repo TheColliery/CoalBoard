@@ -4,7 +4,7 @@
 // read of it returns, so the change sits inside the window whatever re-check a fix adds before the delete.
 //   Leg A (an append, and a same-size replace): the legacy file is kept, the exit is non-zero, a "kept" line prints.
 //   Leg B (no change): the migration still removes the legacy file, writes the new config and exits 0.
-// The preload watches fs.readFileSync, which configure.mjs uses for that read. If a later change reads the legacy file
+// The preload watches the descriptor configure.mjs opens for that read (fs.openSync, closed by fs.closeSync; T-29kw-1). If a later change reads the legacy file
 // another way, the preload never fires, the legacy file is deleted, and leg A goes red (loud, never a false green).
 // Zero deps. Each run works in one temp root made here (sandbox HOME, USERPROFILE, TEMP, TMP, TMPDIR; no git ancestor, so
 // configure's git check answers "not tracked"), removed only by its own name after its real path is checked under the
@@ -31,11 +31,21 @@ import { syncBuiltinESMExports } from 'node:module';
 const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
 const target = real(process.env.CB_WITNESS_LEGACY);
 const mode = process.env.CB_WITNESS_MODE;
-const origRead = fs.readFileSync;
+const origOpen = fs.openSync;
+const origClose = fs.closeSync;
+const targetFds = new Set();
 let fired = false;
-fs.readFileSync = function (p, ...rest) {
-  const out = origRead.call(this, p, ...rest);
-  if (!fired && typeof p === 'string' && real(p) === target) {
+// configure.mjs reads the legacy file through one descriptor (T-29kw-1): the seeding read is the first descriptor opened on
+// the target, and the change lands when that descriptor is closed, so it sits between the seed and the re-check.
+fs.openSync = function (p, ...rest) {
+  const fd = origOpen.call(this, p, ...rest);
+  if (!fired && typeof p === 'string' && real(p) === target) targetFds.add(fd);
+  return fd;
+};
+fs.closeSync = function (fd) {
+  const wasTarget = targetFds.delete(fd);
+  origClose.call(this, fd);
+  if (wasTarget && !fired) {
     fired = true;
     if (mode === 'append') fs.appendFileSync(target, ' ');
     if (mode === 'replace') {
@@ -45,7 +55,6 @@ fs.readFileSync = function (p, ...rest) {
     }
     if (mode === 'append' || mode === 'replace') process.stderr.write('[witness] changed the legacy config after its first read\\n');
   }
-  return out;
 };
 syncBuiltinESMExports();
 `;
