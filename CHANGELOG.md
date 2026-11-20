@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.11] - 2026-11-20
+
+Keeping a changed legacy config, and naming the run-safety window
+
+### Fixed
+- The configure migration could lose an edit made to the legacy project config between its read and its delete, and it still reported success. Severity HIGH: one edit to a setting, lost silently, inside a one-time migration. The migration now re-checks the legacy file just before the delete. A changed file is kept, the run exits 1 with one warning, and the new config is still written. A change made after the last check can still be lost. Regression test: `scripts/lib/configure-migrate.test.mjs`. The skill's own instruction for moving a legacy config when it saves `fableConsent` carries the same re-check, an instruction the agent follows, not an enforced check.
+- The run-safety text in the skill, `SECURITY.md` and the README said an edit another process made during a run is never discarded. That is not true for a write that lands between the save and the restore. These texts now name that window.
+
 ## [2.9.10] - 2026-11-20
 
 With no session-start line, auto asks before it convenes
