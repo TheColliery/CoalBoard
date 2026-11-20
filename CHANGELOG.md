@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.12] - 2026-11-20
+
+Reading the legacy config through one open file handle
+
+### Fixed
+- The configure migration now reads the legacy project config through one open file handle, and it re-checks that file just before removing it. The identity it compares is taken from the same handle the file was read through, so the file it checks is the file it read. The earlier form read by name and took the identity by a second name lookup. The rule is unchanged: a changed or replaced legacy file is kept, the run exits 1, and one warning is printed. A change made after the last check can still be lost. Regression test: `scripts/lib/configure-migrate.test.mjs`.
+
 ## [2.9.11] - 2026-11-20
 
 Keeping a changed legacy config, and naming the run-safety window
