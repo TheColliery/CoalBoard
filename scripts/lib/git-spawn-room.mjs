@@ -5,7 +5,7 @@
 // A pin is { rel, blob, why }: the census skips that file only while its git blob id equals `blob`, so the first edited byte (or a re-sync of the source it copies)
 // re-arms the census on it, and git-spawn-room.test.mjs fails a pin that matches no bytes and a pin whose file passes without it. Each file below is a byte-equal copy
 // of an org template (SERIES-CANON "Secret scan": scanner parity measures it), so the room cannot route its git spawns through gitEnv() without breaking that parity;
-// the real fix belongs to the canon (the .github deputy). Why each stays, quoted from the canon census run with no pin (the secret gate is the one carrier the census still refuses unpinned: re-measured 2026-11-21 against canon .github 3202fef (blob ba20e84cc03e), the unpinned census finds 1 hit, scripts/secret-gate.mjs:79, "env: holds process.env without gitEnv()"; the count was taken by git-spawn-room.test.mjs with the pin's blob not matching the copied gate):
+// the real fix belongs to the canon (the .github deputy). Why each stays, quoted from the canon census run with no pin (the secret gate is the one carrier the census still refuses unpinned: re-measured 2026-11-21 against canon .github ea92a58 (blob 235bf5b5b4df), the unpinned census finds 1 hit, scripts/secret-gate.mjs:79, "env: holds process.env without gitEnv()"; the count was taken by git-spawn-room.test.mjs with the pin's blob not matching the copied gate):
 import fs from 'node:fs';
 import path from 'node:path';
 import { collectScriptsMjs, scanGitSpawns } from './git-env-census.mjs';
@@ -13,8 +13,8 @@ import { collectScriptsMjs, scanGitSpawns } from './git-env-census.mjs';
 export const PINS = [
   {
     rel: 'scripts/secret-gate.mjs',
-    blob: 'ba20e84cc03eb6efd9394a13e88587321ea4ecec',
-    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at secret-gate.mjs:79, one of its two git spawn sites (:79 and :132; the census flags only :79; measured 2026-11-21 at canon 3202fef), and the name cannot vouch for it (F42).',
+    blob: '235bf5b5b4dffaa814c07b7c56b5499232937b2b',
+    why: 'canon published-code secret gate, byte-equal: its own gitEnv is an Object.entries(process.env) filter that strips GIT_* (a denylist) and keeps GIT_INDEX_FILE and GIT_CEILING_DIRECTORIES for the gate\'s two real-repo reads on purpose, so the census finds "env: holds process.env without gitEnv()" at secret-gate.mjs:79, one of its two git spawn sites (:79 and :132; the census flags only :79; measured 2026-11-21 at canon ea92a58), and the name cannot vouch for it (F42).',
   },
 ];
 
