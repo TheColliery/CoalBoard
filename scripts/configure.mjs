@@ -167,14 +167,15 @@ function writeConfigAtomic(target, text) {
 }
 
 // T-29kw-1: read a config through ONE descriptor: open, fstat, the bytes read through that same descriptor, close. Returns
-// the text and the descriptor's identity (device, inode, size, mtime), or null when the file is not a readable regular file.
+// the text and the descriptor's identity (device, inode, size, mtime). Any failure THROWS with its code: a missing file (ENOENT) is the caller's empty start,
+// and anything else (a denied read, a folder, an I/O error) must never read as an empty config (29mn R, T-29mg-D1: the next write would replace the file).
 // BB-533: the migration compares TEXT only (the backup read back against the seed); the identity is no longer consumed here, and stays for the reader study (item D).
-function readLegacyWithIdentity(p) {
+function readConfigFile(p) {
   let fd;
   try {
     fd = fs.openSync(p, 'r');
     const st = fs.fstatSync(fd);
-    if (!st.isFile()) return null;
+    if (!st.isFile()) throw Object.assign(new Error(`${p} is not a regular file`), { code: st.isDirectory() ? 'EISDIR' : 'ENOTFILE' });
     const buf = Buffer.alloc(st.size);
     let got = 0;
     while (got < st.size) {
@@ -183,13 +184,16 @@ function readLegacyWithIdentity(p) {
       got += n;
     }
     return { text: buf.subarray(0, got).toString('utf8'), identity: { dev: st.dev, ino: st.ino, size: st.size, mtimeMs: st.mtimeMs } };
-  } catch {
-    return null;
   } finally {
     if (fd !== undefined) {
       try { fs.closeSync(fd); } catch {}
     }
   }
+}
+
+// The backup read-back's form: null on any failure, and the caller says the backup "could not be read back" (its own line, never an empty start).
+function readLegacyWithIdentity(p) {
+  try { return readConfigFile(p); } catch { return null; }
 }
 
 function printHelp() {
@@ -295,8 +299,23 @@ function main() {
   let hadComments = false;
   let malformed = false;
   // Read once (no existsSync precheck, no check-to-use gap): one descriptor gives the text and the identity the migration's
-  // delete is judged against (T-29kw-1).
-  const legacySeed = readLegacyWithIdentity(readPath);
+  // delete is judged against (T-29kw-1). 29mn R (T-29mg-D1): only a missing file is an empty start. Any other read failure stops
+  // the run here, before anything is written, so the bytes it could not read are never replaced.
+  // A link at the read source is refused by name before any read follows it (17a M1): the same check that runs with the write refusals below, moved up
+  // so the reader never opens a link's target and fails on it with a read error instead.
+  try { refuseLinkedTarget(readPath); } catch (e) {
+    if (e instanceof ConfigWriteRefused) { console.error(`Error: ${e.message}`); process.exit(1); }
+    throw e;
+  }
+  let legacySeed = null;
+  try {
+    legacySeed = readConfigFile(readPath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      console.error(`Error: ${readPath} could not be read (${e.code || e.message}); nothing was written.`);
+      process.exit(1);
+    }
+  }
   let rawConfig = legacySeed === null ? null : legacySeed.text.replace(/^\uFEFF/, '');
   if (rawConfig !== null) {
     try {
@@ -400,8 +419,7 @@ function main() {
     // is said to be unchecked. Every step that cannot be done says so and exits 1; no step is retried.
     if (migrating) {
       if (legacySeed === null) {
-        process.exitCode = 1;
-        console.error(`Error: the legacy config ${readPath} could not be read at the start, so nothing was moved and it stays in place. The new config at ${writePath} was written without its settings: merge them by hand.`);
+        // 29mn R: absent when read, so there is nothing to move (every other read failure stopped the run before the write).
       } else {
         const bak = readPath + '.bak';
         // Asked before the move: after it the name is gone. An answer git cannot give is said as such, never guessed; nothing is gitignored for the user.

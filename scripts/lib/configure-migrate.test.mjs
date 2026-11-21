@@ -265,17 +265,18 @@ test('a backup that cannot be read back is said to be unchecked: exit 1, no succ
   assert.ok(!/Migrated the project config/.test(out), out);
 });
 
-// ---- A null seed moves nothing: the legacy path is there but cannot be read as a file. The new home is written as before; exit 1.
-test('a null seed moves nothing: the legacy path cannot be read as a file, exit 1, the path stays in place, no backup', (t) => {
+// ---- A legacy path that is a folder, not a file: refused BEFORE anything is written (29mn R). Until R the run wrote the new home first and only then said
+// nothing was moved; the reader now stops at the read, so the new home is not written and the folder stays where it was.
+test('a legacy path that is a folder: refused before anything is written, exit 1, the path stays, no backup, no new home', (t) => {
   const sb = sandbox(t);
   const legacy = path.join(sb.proj, '.coalboard.json');
   fs.mkdirSync(legacy);
   const { r, out, bak } = migrate(sb, legacy, 'none');
   assert.equal(r.status, 1, out);
-  assert.ok(/could not be read at the start, so nothing was moved/.test(r.stderr), `the run says nothing was moved: ${out}`);
+  assert.match(r.stderr, /could not be read \([A-Z_]+\); nothing was written/, `the run says nothing was written: ${out}`);
   assert.ok(fs.statSync(legacy).isDirectory(), 'the legacy path is still where it was');
   assert.equal(fs.existsSync(bak), false, 'no backup was made');
-  assert.equal(JSON.parse(read(sb.newCfg)).rigor, 'high', 'the new home is written as before');
+  assert.equal(fs.existsSync(sb.newCfg), false, 'the new home was not written');
 });
 
 // ---- git: the git answer is asked before the move and reported after it. Git-free machines skip these visibly.

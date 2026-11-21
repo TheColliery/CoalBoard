@@ -53,6 +53,7 @@ const TESTS = [
   'scripts/front-door-links.test.mjs',
   'scripts/configure.test.mjs',
   'scripts/lib/configure-migrate.test.mjs',
+  'scripts/lib/configure-reader.test.mjs',
   'scripts/verify.test.mjs',
 ];
 
