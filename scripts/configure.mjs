@@ -73,9 +73,10 @@ function trackState(file) {
   return insideRepoTree(file) ? 'unknown' : 'untracked';
 }
 
-// BB-533: whether something sits at this name (lstat: a link counts). Used to report what a failed step left behind, never to decide a destroy.
-function nameExists(p) {
-  try { fs.lstatSync(p); return true; } catch { return false; }
+// BB-533 (M1): one lstat, three answers: 'found' (something sits at the name; a link counts), 'gone' (ENOENT), or the error code of any other failure, where
+// the name may still be there. A report must not read a failed lstat as absence. Used to report what a step left behind, never to decide a destroy.
+function nameState(p) {
+  try { fs.lstatSync(p); return 'found'; } catch (e) { return e.code === 'ENOENT' ? 'gone' : (e.code || 'unknown error'); }
 }
 
 // String-aware JSONC strip + prototype-pollution guard — the SAME stripping
@@ -380,7 +381,7 @@ function main() {
   // BB-533: whether a backup already sits at <legacy>.bak, read before the malformed copy below (which makes one itself) and before the rename. It reports
   // only: a backup another process makes after this check is not seen (a stated limit, CoalFace F2).
   const migrating = legacyPaths.includes(readPath) && writePath !== readPath;
-  const bakExisted = migrating && nameExists(readPath + '.bak');
+  const bakBefore = migrating ? nameState(readPath + '.bak') : null;
   if (malformed) {
     process.exitCode = 1;
     try {
@@ -410,9 +411,14 @@ function main() {
         if (moveErr) {
           process.exitCode = 1;
           const code = moveErr.code || moveErr.message;
-          console.error(nameExists(readPath)
-            ? `Error: could not move the legacy config ${readPath} aside (${code}); it is kept at ${readPath}. The new config at ${writePath} was already written: compare the two, then move ${readPath} by hand.`
-            : `Error: could not move the legacy config ${readPath} aside (${code}), and it is no longer at that path. The new config at ${writePath} was already written: find the moved bytes, then compare them with it.`);
+          const now = nameState(readPath);
+          if (now === 'found') {
+            console.error(`Error: could not move the legacy config ${readPath} aside (${code}); it is kept at ${readPath}. The new config at ${writePath} was already written: compare the two, then move ${readPath} by hand.`);
+          } else if (now === 'gone') {
+            console.error(`Error: could not move the legacy config ${readPath} aside (${code}), and it is no longer at that path. The new config at ${writePath} was already written: find the moved bytes, then compare them with it.`);
+          } else {
+            console.error(`Error: could not move the legacy config ${readPath} aside (${code}), and its state could not be checked (${now}): it may still be at ${readPath}. The new config at ${writePath} was already written: check ${readPath} by hand, then compare it with the new config.`);
+          }
         } else {
           const back = readLegacyWithIdentity(bak);
           if (back === null) {
@@ -420,9 +426,10 @@ function main() {
             console.error(`Error: the backup ${bak} could not be read back, so it could not be checked against the migrated config ${writePath}. The moved bytes are in ${bak}.`);
           } else if (back.text !== legacySeed.text) {
             process.exitCode = 1;
-            console.error(`Warning: the backup ${bak} holds a change the new config ${writePath} does not have (written after the move). Merge it by hand; the backup is yours to keep or delete.`);
+            console.error(`Warning: the backup ${bak} holds a change the new config ${writePath} does not have: the legacy file changed after this migration read it (before the move, or through the backup after it). Merge it by hand; the backup is yours to keep or delete.`);
           } else {
-            console.log(`Migrated the project config to ${writePath}; the old file is kept as ${bak}${bakExisted ? ' (replaced an earlier backup)' : ' (no earlier backup)'}.`);
+            const earlier = bakBefore === 'found' ? ' (replaced an earlier backup)' : bakBefore === 'gone' ? ' (no earlier backup)' : ` (could not check for an earlier backup: ${bakBefore})`;
+            console.log(`Migrated the project config to ${writePath}; the old file is kept as ${bak}${earlier}.`);
           }
           if (tracked === 'tracked') console.log(`${readPath} is tracked by git: commit its removal (git add -A -- ${readPath}). ${bak} is untracked and yours to keep or delete.`);
           if (tracked === 'unknown') console.log(`git could not say whether ${readPath} is tracked; if it is, commit its removal (git add -A -- ${readPath}). ${bak} is yours to keep or delete.`);

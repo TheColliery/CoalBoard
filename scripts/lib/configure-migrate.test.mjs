@@ -6,6 +6,7 @@
 //   replace         a same-size replacement of the legacy file in the same window (leg A, replace)
 //   writer-after    a writer appends to the backup right after the rename, before the read-back (W-b1's shape)
 //   refuse          the rename throws EBUSY (W-b2: a held file)
+//   unchecked       the rename throws EPERM and the lstat of the legacy path then throws EACCES (M1: the state cannot be checked)
 //   gone            another actor moves the legacy file away, then the rename throws ENOENT (F1: a failed rename does not prove the source is there)
 //   bak-unreadable  the backup cannot be opened for the read-back
 // Zero deps. Each run works in one temp root made here (sandbox HOME, USERPROFILE, TEMP, TMP, TMPDIR), removed only by its own name after its real
@@ -47,8 +48,10 @@ const isBak = (p) => typeof p === 'string' && real(p) === BAK;
 const note = (m) => process.stderr.write('[witness] ' + m + '\\n');
 let fired = false;
 let blockBak = false;
+let lstatBlock = false;
 // window: the migration's last look at the legacy name is its lstat after the new home exists (the old delete's residual window); the append lands after it.
 fs.lstatSync = function (p, ...rest) {
+  if (lstatBlock && isLegacy(p)) { const e = new Error('EACCES: permission denied, lstat'); e.code = 'EACCES'; throw e; }
   const out = origLstat.call(this, p, ...rest);
   if (MODE === 'window' && !fired && isLegacy(p) && fs.existsSync(NEW)) {
     fired = true;
@@ -68,6 +71,7 @@ fs.renameSync = function (from, to, ...rest) {
       note('replaced the legacy config before the move');
     }
     if (MODE === 'refuse') { fired = true; const e = new Error('EBUSY: resource busy or locked, rename'); e.code = 'EBUSY'; throw e; }
+    if (MODE === 'unchecked') { fired = true; lstatBlock = true; const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM'; throw e; }
     if (MODE === 'gone') {
       fired = true;
       origRename.call(fs, LEGACY, LEGACY + '.elsewhere');
@@ -146,6 +150,8 @@ for (const [label, rel] of SHAPES) {
     assert.equal(fs.existsSync(legacy), false, `the legacy name is gone, the file was moved: ${out}`);
     assert.ok(read(bak).includes(MARKER), `the appended bytes are in the backup: ${out}`);
     assert.ok(/^Warning: /m.test(r.stderr) && r.stderr.includes(bak) && r.stderr.includes(sb.newCfg), `the warning names both files: ${out}`);
+    assert.ok(/changed after this migration read it/.test(r.stderr), `the warning says when the change landed, not "after the move": ${out}`);
+    assert.ok(!/written after the move/.test(out), out);
     assert.ok(!/Migrated the project config/.test(out), `no success line: ${out}`);
     assert.equal(JSON.parse(read(sb.newCfg)).rigor, 'high', 'the new home is written');
   });
@@ -216,6 +222,21 @@ test('a refused move (EBUSY) keeps the legacy file byte for byte, makes no backu
   const { r, out, bak } = migrate(sb, legacy, 'refuse');
   assert.equal(r.status, 1, out);
   assert.ok(r.stderr.includes('EBUSY') && /kept at /.test(r.stderr), `the code is named and the file is said kept: ${out}`);
+  assert.equal(read(legacy), LEGACY_TEXT, 'the legacy bytes are where they were');
+  assert.equal(fs.existsSync(bak), false, 'no backup was made');
+  assert.ok(!/Migrated the project config/.test(out), out);
+});
+
+// ---- M1: the move is refused AND the lstat that would say where the file is also fails (EACCES, not ENOENT). The file is still there, but the run
+// cannot say so from the name alone: it must say the state could not be checked, never "no longer at that path", and exit 1.
+test('a refused move whose re-check also fails (EPERM, then lstat EACCES) says the state could not be checked, never "no longer at that path"; the legacy file still exists; exit 1', (t) => {
+  const sb = sandbox(t);
+  const legacy = legacyAt(sb, ['.coalboard.json']);
+  const { r, out, bak } = migrate(sb, legacy, 'unchecked');
+  assert.equal(r.status, 1, out);
+  assert.ok(/its state could not be checked \(EACCES\)/.test(r.stderr), `the third state is said, with its code: ${out}`);
+  assert.ok(!/no longer at that path/.test(out), `never read a failed lstat as absence: ${out}`);
+  assert.ok(fs.existsSync(legacy), 'the legacy file is still there');
   assert.equal(read(legacy), LEGACY_TEXT, 'the legacy bytes are where they were');
   assert.equal(fs.existsSync(bak), false, 'no backup was made');
   assert.ok(!/Migrated the project config/.test(out), out);
