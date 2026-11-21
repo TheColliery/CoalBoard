@@ -2,6 +2,17 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.13] - 2026-11-21
+
+Keeping the old config as a backup instead of deleting it
+
+### Fixed
+- The configure migration no longer deletes the old project config. It renames it to `<name>.bak` beside it, one rename and nothing removed. An edit that lands in the old file while the migration runs is kept in the backup, and the run warns that the new config does not have it. A rename that fails keeps the old file and exits 1. The skill's own instruction for moving a legacy config when it saves `fableConsent` does the same rename. Regression test: `scripts/lib/configure-migrate.test.mjs`.
+
+### Changed
+- The plugin carries its icon files (`plugin/.claude-plugin/icon.png` and `plugin/assets/logo.svg`). No manifest key names them, so a user sees no change until the directory listing is updated.
+- The run-safety text names the window that remains after the restore: a process the tested tool started can still write a real file after the compare. The apply step names the window a local writer can use between the last check and the write.
+
 ## [2.9.12] - 2026-11-20
 
 Reading the legacy config through one open file handle
