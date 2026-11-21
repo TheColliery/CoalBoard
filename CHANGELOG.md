@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.15] - 2026-11-22
+
+Keeping an unreadable config untouched when the skill saves a consent
+
+### Fixed
+- The skill's instruction to save the "always in this project" consent did not say what to do with a config that exists but cannot be read or is read-only, so an agent could write a fresh file holding only that key over the user's settings. It now says to write nothing, keep the choice for this run only, and say in one line which file and why. This is the rule the configure script follows since 2.9.14.
+
+### Changed
+- The plugin icon sits at the plugin root, and the manifest names it with an `icon` key. The copy under `.claude-plugin/` is gone from the dist.
+
 ## [2.9.14] - 2026-11-21
 
 Refusing to replace a config that cannot be read or written
