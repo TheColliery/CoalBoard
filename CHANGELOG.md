@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.14] - 2026-11-21
+
+Refusing to replace a config that cannot be read or written
+
+### Fixed
+- An unreadable project or global config was replaced by a file holding only the setting just written, and the run reported success. Severity HIGH: settings lost silently. Now the run writes nothing, names the file and the error code, and exits 1. A legacy config that cannot be read is refused the same way before its new home is written. Regression test: `scripts/lib/configure-reader.test.mjs`.
+- On POSIX a read-only config was replaced, and a malformed config whose backup could not be made was rebuilt without one. Now a config or backup path with no write permission is refused by name before the first write, and a failed backup refuses the run and keeps the malformed bytes. A file made read-only after that check is still replaced on POSIX. Same test file.
+
 ## [2.9.13] - 2026-11-21
 
 Keeping the old config as a backup instead of deleting it
