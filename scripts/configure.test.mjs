@@ -209,7 +209,7 @@ test('configure: an unrecognised flag exits non-zero and writes NOTHING', () => 
   } finally { clean(sb); }
 });
 
-test('configure: a LEGACY-location config (.claude/.coalboard.json AT the project dir) migrates on write, old file removed', () => {
+test('configure: a LEGACY-location config (.claude/.coalboard.json AT the project dir) migrates on write, old file moved to .bak', () => {
   const sb = sandbox();
   try {
     fs.mkdirSync(path.join(sb.proj, '.claude'), { recursive: true });
@@ -220,12 +220,13 @@ test('configure: a LEGACY-location config (.claude/.coalboard.json AT the projec
     const cfg = JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'));
     assert.strictEqual(cfg.updateCheckDays, 30, 'the pre-existing value survives the migration');
     assert.strictEqual(cfg.language, 'en', 'the new CLI-set value is also present');
-    assert.strictEqual(fs.existsSync(path.join(sb.proj, '.claude', '.coalboard.json')), false, 'the legacy file must be removed after a successful migration');
-    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration must be announced, not silent');
+    assert.strictEqual(fs.existsSync(path.join(sb.proj, '.claude', '.coalboard.json')), false, 'the legacy name is moved away (BB-533: one rename, nothing deleted)');
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(sb.proj, '.claude', '.coalboard.json.bak'), 'utf8')).updateCheckDays, 30, 'the old file is kept whole as .bak beside it');
+    assert.ok(r.stdout.includes('Migrated the project config to'), 'the migration must be announced, not silent');
   } finally { clean(sb); }
 });
 
-test('configure (UMB-133): a ROOT-legacy config (<project>/.coalboard.json) is FOUND, migrates on write to the canonical path, old file removed', () => {
+test('configure (UMB-133): a ROOT-legacy config (<project>/.coalboard.json) is FOUND, migrates on write to the canonical path, old file moved to .bak', () => {
   const sb = sandbox();
   try {
     fs.writeFileSync(path.join(sb.proj, '.coalboard.json'), JSON.stringify({ updateCheckDays: 30 }));
@@ -235,8 +236,9 @@ test('configure (UMB-133): a ROOT-legacy config (<project>/.coalboard.json) is F
     const cfg = JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8'));
     assert.strictEqual(cfg.updateCheckDays, 30, 'the value read from the root legacy file survives the migration -- proof the CLI FOUND it, not just planted a fresh config');
     assert.strictEqual(cfg.language, 'en');
-    assert.strictEqual(fs.existsSync(path.join(sb.proj, '.coalboard.json')), false, 'the root legacy file must be removed after a successful migration');
-    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration must be announced, not silent');
+    assert.strictEqual(fs.existsSync(path.join(sb.proj, '.coalboard.json')), false, 'the root legacy name is moved away (BB-533: one rename, nothing deleted)');
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(sb.proj, '.coalboard.json.bak'), 'utf8')).updateCheckDays, 30, 'the old file is kept whole as .bak beside it');
+    assert.ok(r.stdout.includes('Migrated the project config to'), 'the migration must be announced, not silent');
   } finally { clean(sb); }
 });
 
@@ -453,13 +455,14 @@ for (const [label, legacyRel] of [['nested .claude/.coalboard.json', ['.claude',
     assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
     assert.ok(fs.existsSync(PROJECT_TARGET(proj)), 'the config must land at the own-dir location, not be rewritten in place');
     assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(proj), 'utf8')).updateCheckDays, 30, 'the legacy value survives the migration');
-    assert.strictEqual(fs.existsSync(legacy), false, 'the legacy file is removed after the migration');
-    assert.ok(r.stdout.includes('Migrated the project config'), 'the migration is announced');
+    assert.strictEqual(fs.existsSync(legacy), false, 'the legacy name is moved away after the migration (BB-533)');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the old file is kept whole as .bak');
+    assert.ok(r.stdout.includes('Migrated the project config to'), 'the migration is announced');
   });
 }
 
-// ---- PR 19 #15 (u2): the migration must never delete a file git tracks (the room's own CodeRabbit path instruction). A tracked legacy file
-// survives with a printed note; an untracked one is removed as before; with no git on PATH behaviour is unchanged (git stays optional).
+// ---- PR 19 #15 (u2), BB-533 (signed 2026-11-21): the migration never deletes anything. A tracked legacy file is moved to .bak like any other, and the run
+// names the commit step for its removal; an untracked one is moved with no git sentence; with no git on PATH behaviour is unchanged (git stays optional).
 // 18c (L-b; 7d57207 claimed this and did not land it): the setup git children get HOME/USERPROFILE/TMPDIR/TMP/TEMP under the sandbox home (dir is sb.proj, so its parent), keeping gitEnv()'s GIT_* cleanup and ceiling.
 // sandboxVars returns a literal of named keys over names declared once, the shape the git spawn census reads whole (verify.mjs).
 function sandboxVars(home) {
@@ -476,32 +479,35 @@ const legacyRepo = (sb, rel) => {
   return legacy;
 };
 for (const [label, rel] of [['nested .claude/.coalboard.json', ['.claude', '.coalboard.json']], ['root .coalboard.json', ['.coalboard.json']]]) {
-  test(`configure (PR 19 #15): a git-TRACKED legacy config (${label}) survives the migration with a printed note, and the new config is written`, () => {
+  test(`configure (PR 19 #15, BB-533): a git-TRACKED legacy config (${label}) is moved to .bak, and the run names the commit step for its removal`, () => {
     const sb = sandbox();
     try {
       const legacy = legacyRepo(sb, rel);
       assert.strictEqual(gitIn(sb.proj, 'add', '--', path.join(...rel)).status, 0);
       const r = run(['--language', 'en'], sb);
       assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-      assert.ok(fs.existsSync(legacy), 'a file git tracks must not be deleted');
-      assert.ok(/git tracks/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
-      assert.ok(r.stdout.includes('Migrated the project config'), 'the new config was written, so the migration is announced even though git keeps the legacy file: ' + r.stdout);
+      assert.strictEqual(fs.existsSync(legacy), false, 'the tracked name is moved away: the removal is for the user to commit');
+      assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the tracked bytes are whole in .bak');
+      assert.ok(/is tracked by git: commit its removal \(git add -A -- /.test(r.stdout), 'the commit step is named: ' + r.stdout);
+      assert.ok(r.stdout.includes('Migrated the project config to'), 'the migration is announced: ' + r.stdout);
       assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the migration still writes the new config');
     } finally { clean(sb); }
   });
 }
-test('configure (PR 19 #15): an UNTRACKED legacy config inside a git repository is still removed by the migration', () => {
+test('configure (PR 19 #15, BB-533): an UNTRACKED legacy config inside a git repository is moved to .bak with no git sentence', () => {
   const sb = sandbox();
   try {
     const legacy = legacyRepo(sb, ['.coalboard.json']);
     const r = run(['--language', 'en'], sb);
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.strictEqual(fs.existsSync(legacy), false, 'an untracked legacy file is removed as before');
-    assert.ok(r.stdout.includes('Migrated the project config'));
+    assert.strictEqual(fs.existsSync(legacy), false, 'an untracked legacy name is moved away, not deleted');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(r.stdout.includes('Migrated the project config to'));
+    assert.ok(!/tracked by git|could not say/.test(r.stdout), 'git said nothing about an untracked file: ' + r.stdout);
   } finally { clean(sb); }
 });
-// R16e T7 (vehicle thread, the head ruled FIXED; reverses the PR 19 #15 pin that deleted here): with no git on PATH, git cannot say whether it tracks the file, the same
-// unknown answer as status 128, so the file is KEPT wherever a .git entry surrounds it (insideRepoTree is a filesystem walk and needs no git). Only with no repository at all does the delete run.
+// R16e T7 (vehicle thread): with no git on PATH, git cannot say whether it tracks the file, the same unknown answer as status 128. BB-533: the run says so and
+// moves the file to .bak; the move itself no longer depends on that answer (insideRepoTree is a filesystem walk and needs no git).
 const noGitEnv = (sb) => {
   const emptyBin = path.join(sb.home, 'empty-bin');
   fs.mkdirSync(emptyBin, { recursive: true });
@@ -509,22 +515,23 @@ const noGitEnv = (sb) => {
   const env = Object.fromEntries(Object.entries(childEnv(sb.home)).filter(([k]) => !/^path$/i.test(k)));
   return { ...env, PATH: emptyBin };
 };
-test('configure (R16e T7): with no git on PATH a legacy config inside a repository tree is KEPT, with the note (git cannot say, so the delete does not run)', () => {
+test('configure (R16e T7, BB-533): with no git on PATH a legacy config inside a repository tree is moved to .bak, with the note (git cannot say whether it is tracked)', () => {
   const sb = sandbox();
   try {
     const legacy = legacyRepo(sb, ['.coalboard.json']);
     assert.strictEqual(gitIn(sb.proj, 'add', '--', '.coalboard.json').status, 0);
     const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: noGitEnv(sb), timeout: 20000 });
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.ok(fs.existsSync(legacy), 'with no git on PATH and a .git around it the legacy file must survive');
-    assert.ok(/git tracks it \(or could not say\)/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+    assert.strictEqual(fs.existsSync(legacy), false, 'the name is moved away; the bytes are in .bak');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(/git could not say whether .* is tracked; if it is, commit its removal/.test(r.stdout), 'the unknown answer is said, with what to do: ' + r.stdout);
     assert.ok(fs.existsSync(PROJECT_TARGET(sb.proj)), 'the migration still writes the new config');
   } finally { clean(sb); }
 });
 // R16e L4: insideRepoTree walks to the drive root, and os.tmpdir() sits under the home folder on Windows, so a machine whose home (or any parent of the temp dir) is a git
 // repository would fail this leg for a reason that is not the code's. Probe for a .git ancestor of the sandbox first and skip visibly (one skippable leg).
 const hasGitAncestor = (dir) => { for (let d = dir; ; d = path.dirname(d)) { if (fs.existsSync(path.join(d, '.git'))) return true; if (path.dirname(d) === d) return false; } };
-test('configure (R16e T7): with no git on PATH and NO repository anywhere above, the legacy config is still removed by the migration', (t) => {
+test('configure (R16e T7, BB-533): with no git on PATH and NO repository anywhere above, the legacy config is moved to .bak with no git sentence', (t) => {
   const sb = sandbox();
   try {
     if (hasGitAncestor(sb.proj)) { t.skip('a .git sits above the temp dir on this machine (capability probe), so the no-repository case cannot be built here'); return; }
@@ -532,16 +539,18 @@ test('configure (R16e T7): with no git on PATH and NO repository anywhere above,
     fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
     const r = spawnSync(process.execPath, [CLI, '--language', 'en'], { cwd: sb.proj, encoding: 'utf8', env: noGitEnv(sb), timeout: 20000 });
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.strictEqual(fs.existsSync(legacy), false, 'with no git and no .git anywhere the legacy file is removed as before');
-    assert.ok(r.stdout.includes('Migrated the project config'));
+    assert.strictEqual(fs.existsSync(legacy), false, 'with no git and no .git anywhere the legacy name is moved away');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(r.stdout.includes('Migrated the project config to'));
+    assert.ok(!/could not say|tracked by git/.test(r.stdout), 'outside every repository there is nothing to say about tracking: ' + r.stdout);
   } finally { clean(sb); }
 });
 
 // ---- t29 #1 (09a): git is asked about the file, and an answer that is neither "tracked" nor "not tracked" keeps it where a repository exists.
-// Only status 1 (a repository answered: not tracked) lets the migration delete where a repository exists. A corrupt index, a repository git refuses
+// BB-533: git's answer only chooses the sentence the run prints; the move happens either way. Only status 1 (a repository answered: not tracked) prints no sentence. A corrupt index, a repository git refuses
 // (dubious ownership, a broken .git file), a timeout and, since R16e T7, no git on PATH all answer something else, so the file stays when a .git entry (file or
-// directory) sits in its directory or above it. No git at all deletes the file only when no .git surrounds it (the R16e T7 legs above and the nested-legacy migration legs).
-test('configure (t29 #1): a legacy config committed to a repository whose index is CORRUPT survives the migration, with the note', () => {
+// directory) sits in its directory or above it: the run says git could not say. No git at all and no .git around it prints no sentence (the R16e T7 legs above).
+test('configure (t29 #1, BB-533): a legacy config committed to a repository whose index is CORRUPT is moved to .bak, with the could-not-say note', () => {
   const sb = sandbox();
   try {
     const legacy = legacyRepo(sb, ['.coalboard.json']);
@@ -551,12 +560,13 @@ test('configure (t29 #1): a legacy config committed to a repository whose index 
     assert.notStrictEqual(gitIn(sb.proj, 'ls-files', '--error-unmatch', '--', '.coalboard.json').status, 0, 'precondition: git cannot read the index');
     const r = run(['--language', 'en'], sb);
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.ok(fs.existsSync(legacy), 'git could not say, and a repository exists: the file must not be deleted');
-    assert.ok(/git tracks/.test(r.stdout), 'the kept file is announced: ' + r.stdout);
+    assert.strictEqual(fs.existsSync(legacy), false, 'the name is moved away; git could not say, so the run says so');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(/git could not say whether .* is tracked/.test(r.stdout), 'the unknown answer is said: ' + r.stdout);
     assert.strictEqual(JSON.parse(fs.readFileSync(PROJECT_TARGET(sb.proj), 'utf8')).updateCheckDays, 30, 'the new config is still written');
   } finally { clean(sb); }
 });
-test('configure (t29 #1): a .git FILE git cannot follow (a broken worktree pointer) is still a repository entry, so the legacy config is kept', () => {
+test('configure (t29 #1, BB-533): a .git FILE git cannot follow (a broken worktree pointer) is a repository entry: the legacy name is moved to .bak with the could-not-say note', () => {
   const sb = sandbox();
   try {
     const legacy = path.join(sb.proj, '.coalboard.json');
@@ -564,10 +574,12 @@ test('configure (t29 #1): a .git FILE git cannot follow (a broken worktree point
     fs.writeFileSync(path.join(sb.proj, '.git'), 'gitdir: ' + path.join(sb.home, 'nowhere') + '\n');
     const r = run(['--language', 'en'], sb);
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.ok(fs.existsSync(legacy), 'a .git file is an entry: the walk tests existence, not isDirectory');
+    assert.strictEqual(fs.existsSync(legacy), false, 'the name is moved away');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(/git could not say whether/.test(r.stdout), 'a .git file is an entry: the walk tests existence, not isDirectory: ' + r.stdout);
   } finally { clean(sb); }
 });
-test('configure (t29 #1): the repository may sit ABOVE the file (an ancestor .git), and a broken one still keeps a nested legacy config', () => {
+test('configure (t29 #1, BB-533): the repository may sit ABOVE the file (an ancestor .git); a broken one still gets the could-not-say note on a nested legacy config', () => {
   const sb = sandbox();
   try {
     fs.writeFileSync(path.join(sb.home, '.git'), 'gitdir: ' + path.join(sb.home, 'nowhere') + '\n');
@@ -576,7 +588,9 @@ test('configure (t29 #1): the repository may sit ABOVE the file (an ancestor .gi
     fs.writeFileSync(legacy, JSON.stringify({ updateCheckDays: 30 }));
     const r = run(['--language', 'en'], sb);
     assert.strictEqual(r.status, 0, `stderr: ${r.stderr}`);
-    assert.ok(fs.existsSync(legacy), 'an ancestor .git entry counts');
+    assert.strictEqual(fs.existsSync(legacy), false, 'the nested name is moved away');
+    assert.strictEqual(JSON.parse(fs.readFileSync(legacy + '.bak', 'utf8')).updateCheckDays, 30, 'the bytes are whole in .bak');
+    assert.ok(/git could not say whether/.test(r.stdout), 'an ancestor .git entry counts: ' + r.stdout);
   } finally { clean(sb); }
 });
 
