@@ -7,7 +7,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 Keeping the old config as a backup instead of deleting it
 
 ### Fixed
-- The configure migration no longer deletes the old project config. It renames it to `<name>.bak` beside it, one rename and nothing removed. An edit that lands in the old file while the migration runs is kept in the backup, and the run warns that the new config does not have it. A rename that fails keeps the old file and exits 1. The skill's own instruction for moving a legacy config when it saves `fableConsent` does the same rename. Regression test: `scripts/lib/configure-migrate.test.mjs`.
+- The configure migration no longer deletes the old project config. It renames it to `<name>.bak` beside it, one rename and nothing removed. An edit that lands in the old file while the migration runs is kept in the backup, and the run warns that the new config does not have it. A rename that fails exits 1 and says whether the old file is still there, gone, or not checkable. The skill's own instruction for moving a legacy config when it saves `fableConsent` does the same rename. Regression test: `scripts/lib/configure-migrate.test.mjs`.
 
 ### Changed
 - The plugin carries its icon files (`plugin/.claude-plugin/icon.png` and `plugin/assets/logo.svg`). No manifest key names them, so a user sees no change until the directory listing is updated.
