@@ -149,3 +149,92 @@ test('R directory at the config path: refused, the directory stays, nothing is w
     assert.ok(!name.endsWith('.bak') && !name.endsWith('.tmp'), `nothing was written in ${dir}: found ${name}`);
   }
 });
+
+// ==== 29mn Z: a read-only target is REFUSED BY NAME, never chmodded and never replaced. The check reads the MODE (mode & 0o222 === 0), never an EACCES:
+// root ignores the write bit, and on Windows the read-only attribute reads as 0o444. It runs before the first write of the run, so the malformed copy,
+// the new home and the rename all come after it. Stated limit: a file made read-only AFTER this check is still replaced on POSIX (the rename needs only
+// the folder's write bit); the check judges one moment and says so.
+const READ_ONLY_WORDS = /read-only; nothing was written/;
+
+function assertReadOnlyRefusal(r, file) {
+  assert.equal(r.status, 1, `exit ${r.status}: ${r.stdout}\n${r.stderr}`);
+  assert.match(r.stderr, READ_ONLY_WORDS, r.stderr);
+  assert.ok(r.stderr.includes(path.basename(file)), `the sentence names the file: ${r.stderr}`);
+}
+
+// A file whose mode is read-only; restored to writable in the caller's finally, because a read-only file cannot be removed on Windows.
+function makeReadOnly(file, text) {
+  fs.writeFileSync(file, text);
+  fs.chmodSync(file, 0o444);
+}
+
+test('Z config: a read-only config is refused by name, its mode and bytes unchanged, nothing written, exit 1', (t) => {
+  const sb = sandbox(t);
+  const dir = path.join(sb.proj, '.claude', 'coal');
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    makeReadOnly(sb.newCfg, ORIGINAL);
+    const r = runCli(sb, ['--rigor', 'high']);
+    assertReadOnlyRefusal(r, sb.newCfg);
+    assert.equal(fs.readFileSync(sb.newCfg, 'utf8'), ORIGINAL, 'the read-only config keeps its bytes');
+    assert.equal(fs.statSync(sb.newCfg).mode & 0o222, 0, 'the read-only config keeps its mode (never chmodded)');
+    for (const name of fs.readdirSync(dir)) {
+      assert.ok(!name.endsWith('.bak') && !name.endsWith('.tmp'), `nothing was written in ${dir}: found ${name}`);
+    }
+  } finally {
+    fs.chmodSync(sb.newCfg, 0o644);
+  }
+});
+
+test('Z malformed config with a read-only backup: refused by name before the backup is copied, both files unchanged, exit 1', (t) => {
+  const sb = sandbox(t);
+  const dir = path.join(sb.proj, '.claude', 'coal');
+  fs.mkdirSync(dir, { recursive: true });
+  const bak = sb.newCfg + '.bak';
+  const BROKEN = '{not json\n';
+  const OLD_BAK = 'OLD BACKUP\n';
+  fs.writeFileSync(sb.newCfg, BROKEN);
+  makeReadOnly(bak, OLD_BAK);
+  try {
+    const r = runCli(sb, ['--rigor', 'high']);
+    assertReadOnlyRefusal(r, bak);
+    assert.equal(fs.readFileSync(bak, 'utf8'), OLD_BAK, 'the read-only backup keeps its bytes');
+    assert.equal(fs.readFileSync(sb.newCfg, 'utf8'), BROKEN, 'the malformed config is not rebuilt');
+  } finally {
+    fs.chmodSync(bak, 0o644);
+  }
+});
+
+test('Z migration with a read-only backup: refused by name before the new home is written, legacy and backup unchanged, exit 1', (t) => {
+  const sb = sandbox(t);
+  const legacy = path.join(sb.proj, '.coalboard.json');
+  const bak = legacy + '.bak';
+  const OLD_BAK = 'OLD BACKUP\n';
+  fs.writeFileSync(legacy, ORIGINAL);
+  makeReadOnly(bak, OLD_BAK);
+  try {
+    const r = runCli(sb, ['--rigor', 'high']);
+    assertReadOnlyRefusal(r, bak);
+    assert.equal(fs.readFileSync(legacy, 'utf8'), ORIGINAL, 'the legacy config keeps its bytes');
+    assert.equal(fs.readFileSync(bak, 'utf8'), OLD_BAK, 'the read-only backup keeps its bytes');
+    assert.equal(fs.existsSync(sb.newCfg), false, 'the new home was not written');
+  } finally {
+    fs.chmodSync(bak, 0o644);
+  }
+});
+
+// The backup copy of a malformed config that FAILS (a folder sits at the backup name): until now the run warned "Overwriting" and rebuilt the config with
+// no backup, so the malformed bytes were lost. Now the run refuses before the write and the bytes stay.
+test('Z malformed config whose backup cannot be made (a folder at the backup name): refused, the malformed bytes kept, exit 1', (t) => {
+  const sb = sandbox(t);
+  const bak = sb.newCfg + '.bak';
+  const BROKEN = '{not json\n';
+  fs.mkdirSync(path.dirname(sb.newCfg), { recursive: true });
+  fs.writeFileSync(sb.newCfg, BROKEN);
+  fs.mkdirSync(bak);
+  const r = runCli(sb, ['--rigor', 'high']);
+  assert.equal(r.status, 1, `exit ${r.status}: ${r.stdout}\n${r.stderr}`);
+  assert.match(r.stderr, /could not be backed up \([A-Z_]+\); nothing was written/, r.stderr);
+  assert.equal(fs.readFileSync(sb.newCfg, 'utf8'), BROKEN, 'the malformed bytes are kept');
+  assert.ok(fs.statSync(bak).isDirectory(), 'the folder at the backup name is still there');
+});

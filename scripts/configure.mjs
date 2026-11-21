@@ -53,7 +53,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { CONFIG_SCHEMA, validateValue, validateConfig } from './lib/config-schema.mjs';
 import { gitEnv } from './lib/git-env.mjs';
-import { ConfigWriteRefused, mkdirRepoParents, refuseLinkedTarget } from './lib/repo-fs.mjs';
+import { ConfigWriteRefused, mkdirRepoParents, refuseIfReadOnly, refuseLinkedTarget } from './lib/repo-fs.mjs';
 
 // True when a .git entry (a directory, or the file of a linked worktree) sits in the file's directory or any directory above it.
 function insideRepoTree(file) {
@@ -370,6 +370,8 @@ function main() {
     process.exit(1);
   }
 
+  // 29mn Z: whether this run migrates the legacy file (defined here, before the first write, because the read-only checks below need it).
+  const migrating = legacyPaths.includes(readPath) && writePath !== readPath;
   // 16f wave 2 (CWK2-042): the parent folder is made only after the chain from the project root is judged (a link or junction at any component is refused wherever it points), and
   // the target file is never written through a link; both run BEFORE the malformed-config backup so a refusal leaves nothing behind (R16e L1). The project root is the folder whose
   // candidate list holds writePath (projectCandidates, walked from cwd exactly as findProjectCfg walks it), so it is right for a write at cwd, for a canonical config found above cwd
@@ -388,6 +390,10 @@ function main() {
     }
   };
   try {
+    // 29mn Z (T-29mg-D2): every target this run would write is judged BEFORE the first write (the folders, the new home, the malformed copy, the move).
+    // A read-only target is refused by name and nothing is chmodded or replaced. Stated limit: a file made read-only after this check is still replaced on POSIX.
+    refuseIfReadOnly(writePath);
+    if (malformed || migrating) refuseIfReadOnly(readPath + '.bak');
     mkdirRepoParents(path.dirname(writePath), isGlobal ? null : projectRootOf(writePath));
     refuseLinkedTarget(writePath);
     refuseLinkedTarget(readPath);
@@ -399,7 +405,6 @@ function main() {
 
   // BB-533: whether a backup already sits at <legacy>.bak, read before the malformed copy below (which makes one itself) and before the rename. It reports
   // only: a backup another process makes after this check is not seen (a stated limit, CoalFace F2).
-  const migrating = legacyPaths.includes(readPath) && writePath !== readPath;
   const bakBefore = migrating ? nameState(readPath + '.bak') : null;
   if (malformed) {
     process.exitCode = 1;
@@ -407,8 +412,10 @@ function main() {
       // T-29mg-1 (predates BB-533, booked not changed here): this copy replaces an earlier <legacy>.bak with no line saying so.
       fs.copyFileSync(readPath, readPath + '.bak');
       console.warn(`Warning: existing config is malformed — backed it up to ${readPath}.bak and rebuilding.`);
-    } catch {
-      console.warn('Warning: existing config is malformed. Overwriting.');
+    } catch (e) {
+      // 29mn Z: the malformed bytes are the user's only copy. A backup that cannot be made refuses the run before anything is rebuilt over them.
+      console.error(`Error: the malformed config ${readPath} could not be backed up (${e.code || e.message}); nothing was written.`);
+      process.exit(1);
     }
   }
 

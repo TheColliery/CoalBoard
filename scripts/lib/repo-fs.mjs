@@ -61,3 +61,16 @@ export function refuseLinkedTarget(file) {
   }
   if (st.isSymbolicLink()) throw new ConfigWriteRefused(file, 'a link sits at the config file, wherever it points', FILE_FIX);
 }
+
+// 29mn Z (T-29mg-D2): a target with no write bit is refused BY NAME before any write, never chmodded and never replaced. The MODE is read (mode & 0o222 === 0),
+// never an EACCES: root ignores the write bit, and on Windows the read-only attribute reads as 0o444. A missing target is the normal first write.
+// Stated limit: a file made read-only AFTER this check is still replaced on POSIX (the rename needs only the folder's write bit).
+const READ_ONLY_FIX = 'make the file writable if you mean to change it';
+export function refuseIfReadOnly(file) {
+  let st;
+  try { st = fs.lstatSync(file); } catch (e) {
+    if (e.code === 'ENOENT') return;
+    throw new ConfigWriteRefused(file, `it could not be inspected (${e.code})`, FILE_FIX);
+  }
+  if (st.isFile() && (st.mode & 0o222) === 0) throw new ConfigWriteRefused(file, 'read-only; nothing was written', READ_ONLY_FIX);
+}
