@@ -5,6 +5,7 @@
   "author": {
     "name": "HetCreep"
   },
+  "icon": "./icon.png",
   "homepage": "https://github.com/TheColliery/CoalBoard",
   "repository": "https://github.com/TheColliery/CoalBoard",
   "license": "Apache-2.0",

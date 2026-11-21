@@ -159,7 +159,7 @@ function buildFixture(t) {
   for (const d of ['skills', 'hooks', 'commands', 'agents']) { fs.mkdirSync(path.join(tmp, d, 'x'), { recursive: true }); fs.writeFileSync(path.join(tmp, d, 'x', 'f.md'), 'x\n'); }
   fs.mkdirSync(path.join(tmp, '.claude-plugin'), { recursive: true });
   fs.writeFileSync(path.join(tmp, '.claude-plugin', 'plugin.json'), '{}\n');
-  fs.writeFileSync(path.join(tmp, '.claude-plugin', 'icon.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  fs.writeFileSync(path.join(tmp, 'icon.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47])); // 29mn I: the icon sits at the plugin root, never inside .claude-plugin/
   fs.mkdirSync(path.join(tmp, 'assets'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'assets', 'logo.svg'), '<svg/>\n');
   fs.mkdirSync(path.join(tmp, 'plugin-src'), { recursive: true });
@@ -178,7 +178,8 @@ test('M1 control: the build run by its direct path writes plugin/README.md', (t)
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.readFileSync(path.join(tmp, 'plugin', 'README.md'), 'utf8'), good + '\n');
   // The plugin icon and assets/ ship with the dist: a build that drops either one stays silent otherwise (verify's orphan walk only sees what is there).
-  assert.ok(fs.existsSync(path.join(tmp, 'plugin', '.claude-plugin', 'icon.png')), 'the plugin icon is in the dist');
+  assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'icon.png')), 'the plugin icon is at the dist root (29mn I)');
+  assert.ok(!fs.existsSync(path.join(tmp, 'plugin', '.claude-plugin', 'icon.png')), 'the old dist path inside .claude-plugin/ is gone (29mn I)');
   assert.ok(fs.existsSync(path.join(tmp, 'plugin', 'assets', 'logo.svg')), 'the assets/ logo is in the dist');
 });
 

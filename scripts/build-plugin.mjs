@@ -1,5 +1,5 @@
 // Build the clean plugin/ dist from source: ship skills/ + hooks/ + commands/ + agents/ +
-// the plugin manifest and its icon (.claude-plugin/icon.png) + assets/, plus the plugin README (plugin-src/README.md, see scripts/lib/dist-docs.mjs);
+// the plugin manifest and its icon (icon.png at the plugin root, named by plugin.json's "icon") + assets/, plus the plugin README (plugin-src/README.md, see scripts/lib/dist-docs.mjs);
 // EXCLUDE scripts/ (lib, tests, build/verify are dev-only) and the internal design docs. Zero-dep.
 // (cpSync recursive — never flat copyFileSync on a dir.) Importing this file builds nothing: the build
 // runs only when the file is invoked directly.
@@ -30,7 +30,7 @@ export function buildDist(distRoot = DIST, srcRoot = ROOT) {
   };
   for (const d of ['skills', 'hooks', 'commands', 'agents']) copy(d);
   copy(path.join('.claude-plugin', 'plugin.json'));
-  copy(path.join('.claude-plugin', 'icon.png'));
+  copy('icon.png');
   copy('assets');
   for (const { src, dst } of DIST_DOCS) {
     const to = path.join(distRoot, dst);
