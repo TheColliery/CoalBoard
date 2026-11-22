@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.18] - 2026-11-23
+
+Saying a replaced config when a file is swapped in its place
+
+### Fixed
+- The session-start hook's refusal reason now says the config was replaced while it was read, which is what its check catches (a swapped file), rather than claiming any change.
+
+### Notes
+- The 2.9.10 fix (with `coalboardMode` set to `auto` and no session-start line, the skill shows its consent box before convening) was checked by a run of headless test agents: three of three showed the box, where the version before it showed none in three of three.
+
 ## [2.9.17] - 2026-11-22
 
 Refusing a session-start config that was swapped during its read
