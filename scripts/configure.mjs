@@ -498,7 +498,9 @@ function main() {
             console.error(`Warning: the backup ${bak} holds a change the new config ${writePath} does not have: the legacy file changed after this migration read it (before the move, or through the backup after it). Merge it by hand; the backup is yours to keep or delete.`);
           } else {
             const earlier = bakBefore === 'found' ? ' (replaced an earlier backup)' : bakBefore === 'gone' ? ' (no earlier backup)' : ` (could not check for an earlier backup: ${bakBefore})`;
-            console.log(`Migrated the project config to ${writePath}; the old file is kept as ${bak}${earlier}.`);
+            // 29nh N: the mode is the seed's own handle's (read before the move). A read-only old file says so in the one line; the rename keeps its mode in the backup.
+            const roNote = (legacySeed.mode & 0o222) === 0 ? ' The old file was read-only when it was read, and it is kept with that mode.' : '';
+            console.log(`Migrated the project config to ${writePath}; the old file is kept as ${bak}${earlier}.${roNote}`);
           }
           if (tracked === 'tracked') console.log(`${readPath} is tracked by git: commit its removal (git add -A -- ${readPath}). ${bak} is untracked and yours to keep or delete.`);
           if (tracked === 'unknown') console.log(`git could not say whether ${readPath} is tracked; if it is, commit its removal (git add -A -- ${readPath}). ${bak} is yours to keep or delete.`);

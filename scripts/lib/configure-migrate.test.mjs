@@ -322,3 +322,38 @@ test('inside a repository git cannot answer (a broken .git file): the run says g
   assert.equal(fs.existsSync(legacy), false, 'the file is moved');
   assert.equal(read(bak), LEGACY_TEXT, 'the backup holds its bytes');
 });
+
+// ---- 29nh N: the migration's one line says when the legacy file was read-only as it was. The mode is read from the seed's own handle, before the move.
+// The line is checked with the backup path and the new home stripped first (a temp path can carry the word: CoalTipple F-1).
+function migratedLine(out, sb, bak) {
+  const line = out.split('\n').find((l) => l.startsWith('Migrated the project config'));
+  assert.ok(line, `the run printed the migration line: ${out}`);
+  return line.split(bak).join('<bak>').split(sb.newCfg).join('<new>');
+}
+
+test('N read-only legacy: moved to <legacy>.bak with its mode kept, and the one line says the old file was read-only', (t) => {
+  const sb = sandbox(t);
+  const legacy = legacyAt(sb, ['.coalboard.json']);
+  const bak = legacy + '.bak';
+  try {
+    fs.chmodSync(legacy, 0o444);
+    assert.equal(fs.statSync(legacy).mode & 0o222, 0, 'precondition: the legacy file has no write bit on this platform');
+    const { r, out } = migrate(sb, legacy, 'none');
+    assert.equal(r.status, 0, out);
+    assert.equal(read(bak), LEGACY_TEXT, 'the bytes survive as the backup');
+    assert.equal(fs.statSync(bak).mode & 0o222, 0, 'the backup keeps the read-only mode');
+    assert.match(migratedLine(out, sb, bak), /read-only/, out);
+  } finally {
+    for (const p of [bak, legacy]) if (fs.existsSync(p)) fs.chmodSync(p, 0o644);
+  }
+});
+
+test('N writable legacy: moved as before, and the one line does not mention read-only', (t) => {
+  const sb = sandbox(t);
+  const legacy = legacyAt(sb, ['.coalboard.json']);
+  const bak = legacy + '.bak';
+  const { r, out } = migrate(sb, legacy, 'none');
+  assert.equal(r.status, 0, out);
+  assert.equal(read(bak), LEGACY_TEXT, 'the bytes survive as the backup');
+  assert.doesNotMatch(migratedLine(out, sb, bak), /read-only/, out);
+});
