@@ -71,23 +71,63 @@ function readConfigFile(f) {
 // `.native` (CWK-125). Unresolvable = refused: nothing is read and the reason rides to SessionStart. KEPT, not in the class:
 // the existsSync stats in the walk and the stray sweep (a stat reads no content; only the path is printed), and the HOME-scoped
 // reads and writes (the global config, the update stamp under ~/.claude/coal/coalboard/): not a project-state folder.
-function insideFolder(file, folder) {
+// The resolved path of a candidate that sits INSIDE its folder, or null. The one realpath of the name is taken here; readProjectConfig reads that path only.
+function resolveInside(file, folder) {
   try {
     let real;
     try { real = fs.realpathSync.native(file); } catch (e) {
       // A READ-DENIED file (an ACL gives EPERM/EACCES even to realpath) cannot be opened to be canonicalized, yet it must still
-      // reach readConfigFile to be REPORTED as unreadable (UMB-174). Resolve its DIRECTORY instead and demand the file itself be
+      // reach the read to be REPORTED as unreadable (UMB-174). Resolve its DIRECTORY instead and demand the file itself be
       // no link (lstat reads no content). Any other failure stays refused.
-      if (!e || (e.code !== 'EACCES' && e.code !== 'EPERM') || fs.lstatSync(file).isSymbolicLink()) return false;
+      if (!e || (e.code !== 'EACCES' && e.code !== 'EPERM') || fs.lstatSync(file).isSymbolicLink()) return null;
       real = path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file));
     }
     const rel = path.relative(folder, real);
-    return rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
-  } catch { return false; }
+    return rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel) ? real : null;
+  } catch { return null; }
 }
+// The reader's codes, one mapping for every read step: EISDIR is a directory, EACCES and EPERM are unreadable, any other code stays silent
+// (never a fifth reason invented for it).
+function readReason(e) {
+  const code = e && e.code;
+  if (code === 'EISDIR') return 'a directory';
+  if (code === 'EACCES' || code === 'EPERM') return 'unreadable';
+  return null;
+}
+// 29oa (T-29nh-1, the class of the reader study: a check, then a read by name): the check and the read are ONE function on ONE resolved path. The
+// name is realpathed once (resolveInside); from there the read works on that path only: lstat it as bigint (a link refuses; a non-file stays silent or
+// reports a directory), open it, fstat the handle as bigint and compare dev and ino with that lstat, read through that same handle, close it on every
+// path. A mismatch refuses with the reason 'changed while it was read' (SessionStart prints it as an UNREADABLE line) and nothing from the file is used.
+// An ino of 0 on either side skips the compare: a filesystem that reports none cannot tell files apart, as the name check could not either.
 function readProjectConfig(file, folder) {
-  if (!insideFolder(file, folder)) return { cfg: {}, reason: 'resolves outside its folder' };
-  return readConfigFile(file);
+  const real = resolveInside(file, folder);
+  if (real === null) return { cfg: {}, reason: 'resolves outside its folder' };
+  let named;
+  try { named = fs.lstatSync(real, { bigint: true }); } catch (e) { return { cfg: {}, reason: readReason(e) }; }
+  if (named.isSymbolicLink()) return { cfg: {}, reason: 'changed while it was read' };
+  if (!named.isFile()) return { cfg: {}, reason: named.isDirectory() ? 'a directory' : null };
+  let fd;
+  try { fd = fs.openSync(real, 'r'); } catch (e) { return { cfg: {}, reason: readReason(e) }; }
+  let content;
+  try {
+    const st = fs.fstatSync(fd, { bigint: true });
+    if (named.ino !== 0n && st.ino !== 0n && (st.dev !== named.dev || st.ino !== named.ino)) return { cfg: {}, reason: 'changed while it was read' };
+    if (!st.isFile()) return { cfg: {}, reason: null };
+    const size = Number(st.size);
+    const buf = Buffer.alloc(size);
+    let got = 0;
+    while (got < size) {
+      const n = fs.readSync(fd, buf, got, size - got, got);
+      if (n === 0) break;
+      got += n;
+    }
+    content = buf.subarray(0, got).toString('utf8');
+  } catch (e) {
+    return { cfg: {}, reason: readReason(e) };
+  } finally {
+    try { fs.closeSync(fd); } catch {}
+  }
+  return parseConfig(content);
 }
 
 // realpath a dir to its PHYSICAL path, falling back to a lexical resolve if realpath
@@ -191,7 +231,7 @@ function isCandidateElsewhere(p, dir) {
 // home dir (its config is the GLOBAL, already read); never walk ABOVE home -- nothing above
 // your home dir is "this project" (Phoenix #10 sandbox-compliance: do not escape upward into
 // another scope's config; also keeps the hermetic test from reading the real ~/.claude). Issue #2 f/u.
-// Returns { file, folder, legacyDir, ignored }: `file` = the config found (null if none); `folder` = the folder that file must resolve inside (see insideFolder); `legacyDir` = the
+// Returns { file, folder, legacyDir, ignored }: `file` = the config found (null if none); `folder` = the folder that file must resolve inside (see resolveInside); `legacyDir` = the
 // level whose LEGACY shape supplied it (null when a canonical path did, or nothing was found);
 // `ignored` = near-miss paths (strayCandidates) present at the levels visited, INCLUDING the level
 // that supplied the config, never above it (the walk returns there). `ignored` stays empty unless
