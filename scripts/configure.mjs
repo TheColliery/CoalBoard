@@ -206,7 +206,7 @@ function readConfigFile(p, root = null) {
   if (!named.isFile()) throw Object.assign(new Error(`${p} is not a regular file`), { code: named.isDirectory() ? 'EISDIR' : 'ENOTFILE' });
   let fd;
   try {
-    // A stated limit (29ns, T-82): the folders above the file are checked by name, so a local process that can write in the project's .claude, .agents or .gemini folder can swap a folder for a link after that check and back after the open, and the file compare does not see it. Node's file API on Windows and macOS has no handle-relative open to close it, and a process with that write access can already write the config itself.
+    // A stated limit (29ns, T-82): the folders above the file are checked by name, so a local process that can write in the project folder can swap a folder on the path (the project's .claude, .agents or .gemini folder is one of them) for a link after that check and back after the open, and the file compare does not see it. Node's file API on Windows and macOS has no handle-relative open to close it, and a process that can write in the project folder can already write the config itself.
     fd = fs.openSync(p, 'r');
     // The compare closes the window for the file actually opened: a handle whose dev or ino differs from the lstat was swapped in between, so it is refused.
     const st = fs.fstatSync(fd, { bigint: true });
