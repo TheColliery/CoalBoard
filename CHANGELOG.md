@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.17] - 2026-11-22
+
+Refusing a session-start config that was swapped during its read
+
+### Fixed
+- The session-start hook checked the project config's path and then read it by name, so a file swapped in between could supply its settings to the session. It now reads the path it checked, compares the opened file with it, and skips a swapped file, saying on the start line that it changed while it was read. Regression test: a test that swaps the config in that gap (`scripts/lib/conductor-toctou.test.mjs`).
+
 ## [2.9.16] - 2026-11-22
 
 Refusing a config swapped during its read, and saying when a migrated config was read-only
