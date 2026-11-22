@@ -166,24 +166,68 @@ function writeConfigAtomic(target, text) {
   }
 }
 
-// T-29kw-1: read a config through ONE descriptor: open, fstat, the bytes read through that same descriptor, close. Returns
-// the text and the descriptor's identity (device, inode, size, mtime). Any failure THROWS with its code: a missing file (ENOENT) is the caller's empty start,
-// and anything else (a denied read, a folder, an I/O error) must never read as an empty config (29mn R, T-29mg-D1: the next write would replace the file).
-// BB-533: the migration compares TEXT only (the backup read back against the seed); the identity is no longer consumed here, and stays for the reader study (item D).
-function readConfigFile(p) {
+// 29nh T: a refusal the reader makes itself. Its message says what happened; main prints it with "nothing was written" and exits 1.
+function readRefused(message, code) {
+  return Object.assign(new Error(message), { code, refused: true });
+}
+
+// 29nh T: the project root a config belongs to: the folder whose candidate list holds the file, walked up from cwd (the walk findProjectCfg makes); cwd when none does.
+function projectRootFor(file, cwd) {
+  for (let d = cwd; ; d = path.dirname(d)) {
+    if (projectCandidates(d).includes(file)) return d;
+    if (path.dirname(d) === d) return cwd;
+  }
+}
+
+// 29nh T: the folders from the project root down to the config's folder, each lstat'ed BEFORE the file is opened. A link or junction in the chain refuses,
+// wherever it points, and nothing is opened. A missing folder throws ENOENT (an absent config). The root itself is not walked (a project opened through a
+// linked path still works). The walk narrows the window; the handle compare in readConfigFile closes it for the file actually opened.
+function refuseChainLinks(file, root) {
+  const rel = path.relative(root, path.dirname(file));
+  let cur = root;
+  for (const part of rel.split(path.sep).filter(Boolean)) {
+    cur = path.join(cur, part);
+    const st = fs.lstatSync(cur, { bigint: true });
+    if (st.isSymbolicLink()) throw readRefused(`a link or junction sits on the path to the config folder, wherever it points: ${cur}`, 'ELINK');
+    if (!st.isDirectory()) throw readRefused(`${cur} is on the path to the config and is not a folder`, 'ENOTDIR');
+  }
+}
+
+// T-29kw-1: read a config through ONE descriptor: lstat, open, fstat, the bytes read through that same descriptor, close. Returns the text, the
+// descriptor's identity (device, inode, size, mtime) and its mode. Any failure THROWS with its code: a missing file (ENOENT) is the caller's empty start,
+// and anything else (a denied read, a folder, a link, a swapped file, an I/O error) must never read as an empty config (29mn R, T-29mg-D1).
+// BB-533: the migration compares TEXT only (the backup read back against the seed); the identity stays for the reader study (item D).
+function readConfigFile(p, root = null) {
+  // 29nh T: a project root is known, so the folder chain is walked by lstat before anything is opened (a link in it refuses, nothing opened).
+  if (root !== null) refuseChainLinks(p, root);
+  // The name is lstat'ed as bigint: its dev and ino are the identity the open must match. ENOENT is the caller's empty start.
+  const named = fs.lstatSync(p, { bigint: true });
+  if (named.isSymbolicLink()) throw readRefused(`a link sits at the config file, wherever it points: ${p}`, 'ELINK');
+  if (!named.isFile()) throw Object.assign(new Error(`${p} is not a regular file`), { code: named.isDirectory() ? 'EISDIR' : 'ENOTFILE' });
   let fd;
   try {
     fd = fs.openSync(p, 'r');
-    const st = fs.fstatSync(fd);
+    // The compare closes the window for the file actually opened: a handle whose dev or ino differs from the lstat was swapped in between, so it is refused.
+    const st = fs.fstatSync(fd, { bigint: true });
+    // ino 0 on either side (a filesystem that reports none) means the compare cannot tell files apart, so it is skipped, as the name check was.
+    if (named.ino !== 0n && st.ino !== 0n && (st.dev !== named.dev || st.ino !== named.ino)) {
+      throw readRefused(`${p} changed while it was being read`, 'ECHANGED');
+    }
     if (!st.isFile()) throw Object.assign(new Error(`${p} is not a regular file`), { code: st.isDirectory() ? 'EISDIR' : 'ENOTFILE' });
-    const buf = Buffer.alloc(st.size);
+    const size = Number(st.size);
+    const buf = Buffer.alloc(size);
     let got = 0;
-    while (got < st.size) {
-      const n = fs.readSync(fd, buf, got, st.size - got, got);
+    while (got < size) {
+      const n = fs.readSync(fd, buf, got, size - got, got);
       if (n === 0) break;
       got += n;
     }
-    return { text: buf.subarray(0, got).toString('utf8'), identity: { dev: st.dev, ino: st.ino, size: st.size, mtimeMs: st.mtimeMs } };
+    // mode is the handle's own mode bits (29mn N reads the write bit from it, before the migration moves the file).
+    return {
+      text: buf.subarray(0, got).toString('utf8'),
+      identity: { dev: Number(st.dev), ino: Number(st.ino), size, mtimeMs: Number(st.mtimeMs) },
+      mode: Number(st.mode),
+    };
   } finally {
     if (fd !== undefined) {
       try { fs.closeSync(fd); } catch {}
@@ -192,8 +236,8 @@ function readConfigFile(p) {
 }
 
 // The backup read-back's form: null on any failure, and the caller says the backup "could not be read back" (its own line, never an empty start).
-function readLegacyWithIdentity(p) {
-  try { return readConfigFile(p); } catch { return null; }
+function readLegacyWithIdentity(p, root = null) {
+  try { return readConfigFile(p, root); } catch { return null; }
 }
 
 function printHelp() {
@@ -307,12 +351,16 @@ function main() {
     if (e instanceof ConfigWriteRefused) { console.error(`Error: ${e.message}`); process.exit(1); }
     throw e;
   }
+  // 29nh T: a project config is read through its folder chain, from the root it belongs to (a global config has none, so no chain walk).
+  const seedRoot = isGlobal ? null : projectRootFor(readPath, cwd);
   let legacySeed = null;
   try {
-    legacySeed = readConfigFile(readPath);
+    legacySeed = readConfigFile(readPath, seedRoot);
   } catch (e) {
     if (e.code !== 'ENOENT') {
-      console.error(`Error: ${readPath} could not be read (${e.code || e.message}); nothing was written.`);
+      console.error(e.refused
+        ? `Error: ${e.message}; nothing was written.`
+        : `Error: ${readPath} could not be read (${e.code || e.message}); nothing was written.`);
       process.exit(1);
     }
   }
@@ -383,12 +431,8 @@ function main() {
   // What the rename buys (node/runtime.md section 5): it replaces a directory entry, so a link planted at the target name AFTER these checks is replaced, never written through, and a crash
   // leaves the old file or the new one, never a torn one. What it does NOT close: the folder-swap window (a checked folder swapped for a junction before the temp is made): the temp and the
   // rename land inside whatever the folder then is.
-  const projectRootOf = (file) => {
-    for (let d = cwd; ; d = path.dirname(d)) {
-      if (projectCandidates(d).includes(file)) return d;
-      if (path.dirname(d) === d) return cwd; // not found: cwd, so a path outside it is refused (fail closed)
-    }
-  };
+  // (projectRootFor: cwd when no candidate holds the file, so a path outside it is refused, fail closed)
+  const projectRootOf = (file) => projectRootFor(file, cwd);
   try {
     // 29mn Z (T-29mg-D2): every target this run would write is judged BEFORE the first write (the folders, the new home, the malformed copy, the move).
     // A read-only target is refused by name and nothing is chmodded or replaced. Stated limit: a file made read-only after this check is still replaced on POSIX.
@@ -445,7 +489,7 @@ function main() {
             console.error(`Error: could not move the legacy config ${readPath} aside (${code}), and its state could not be checked (${now}): it may still be at ${readPath}. The new config at ${writePath} was already written: check ${readPath} by hand, then compare it with the new config.`);
           }
         } else {
-          const back = readLegacyWithIdentity(bak);
+          const back = readLegacyWithIdentity(bak, seedRoot);
           if (back === null) {
             process.exitCode = 1;
             console.error(`Error: the backup ${bak} could not be read back, so it could not be checked against the migrated config ${writePath}. The moved bytes are in ${bak}.`);

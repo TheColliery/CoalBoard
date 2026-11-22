@@ -54,6 +54,7 @@ const TESTS = [
   'scripts/configure.test.mjs',
   'scripts/lib/configure-migrate.test.mjs',
   'scripts/lib/configure-reader.test.mjs',
+  'scripts/lib/configure-toctou.test.mjs',
   'scripts/verify.test.mjs',
 ];
 
