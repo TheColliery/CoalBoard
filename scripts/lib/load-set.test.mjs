@@ -138,3 +138,14 @@ test('29js: references/steps.md and its plugin copy both say that with no sessio
     assert.ok(read(path.join(root, rel)).includes(PHRASE), `${rel} lacks the phrase: ${PHRASE}`);
   }
 });
+
+// 29oh (T-29og-1): until GATE 1 is decided, nothing outside .coalboard/ is written (a step that asks before it acts says so in its own text).
+// The two phrases must sit in steps.md Step 0 and in its plugin copy.
+test('29oh: references/steps.md and its plugin copy both say nothing outside .coalboard/ is written until GATE 1 is decided', () => {
+  const PHRASES = ['write nothing outside `.coalboard/`', 'GATE 1 is decided'];
+  for (const rel of [STEPS, 'plugin/skills/coalboard/references/steps.md']) {
+    for (const phrase of PHRASES) {
+      assert.ok(read(path.join(root, rel)).includes(phrase), `${rel} lacks the phrase: ${phrase}`);
+    }
+  }
+});
