@@ -10,7 +10,7 @@ Saying a replaced config when a file is swapped in its place
 - The session-start hook's refusal reason now says the config was replaced while it was read, which is what its check catches (a swapped file), rather than claiming any change.
 
 ### Notes
-- The 2.9.10 fix (with `coalboardMode` set to `auto` and no session-start line, the skill shows its consent box before convening) was checked by a run of headless test agents: three of three showed the box, where the version before it showed none in three of three.
+- The 2.9.10 fix was checked by a run of headless test agents told the mode was `auto` (stated in the prompt, not read from a config file), with no session-start line, one round of three per version: three of three showed the consent box before convening, where the version before it showed none in three of three.
 
 ## [2.9.17] - 2026-11-22
 
