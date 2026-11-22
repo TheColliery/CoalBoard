@@ -2,6 +2,16 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.16] - 2026-11-22
+
+Refusing a config swapped during its read, and saying when a migrated config was read-only
+
+### Fixed
+- The configure script checked a config file's name and then opened it by that name, so a file swapped for another in that gap could be read and its settings written into the project. It now compares the opened file with the one it checked and refuses on a mismatch, with nothing written and exit 1. It also refuses a link in the project's folder chain before opening anything. Regression test: `scripts/lib/configure-toctou.test.mjs`, which swaps the file in that gap.
+
+### Changed
+- The migration line says when the old config was read-only. The file is still moved to its `.bak` with its mode kept.
+
 ## [2.9.15] - 2026-11-22
 
 Keeping an unreadable config untouched when the skill saves a consent
