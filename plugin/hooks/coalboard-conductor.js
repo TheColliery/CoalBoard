@@ -97,21 +97,21 @@ function readReason(e) {
 // 29oa (T-29nh-1, the class of the reader study: a check, then a read by name): the check and the read are ONE function on ONE resolved path. The
 // name is realpathed once (resolveInside); from there the read works on that path only: lstat it as bigint (a link refuses; a non-file stays silent or
 // reports a directory), open it, fstat the handle as bigint and compare dev and ino with that lstat, read through that same handle, close it on every
-// path. A mismatch refuses with the reason 'changed while it was read' (SessionStart prints it as an UNREADABLE line) and nothing from the file is used.
+// path. A mismatch refuses with the reason 'replaced while it was read' (SessionStart prints it as an UNREADABLE line) and nothing from the file is used.
 // An ino of 0 on either side skips the compare: a filesystem that reports none cannot tell files apart, as the name check could not either.
 function readProjectConfig(file, folder) {
   const real = resolveInside(file, folder);
   if (real === null) return { cfg: {}, reason: 'resolves outside its folder' };
   let named;
   try { named = fs.lstatSync(real, { bigint: true }); } catch (e) { return { cfg: {}, reason: readReason(e) }; }
-  if (named.isSymbolicLink()) return { cfg: {}, reason: 'changed while it was read' };
+  if (named.isSymbolicLink()) return { cfg: {}, reason: 'replaced while it was read' };
   if (!named.isFile()) return { cfg: {}, reason: named.isDirectory() ? 'a directory' : null };
   let fd;
   try { fd = fs.openSync(real, 'r'); } catch (e) { return { cfg: {}, reason: readReason(e) }; }
   let content;
   try {
     const st = fs.fstatSync(fd, { bigint: true });
-    if (named.ino !== 0n && st.ino !== 0n && (st.dev !== named.dev || st.ino !== named.ino)) return { cfg: {}, reason: 'changed while it was read' };
+    if (named.ino !== 0n && st.ino !== 0n && (st.dev !== named.dev || st.ino !== named.ino)) return { cfg: {}, reason: 'replaced while it was read' };
     if (!st.isFile()) return { cfg: {}, reason: null };
     const size = Number(st.size);
     const buf = Buffer.alloc(size);

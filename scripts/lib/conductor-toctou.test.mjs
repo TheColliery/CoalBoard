@@ -1,7 +1,7 @@
 // The hook's project-config read (29oa, T-29nh-1, the class of 29nw's sweep and main's ruling c195 1). readProjectConfig checked the config's path (a
 // realpath containment check) and then read it BY NAME: a file swapped in between was read, and its keys reached the session. The fix takes the identity from
 // the one resolved path the check looked at: lstat it, open it, fstat the handle, compare dev and ino, read through that handle, close it on every path. A
-// mismatch refuses with the reason 'changed while it was read', which SessionStart prints as an UNREADABLE line.
+// mismatch refuses with the reason 'replaced while it was read', which SessionStart prints as an UNREADABLE line.
 // The seam is the reviewer's (scratchpad/29nw/conductor-witness.mjs): a CJS preload swaps the config name for a hard link to a victim file just before the
 // first open of that path. Observable: the project file says coalboardMode "ask" (the SessionStart board contract prints); the victim says "off" (the
 // contract is suppressed when it is read). Legs: CONTROL (no swap), INSIDE (another file in the project), OUTSIDE (a file outside the project), and REAL-LINK
@@ -82,7 +82,7 @@ function runHook(sb, victim) {
   return r;
 }
 
-const CHANGED = /UNREADABLE: .* \(changed while it was read\)/;
+const CHANGED = /UNREADABLE: .* \(replaced while it was read\)/;
 
 // ---- CONTROL: no swap. The project's own file is read: the contract prints and no notice is raised.
 test('T29oa control: with no swap the project config is read and the board contract prints, with no UNREADABLE notice', (t) => {
