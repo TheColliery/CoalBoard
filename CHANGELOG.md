@@ -2,6 +2,13 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.20] - 2026-11-23
+
+Scoping the session-start no-write line to a board run
+
+### Fixed
+- The session-start line told every session to write nothing outside the board's folder until a final apply question was answered, including sessions that never run the board. It now applies that rule only during a board run.
+
 ## [2.9.19] - 2026-11-23
 
 Keeping the target untouched until the final apply answer
