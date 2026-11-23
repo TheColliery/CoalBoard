@@ -16,7 +16,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const SURFACES = ['hooks/coalboard-conductor.js', 'plugin/hooks/coalboard-conductor.js'];
 // The four states the variable can be in: absent, the one attended value, and two unattended values (0 and an odd one).
 const STATES = [undefined, '1', '0', 'yes'];
-const SESSION_ATTENDED = 'A user can answer this session, so the consent steps run as written, and nothing outside .coalboard/ is written until GATE 1 is decided.';
+const SESSION_ATTENDED = 'A user can answer this session, so the consent steps run as written, and nothing outside .coalboard/ is written until the GATE 3 apply is answered; CONFIRM at GATE 1 only convenes the board, the task\'s own words never answer GATE 3, and CANCEL releases the task.';
 const SESSION_UNATTENDED = 'No user can answer this session, so the board is not convened';
 const PROMPT_POINTER = "act on this session's CoalBoard start line";
 const OLD_ASK = 'HALT and ask the user (question-box)';
