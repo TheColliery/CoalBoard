@@ -16,7 +16,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const SURFACES = ['hooks/coalboard-conductor.js', 'plugin/hooks/coalboard-conductor.js'];
 // The four states the variable can be in: absent, the one attended value, and two unattended values (0 and an odd one).
 const STATES = [undefined, '1', '0', 'yes'];
-const SESSION_ATTENDED = 'A user can answer this session, so the consent steps run as written, and nothing outside .coalboard/ is written until the GATE 3 apply is answered; CONFIRM at GATE 1 only convenes the board, the task\'s own words never answer GATE 3, and CANCEL releases the task.';
+const SESSION_ATTENDED = 'A user can answer this session, so the consent steps run as written; during a board run, nothing outside .coalboard/ is written until the GATE 3 apply is answered; CONFIRM at GATE 1 only convenes the board, the task\'s own words never answer GATE 3, and CANCEL releases the task.';
 const SESSION_UNATTENDED = 'No user can answer this session, so the board is not convened';
 const PROMPT_POINTER = "act on this session's CoalBoard start line";
 const OLD_ASK = 'HALT and ask the user (question-box)';
@@ -125,5 +125,20 @@ for (const hook of SURFACES) {
     assert.ok(Number.isFinite(stamp) && stamp >= before && stamp <= Date.now(), `the stamp holds a fresh timestamp: ${stamp}`);
     const names = fs.readdirSync(dir);
     assert.deepEqual(names.filter((n) => n !== 'update-check' && n !== 'sibling'), [], `a temp file survived the stamp write: ${names}`);
+  });
+
+  // 29oh-6 (T-29oh-4): a line every session sees states the no-write rule only for the board run it belongs to.
+  test(`${hook}: every SessionStart no-write rule names the board run it belongs to (29oh-6)`, (t) => {
+    const sb = sandbox(t);
+    const RULE = 'outside .coalboard/ until';
+    for (const v of STATES) {
+      const r = run(hook, sb, v, { hook_event_name: 'SessionStart' });
+      assertClean(r);
+      if (v === '1') assert.ok(r.stdout.includes(RULE), `the attended line lost its no-write rule: ${r.stdout}`);
+      for (let i = r.stdout.indexOf(RULE); i !== -1; i = r.stdout.indexOf(RULE, i + 1)) {
+        const before = r.stdout.slice(Math.max(0, i - 60), i);
+        assert.ok(before.includes('during a board run'), `the no-write rule is not scoped to a board run (${label(v)}): ${r.stdout}`);
+      }
+    }
   });
 }
