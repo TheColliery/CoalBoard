@@ -506,7 +506,7 @@ function main() {
   const contract = attended
     ? 'On an error-not-allowed task (security/crypto, DB/financial migration, high-precision math), WITH the user\'s consent, convene the board: diverse lenses debate in parallel -> a judge synthesizes on VERIFIED inputs -> staged to .coalboard/proposed/ -> the human signs off. A user can answer this session, so the consent steps run as written, and nothing outside .coalboard/ is written until the GATE 3 apply is answered; CONFIRM at GATE 1 only convenes the board, the task\'s own words never answer GATE 3, and CANCEL releases the task.'
     : 'No user can answer this session, so the board is not convened and nothing is applied, whatever coalboardMode says (the skill\'s P2); a staged proposal stays staged; any question that would have been asked goes into the final message as text, never as a write or a convene.';
-  let msg = off ? '' : `[CoalBoard] Consensus board available. ${contract} Off ~90% of the time; never touches live files until verified + approved. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.`;
+  let msg = off ? '' : `[CoalBoard] Consensus board available. ${contract} Off ~90% of the time; touch no live file outside .coalboard/ until the GATE 3 apply is answered. Judge EVERY prompt by semantic INTENT, not only the English Layer-1 keywords -- a non-English or obfuscated critical task matches no keyword seed yet still warrants the board.`;
   if (updateDue(cfg)) {
     // CWK-120 row 4 (CodeRabbit 4045387911) + findings-back MEDIUM-1/MEDIUM-2 (INSPECT).
     // The BEHAVIOR is documented, in platform-configs/.coalboard.json's own updateMode
