@@ -136,7 +136,7 @@ Full series matrix + the must-fail set: [Permission Matrix](https://github.com/T
 
 **Cross-vendor (same 2026-07-03 redo, Antigravity / Gemini 3.5 Flash):** solo **~4/15 (27%)** vs board **5/5** — a weak solo model misses reasoning traps too, so the board recovers all of them; the weaker the solo model, the larger the board's lift. (Supersedes the older 2026-06-19 AG run's smaller solo 1/5 → board 4/5 gap.) Full method, per-task scoring, and the honest-ceiling finding live in the series records: [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard).
 
-> Honest scope: small, dated samples; the board **improves** correctness, it does not prove a defect rate. A board whose lenses share one model still shares that model's blind spot (the honest ceiling). The honest sell is **bounded cost + zero-breakage**, not a reliability number.
+> Honest scope: small, dated samples; the board **improves** correctness, it does not prove a defect rate. A board whose lenses share one model still shares that model's blind spot (the honest ceiling). The honest sell is **bounded cost + an aim at zero-breakage** (staging, a rule the agent follows), not a reliability number.
 
 ## 🧭 Part of TheColliery
 
