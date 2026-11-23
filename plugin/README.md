@@ -60,7 +60,7 @@ The policy is in [PRIVACY.md](https://github.com/TheColliery/CoalBoard/blob/main
 
 ## Example uses
 
-1. **`/coalboard` on a hard problem.** The board convenes lenses on the task and returns a judged verdict. It stages any fix in `.coalboard/proposed/`, and asks for your decision before anything reaches a live file.
+1. **`/coalboard` on a hard problem.** The board convenes lenses on the task and returns a judged verdict. The skill tells the agent to stage any fix in `.coalboard/proposed/` and to ask for your decision before anything reaches a live file; the agent follows that rule, and no code enforces it.
 2. **`/coalboard` on a named file or a whole repository, as an audit.** It runs the audit procedure, with its scope confirmed first, and writes a report to `.coalboard/reports/`. It changes no live file unless you choose to apply a fix.
 3. **The opinion lane ("ask CB").** When the agent is about to ask you to settle a decision, it can offer an "ask CB" option, marked with its cost. Choosing it convenes the lenses on that decision. It writes no file, and it never convenes on its own.
 4. **`/coalboard:stats`.** It prints a table of this session's boards, lenses, verdicts and staged changes, with approximate token spend. It changes no file.

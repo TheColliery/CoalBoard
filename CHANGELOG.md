@@ -2,6 +2,19 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.19] - 2026-11-23
+
+Keeping the target untouched until the final apply answer
+
+### Fixed
+- The skill's consent step now says that nothing outside `.coalboard/` is written until the final apply question is answered, and that the first confirmation only convenes the board.
+
+### Known issues
+- An agent may still read the first confirmation as leave to apply the fix directly: in a run of headless test agents, 5 of 7 did so after confirming. The rule is followed by the agent, not enforced by code.
+
+### Notes
+- Counts from the same runs: before this change, 4 of 5 test agents wrote the target before the consent box was answered; after it, 1 of 10 did. The runs told the mode was `auto` in the prompt (no session-start line), at the haiku tier.
+
 ## [2.9.18] - 2026-11-23
 
 Saying a replaced config when a file is swapped in its place
