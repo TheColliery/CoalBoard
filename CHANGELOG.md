@@ -13,7 +13,7 @@ Keeping the target untouched until the final apply answer
 - An agent may still read the first confirmation as leave to apply the fix directly: in a run of headless test agents, 5 of 7 did so after confirming. The rule is followed by the agent, not enforced by code.
 
 ### Notes
-- Counts from the same runs: before this change, 4 of 5 test agents wrote the target before the consent box was answered; after it, 1 of 10 did. The runs told the mode was `auto` in the prompt (no session-start line), at the haiku tier.
+- Counts from the shipped text's own runs: before the fix, 4 of 5 test agents wrote the target before the consent box was answered; on the shipped text, 1 of 5 did; after confirming, 3 of 4 wrote the target directly (5 of 7 across both drafts of the fix). The runs told the mode was `auto` in the prompt (no session-start line), at the haiku tier.
 
 ## [2.9.18] - 2026-11-23
 
