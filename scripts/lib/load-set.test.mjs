@@ -149,3 +149,29 @@ test('29oh: references/steps.md and its plugin copy say nothing outside .coalboa
     }
   }
 });
+
+// 29ow (T-29oh-1): CONFIRM at GATE 1 only convenes; a missing cb-* type stages and asks GATE 3; no live write from a CONFIRM whose board cannot convene.
+// Three legs, on steps.md and its plugin copy: (1) the box names CONFIRM's meaning; (2) the missing-type branch names proposed/, NOT-CHECKED and GATE 3;
+// (3) the old sign-off and the old CANCEL-scoped-to-no-board wording are gone, and CANCEL alone reaches the board-less path.
+test('29ow: references/steps.md and its plugin copy name CONFIRM as convene only, branch a missing cb-* type to staging and GATE 3, and scope the board-less path to CANCEL', () => {
+  const BOX = 'CONFIRM = convene the board on this bill and nothing more; no file outside `.coalboard/` changes until a separate GATE 3 question is answered';
+  const BRANCH_START = 'A missing or unspawnable `cb-*` type';
+  const BRANCH_END = '**WHY structural-not-prose';
+  const OLD_SIGNOFF = 'the CONFIRM is the sign-off';
+  const OLD_CANCEL = 'proceed with the underlying request normally, board-less, saying so in one line';
+  const NEW_CANCEL = 'only the user\'s CANCEL reaches this path';
+  for (const rel of [STEPS, 'plugin/skills/coalboard/references/steps.md']) {
+    const text = read(path.join(root, rel));
+    assert.ok(text.includes(BOX), `${rel} lacks the CONFIRM box meaning: ${BOX}`);
+    const a = text.indexOf(BRANCH_START);
+    assert.ok(a !== -1, `${rel} lacks the missing-type branch: ${BRANCH_START}`);
+    const b = text.indexOf(BRANCH_END, a);
+    const branch = text.slice(a, b === -1 ? undefined : b);
+    for (const token of ['`.coalboard/proposed/`', 'NOT-CHECKED', 'GATE 3']) {
+      assert.ok(branch.includes(token), `${rel}: the missing-type branch lacks ${token}`);
+    }
+    assert.ok(!text.includes(OLD_SIGNOFF), `${rel} still says: ${OLD_SIGNOFF}`);
+    assert.ok(!text.includes(OLD_CANCEL), `${rel} still says the board-less path without CANCEL scope: ${OLD_CANCEL}`);
+    assert.ok(text.includes(NEW_CANCEL), `${rel} lacks the CANCEL-only scope: ${NEW_CANCEL}`);
+  }
+});

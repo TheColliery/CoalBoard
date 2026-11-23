@@ -26,7 +26,7 @@ You are **main** (depth-0): you decide whether to convene, orchestrate, judge, a
 Seven lists own the COUNT + MEMBERSHIP of the consent gates, the absolute prohibitions, the per-seat tool minimum, the on-disk output, the fail routes, the opinion-lane disposition, and the references — plus steps.md Step 0's own auto-trigger signal count, stated where it is used. The Steps carry the execution mechanics; every "how many / which ones" question is answered by one of these lists verbatim.
 
 ### Opinion-lane disposition — ACT (default) or ESCALATE for exactly ONE of three named reasons
-The judge's verdict is not itself an ask. **ACT on it — present the disposition in chat, never a blocking question-box, and continue working** (a technical disposition inside the room — which layer a defect lives in, whether to build a gate, which of two mechanisms — IS this default, never a fourth trigger) — UNLESS one of these three fires, in which case ESCALATE via the platform's question-box and state which one:
+The judge's verdict is not itself an ask. **ACT on it — present the disposition in chat, never a blocking question-box, and continue working; staging is part of acting, and no live change is made before GATE 3** (a technical disposition inside the room — which layer a defect lives in, whether to build a gate, which of two mechanisms — IS this default, never a fourth trigger) — UNLESS one of these three fires, in which case ESCALATE via the platform's question-box and state which one:
 - **Spends real money** (a fable seat, a large fan-out) — authority for spend never flows down.
 - **Changes what the product PROMISES a user** (a shipped claim, a platform tier, a permission).
 - **The seats did NOT converge, or converged at a stated LOW confidence.**
@@ -90,7 +90,7 @@ A recovery move inside a Step and not listed here is that step's mechanics, not 
 - **F4** — a lens looping on an unavailable tool → fail FAST, return "couldn't reach it — flagged" (steps.md Step 1).
 - **F5** — deadlock (consensus below `consensusThreshold`) → `contestedRound` cross-exam (high/nasa) → sub4 blind-solve → matched camp WINS / matches neither → the HUMAN (steps.md Step 3).
 - **F6** — verify FAILS → discard staging → climb ONCE (a stronger tier) or sub4 (one attempt) → still failing → the human + the post-mortem file (steps.md Step 4.6).
-- **F7** — near a budget/quota limit, or a spawn denial (references/rails.md · Grants & denials) → fewer workers, or inline-self for the WHOLE board — never main-as-one-lens (P11) (steps.md Steps 1–2).
+- **F7** — near a budget/quota limit, or a spawn denial (references/rails.md · Grants & denials) → fewer workers, or inline-self for the WHOLE board, staged under `.coalboard/proposed/` with GATE 3 still asked — never main-as-one-lens (P11) (steps.md Steps 1–2); a missing `cb-*` type is the same case.
 - **F8** — mid-run death / overflow / limit-hit → resume from the memory net on the un-done remainder (steps.md · Memory & resume).
 - **F9** — no user can answer this session → the board is not convened, nothing is applied (P2).
 - **F10** — an unverifiable tail (correlated blind spot · unprovable logic · an execute denial, references/rails.md · Grants & denials) → "could not verify — human decision", carried into GATE 3's digest, never a fake green (steps.md Step 4.2).
