@@ -175,3 +175,59 @@ test('29ow: references/steps.md and its plugin copy name CONFIRM as convene only
     assert.ok(text.includes(NEW_CANCEL), `${rel} lacks the CANCEL-only scope: ${NEW_CANCEL}`);
   }
 });
+
+// 29qi (T-29pf-1, T-29pj-1, T-29oh-3): the pins a text fix must keep, on the source and the plugin copy. Each predicate is also run on a
+// copy with its phrase removed and must then fail, so a pin that matches nothing cannot pass.
+const carries = (text, phrases) => phrases.every((p) => text.includes(p));
+const onBoth = (rel) => [rel, path.join('plugin', rel)];
+const FAILMODES = 'skills/coalboard/references/failure-modes.md';
+const F7_PHRASES = ['staged under `.coalboard/proposed/` with GATE 3 still asked', 'a missing `cb-*` type is the same case'];
+const RAIL_PHRASE = 'keeps every write rail, and stages under `.coalboard/proposed/` until GATE 3';
+const ACT_START = "The judge's verdict is not itself an ask.";
+const ACT_END = 'UNLESS one of these three fires';
+const ACT_PHRASE = 'the opinion run itself writes no file';
+const LEDGER_PHRASES = ['S2 backup and S3 clone', 'On-disk output'];
+const actParagraph = (text) => {
+  const a = text.indexOf(ACT_START);
+  const b = a === -1 ? -1 : text.indexOf(ACT_END, a);
+  return b === -1 ? '' : text.slice(a, b);
+};
+const actOk = (text) => { const p = actParagraph(text); return p.includes(ACT_PHRASE) && !/GATE 3|staging/.test(p); };
+
+// T-29pf-1 pin 1: SKILL.md's F7 line names the staging to GATE 3 and the missing-type case.
+test('29qi pin 1: SKILL.md F7 names GATE 3 staging and the missing cb-* type, on the source and the plugin copy', () => {
+  for (const rel of onBoth(SKILL_REL)) {
+    assert.ok(carries(read(path.join(root, rel)), F7_PHRASES), `${rel} lacks an F7 phrase`);
+  }
+  const mutant = read(path.join(root, SKILL_REL)).replace(F7_PHRASES[0], '');
+  assert.equal(carries(mutant, F7_PHRASES), false, 'a copy without the F7 phrase must fail the pin');
+});
+
+// T-29pf-1 pin 2: the parenthesis at failure-modes.md:19 and steps.md:36 says the same thing, in both homes and both copies.
+test('29qi pin 2: failure-modes.md and steps.md carry the inline-self staging parenthesis, on the source and the plugin copy', () => {
+  for (const rel of [...onBoth(FAILMODES), ...onBoth(STEPS)]) {
+    assert.ok(read(path.join(root, rel)).includes(RAIL_PHRASE), `${rel} lacks: ${RAIL_PHRASE}`);
+  }
+  const mutant = read(path.join(root, FAILMODES)).replace(RAIL_PHRASE, '');
+  assert.equal(mutant.includes(RAIL_PHRASE), false, 'a copy without the parenthesis must fail the pin');
+});
+
+// T-29pf-1 pin 3 (T-29pj-1's antibody): the opinion-lane ACT paragraph names neither GATE 3 nor staging, and says the opinion run writes no file.
+// Scoped to the ACT paragraph (from its opening sentence to the ESCALATE list): the GATE 3 bullet in the same section says "no GATE 3 there" and is
+// not an ACT line.
+test('29qi pin 3: the opinion-lane ACT paragraph names no GATE 3 and no staging, and says the opinion run writes no file', () => {
+  for (const rel of onBoth(SKILL_REL)) {
+    assert.ok(actOk(read(path.join(root, rel))), `${rel}: the ACT paragraph names GATE 3 or staging, or lacks "${ACT_PHRASE}"`);
+  }
+  const mutant = read(path.join(root, SKILL_REL)).replace(ACT_PHRASE, 'staging is part of acting, and no live change is made before GATE 3');
+  assert.equal(actOk(mutant), false, 'the 2.9.21 ACT text must fail the pin');
+});
+
+// T-29oh-3 ledger pin: the On-disk output ledger names the S2 backup and the S3 clone, the copies the skill writes before GATE 3.
+test('29qi ledger pin: SKILL.md\'s On-disk output ledger names the S2 backup and the S3 clone, on the source and the plugin copy', () => {
+  for (const rel of onBoth(SKILL_REL)) {
+    assert.ok(carries(read(path.join(root, rel)), LEDGER_PHRASES), `${rel} lacks a ledger phrase: ${LEDGER_PHRASES.join(' | ')}`);
+  }
+  const mutant = read(path.join(root, SKILL_REL)).replace(LEDGER_PHRASES[0], '');
+  assert.equal(carries(mutant, LEDGER_PHRASES), false, 'a ledger without the S2 backup and S3 clone must fail the pin');
+});
