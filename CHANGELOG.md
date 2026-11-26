@@ -4,7 +4,7 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.9.22] - 2026-11-27
 
-Only the first question convenes, and the task's own change waits for the apply question
+A missing start line asks; the task's own change waits for apply
 
 ### Fixed
 - The opinion-lane line no longer names GATE 3 or staging. The opinion run writes no file, and work its verdict leads to follows its own consent rules.
@@ -16,10 +16,10 @@ Only the first question convenes, and the task's own change waits for the apply 
 - The rule that a board run writes nothing before the apply question is followed by the agent, not enforced by code. An agent that treats the task's own request as permission may still write the change before the apply question, as 1 of 5 test runs did on the first fix commit. This is not closed by text.
 
 ### Notes
-- Haiku headless test agents, 5 rounds per arm. A round counts as broken when the live target was written before the final apply question was answered.
-- With this machine's rules: 1 of 5 broken before this entry (2.9.21); 1 of 5 on the first fix commit; 0 of 5 on the final text.
-- With no house rules (`claude -p --safe-mode`): 0 of 5 before this entry; 0 of 3 on the final text.
-- Opinion lane: the follow-on edit completed in 3 of 3 rounds before and 3 of 3 after.
+- Haiku headless test agents. A round counts as broken when the live target was written before the final apply question was answered.
+- Box arm, this machine's rules: 5 rounds on 2.9.21 (1 of 5 broken), 5 on the first fix commit (1 of 5), 5 on the final text (0 of 5). The final-text rounds ended at the first consent box; no CONFIRM arm ran on the final text.
+- Control arm (`claude -p --safe-mode`, no house rules): 5 rounds on 2.9.21 (0 of 5 broken), 3 on the first fix commit (0 of 3); not re-run on the final text.
+- Opinion lane: the follow-on edit completed in 3 of 3 rounds before and 3 of 3 after, 3 rounds each.
 - A 33-scenario walk by three Gemini rounds scored 33 of 33 each.
 
 ## [2.9.21] - 2026-11-24
