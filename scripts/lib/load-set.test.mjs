@@ -231,3 +231,17 @@ test('29qi ledger pin: SKILL.md\'s On-disk output ledger names the S2 backup and
   const mutant = read(path.join(root, SKILL_REL)).replace(LEDGER_PHRASES[0], '');
   assert.equal(carries(mutant, LEDGER_PHRASES), false, 'a ledger without the S2 backup and S3 clone must fail the pin');
 });
+
+// 29qi M1 (INSPECT 29qi-4): each pointer to the pre-GATE-3 exceptions says the change the task asks for is never one of them and waits for GATE 3.
+// The pointer sentence is "The skill's own writes are excepted: ..."; every such sentence carries the new words, in steps.md, SKILL.md and the conductor line.
+const M1_PHRASE = 'the change the task asks for is never one of them: it waits for GATE 3';
+const M1_POINTER = 'own writes are excepted';
+test('29qi M1: each pointer to the pre-GATE-3 exceptions also says the task\'s requested change is never excepted and waits for GATE 3, on the source and the plugin copy', () => {
+  for (const rel of [...onBoth(STEPS), ...onBoth(SKILL_REL), ...onBoth('hooks/coalboard-conductor.js')]) {
+    const text = read(path.join(root, rel));
+    const pointers = text.split(M1_POINTER).length - 1;
+    const withWords = text.split(M1_PHRASE).length - 1;
+    assert.ok(pointers >= 1, `${rel} has no pointer to the exceptions`);
+    assert.equal(withWords, pointers, `${rel}: ${pointers} pointer(s), ${withWords} carrying the GATE 3 words`);
+  }
+});
