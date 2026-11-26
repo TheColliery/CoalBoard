@@ -2,6 +2,26 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.22] - 2026-11-27
+
+Only the first question convenes, and the task's own change waits for the apply question
+
+### Fixed
+- The opinion-lane line no longer names GATE 3 or staging. The opinion run writes no file, and work its verdict leads to follows its own consent rules.
+- The start-line rule (P2) now fires only on a session-start line that says no user can answer. A missing start line is never that case; the ask is the safe branch.
+- With no question tool, the first consent box is printed as text and the turn ends, writing nothing outside `.coalboard/`.
+- The skill's own writes before the final apply question are named once in the On-disk output ledger: the GATE 2 config key with its legacy `.bak`, and the run's S2 backup and S3 clone outside the project. Each pointer to them says the change the task asks for is never one of them.
+
+### Known issues
+- The rule that a board run writes nothing before the apply question is followed by the agent, not enforced by code. An agent that treats the task's own request as permission may still write the change before the apply question, as 1 of 5 test runs did on the first fix commit. This is not closed by text.
+
+### Notes
+- Haiku headless test agents, 5 rounds per arm. A round counts as broken when the live target was written before the final apply question was answered.
+- With this machine's rules: 1 of 5 broken before this entry (2.9.21); 1 of 5 on the first fix commit; 0 of 5 on the final text.
+- With no house rules (`claude -p --safe-mode`): 0 of 5 before this entry; 0 of 3 on the final text.
+- Opinion lane: the follow-on edit completed in 3 of 3 rounds before and 3 of 3 after.
+- A 33-scenario walk by three Gemini rounds scored 33 of 33 each.
+
 ## [2.9.21] - 2026-11-24
 
 Confirming the first question convenes the board and nothing more
