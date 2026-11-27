@@ -1113,3 +1113,39 @@ test('29se T-29mg-N1: a planted update-stamp temp this run did not create surviv
     assert.equal(fs.readFileSync(planted, 'utf8'), 'not ours', 'the file this run did not create is still there');
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
+
+// 29se M1: the exclusive create succeeds and the write then fails (simulated ENOSPC). The preload closes the stamp temp's descriptor and throws, or,
+// for the old string-path write, creates the file and throws, so one test is fair to the old and the new hook. The run's own temp must be gone afterwards.
+test('29se M1: a write that fails after the exclusive create removes the temp this run made', () => {
+  const home = mk();
+  const PID = 4242;
+  try {
+    const stampDir = path.join(home, '.claude', 'coal', 'coalboard');
+    fs.mkdirSync(stampDir, { recursive: true });
+    const temp = path.join(stampDir, `update-check.${PID}.tmp`);
+    const pin = path.join(home, 'pin-write-fail.cjs');
+    fs.writeFileSync(pin, [
+      `Object.defineProperty(process, 'pid', { value: ${PID}, configurable: true });`,
+      `const fs = require('fs');`,
+      `const want = (p) => String(p).endsWith('.${PID}.tmp');`,
+      `const realOpen = fs.openSync, realWrite = fs.writeFileSync;`,
+      `const ours = new Set();`,
+      `const boom = () => { const e = new Error('simulated write failure'); e.code = 'ENOSPC'; return e; };`,
+      `fs.openSync = function (p) { const fd = realOpen.apply(this, arguments); if (want(p)) ours.add(fd); return fd; };`,
+      `fs.writeFileSync = function (p) {`,
+      `  if (typeof p === 'number' && ours.has(p)) { ours.delete(p); fs.closeSync(p); throw boom(); }`,
+      `  if (want(p)) { fs.closeSync(realOpen(p, 'wx')); throw boom(); }`,
+      `  return realWrite.apply(this, arguments);`,
+      `};`,
+    ].join('\n') + '\n');
+    const r = spawnSync(process.execPath, ['--require', pin, HOOK], {
+      input: JSON.stringify({ hook_event_name: 'SessionStart' }), cwd: home,
+      env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8', timeout: 20000,
+    });
+    assert.equal(r.status, 0);
+    assert.equal(r.stderr, '', 'fail-silent: nothing on stderr');
+    assert.match(r.stdout, /self-update due/, 'the stamp write is reached: the first run is due');
+    assert.equal(fs.existsSync(temp), false, 'the temp this run created is removed after the failed write');
+    assert.equal(fs.existsSync(path.join(stampDir, 'update-check')), false, 'no stamp was written');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
