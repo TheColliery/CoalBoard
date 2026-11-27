@@ -2,7 +2,7 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
-## [2.9.24] - 2026-11-27
+## [2.9.24] - 2026-11-28
 
 Earlier backups are reported; a stamp's temp is cleaned only by its run
 
