@@ -454,9 +454,11 @@ function main() {
   if (malformed) {
     process.exitCode = 1;
     try {
-      // T-29mg-1 (predates BB-533, booked not changed here): this copy replaces an earlier <legacy>.bak with no line saying so.
+      // 29se T-29mg-1: say whether this copy replaces an earlier backup. nameState reports a throwing lstat as a state, never as absence.
+      const bakOld = nameState(readPath + '.bak');
+      const replaced = bakOld === 'found' ? ' (replaced an earlier backup)' : bakOld === 'gone' ? '' : ` (could not check for an earlier backup: ${bakOld})`;
       fs.copyFileSync(readPath, readPath + '.bak');
-      console.warn(`Warning: existing config is malformed — backed it up to ${readPath}.bak and rebuilding.`);
+      console.warn(`Warning: existing config is malformed — backed it up to ${readPath}.bak and rebuilding${replaced}.`);
     } catch (e) {
       // 29mn Z: the malformed bytes are the user's only copy. A backup that cannot be made refuses the run before anything is rebuilt over them.
       console.error(`Error: the malformed config ${readPath} could not be backed up (${e.code || e.message}); nothing was written.`);

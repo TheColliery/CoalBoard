@@ -738,6 +738,31 @@ test('configure (H1): a JUNCTION at <config>.bak is refused before anything is r
   } finally { clean(sb); }
 });
 
+// 29se T-29mg-1: a malformed config's backup replaces an earlier <config>.bak. SKILL.md:81 promises one line saying so; the copy itself stays as it was.
+test('29se T-29mg-1: a malformed config whose backup replaces an earlier .bak says so in the warning', () => {
+  const sb = sandbox();
+  try {
+    malformedProject(sb);
+    const bak = PROJECT_TARGET(sb.proj) + '.bak';
+    fs.writeFileSync(bak, 'EARLIER BACKUP');
+    const r = run(['--language', 'en'], sb);
+    const out = (r.stdout || '') + (r.stderr || '');
+    assert.match(out, /rebuilding \(replaced an earlier backup\)/, out);
+    assert.strictEqual(fs.readFileSync(bak, 'utf8'), MALFORMED, 'the copy still replaces the earlier backup');
+  } finally { clean(sb); }
+});
+
+test('29se T-29mg-1 control: a malformed config with no earlier .bak keeps the warning unchanged', () => {
+  const sb = sandbox();
+  try {
+    malformedProject(sb);
+    const r = run(['--language', 'en'], sb);
+    const out = (r.stdout || '') + (r.stderr || '');
+    assert.match(out, /existing config is malformed/, out);
+    assert.doesNotMatch(out, /replaced an earlier backup/, out);
+  } finally { clean(sb); }
+});
+
 test('configure (M1): a legacy <cwd>/.coalboard.json that is a FILE symlink is refused: its target is never read into the project', (t) => {
   if (SKIP_FILE) { t.skip(SKIP_FILE); return; }
   const sb = sandbox();
