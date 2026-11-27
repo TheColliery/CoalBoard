@@ -2,6 +2,14 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.24] - 2026-11-27
+
+Earlier backups are named and reported, and a stamp's temporary file is removed only by the run that made it
+
+### Fixed
+- The update-check stamp's temporary file is removed only by the run that created it. Before, a run that found another run's temporary file already there could remove it.
+- `scripts/configure.mjs`, a repository checkout tool that is not part of the installed plugin: when it moves a legacy-location config aside, the message now says when that replaced an earlier `.bak` file. When it finds a malformed config and saves a copy beside it as `<config>.bak`, the warning now says when that replaced an earlier backup. Nothing is deleted either way.
+
 ## [2.9.23] - 2026-11-27
 
 Clearer scope for the skill's own writes, and Node 26 in CI
