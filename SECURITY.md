@@ -40,14 +40,14 @@ The clean `plugin/` distribution is generated from source by `node scripts/build
 
 CoalBoard is evaluated against [NVIDIA SkillSpector](https://github.com/NVIDIA/skillspector), run locally via `uvx` (no install), static stage only (`--no-llm`).
 
-* **Scan:** 2026-11-06, CoalBoard v2.9.5 dist (`plugin/`, the `v2.9.5` tag at `ad46b4b`), SkillSpector v2.13.4 pinned to commit `5482446` (`54824463814a0be01360792523ec7245a69190fc`), static stage only.
-* **Score:** 93/100 (CRITICAL static). **20 findings, none a defect**, each read at its source line. The same 20 as the v2.9.4 scan, matched by fingerprint.
+* **Scan:** 2026-11-26, CoalBoard v2.9.22 dist (`plugin/`, the `v2.9.22` tag at `ed01fdb`), SkillSpector v2.13.4 pinned to commit `5482446` (`54824463814a0be01360792523ec7245a69190fc`), static stage only.
+* **Score:** 93/100 (CRITICAL static), recommendation DO_NOT_INSTALL, max issue severity HIGH. **20 findings.** The same 20 as the v2.9.21 scan (2026-11-24, the `v2.9.21` tag at `6c078b6`), matched by fingerprint; one EA2 match in `references/steps.md` line 15 moved 273 columns because new text was inserted ahead of it.
 * **Finding classes:**
   * RA1 Self-Modification ×12—the consent-gated self-update text in `commands/update.md`, `hooks/coalboard-conductor.js` and the plugin `README.md`: the hook only schedules and never networks, and the agent offers the platform's own `claude plugin update`.
   * EA2 Autonomous Decision Making ×5—the user-configured standing-consent modes, whose default is `ask`, and the rule that Fable never seats in the opinion lane.
   * P6 Direct Prompt Extraction ×2—the words "footprint rule" and "output rule" in prose.
   * BH1 Bundled hooks can execute when matching lifecycle events occur ×1—the scanner's standing note that `hooks/hooks.json` registers hooks.
-* **Coverage:** partial, 18 of 24 files fully inspected (75%). Six are partial: `hooks/coalboard-conductor.js` and `skills/coalboard/scripts/apply-target.mjs` (the parser's limit on a security-relevant expression), `hooks/hooks.json` (opaque to it), and `SKILL.md`, `lens-prompts.md` and `references/steps.md` (its `obfuscated_instruction_text` exception).
+* **Coverage:** partial, 19 of 25 files fully inspected (76%). Six are partial: `hooks/coalboard-conductor.js` and `skills/coalboard/scripts/apply-target.mjs` (the parser's limit on a security-relevant expression), `hooks/hooks.json` (opaque to it), and `SKILL.md`, `lens-prompts.md` and `references/steps.md` (its `obfuscated_instruction_text` exception).
 * **Not clearance:** a clean scanner run does not clear a behaviour defect. The scanner reads text; the v2.6.0 defect lived in behaviour.
 
 A separate advisory workflow, Skill checks (NVIDIA SkillEvaluator, keyless Tier 1), runs on pull requests and when started by hand, and reports its pattern matches as findings; it does not change the record below.
