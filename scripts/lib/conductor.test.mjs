@@ -1091,3 +1091,25 @@ test('UMB-174 (b) C-6: an UNREADABLE config (EACCES or EPERM) is reported as "un
   assert.equal(r.status, 0);
   assert.deepStrictEqual(unreadableLines(r.stdout), [unreadableLine(path.join(real, '.claude', 'coal', 'coalboard.json'), 'unreadable')]);
 });
+
+// 29se T-29mg-N1: the update-stamp temp is <stamp>.<pid>.tmp. A file already at that name makes the exclusive open fail, and the run did not create it,
+// so the hook must leave it alone. The pid is pinned with a --require preload (process.pid is writable there), so the name is known before the spawn.
+test('29se T-29mg-N1: a planted update-stamp temp this run did not create survives a failed exclusive open', () => {
+  const home = mk();
+  const PID = 4242;
+  try {
+    const stampDir = path.join(home, '.claude', 'coal', 'coalboard');
+    fs.mkdirSync(stampDir, { recursive: true });
+    const planted = path.join(stampDir, `update-check.${PID}.tmp`);
+    fs.writeFileSync(planted, 'not ours');
+    const pin = path.join(home, 'pin-pid.cjs');
+    fs.writeFileSync(pin, `Object.defineProperty(process, 'pid', { value: ${PID}, configurable: true });\n`);
+    const r = spawnSync(process.execPath, ['--require', pin, HOOK], {
+      input: JSON.stringify({ hook_event_name: 'SessionStart' }), cwd: home,
+      env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8', timeout: 20000,
+    });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /self-update due/, 'the stamp write is reached: the first run is due');
+    assert.equal(fs.readFileSync(planted, 'utf8'), 'not ours', 'the file this run did not create is still there');
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});

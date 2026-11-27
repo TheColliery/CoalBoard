@@ -423,12 +423,13 @@ function readUpdateStamp() {
 // 29eh (T-29eb-2): temp-then-rename (node/runtime.md section 5). The temp is opened exclusively in the same directory, so the rename stays on
 // one device, and it is removed in finally when the rename does not happen; a failed write never falls back to an in-place write.
 function writeUpdateStamp(now) {
-  let tmp = null;
+  let tmp = null; // set only once this run's exclusive open has succeeded: a name it did not create is never removed (29se T-29mg-N1)
   try {
     const p = updateStampPath();
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    tmp = `${p}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, String(now), { flag: 'wx' });
+    const name = `${p}.${process.pid}.tmp`;
+    fs.writeFileSync(name, String(now), { flag: 'wx' });
+    tmp = name;
     fs.renameSync(tmp, p);
     tmp = null; // renamed onto the target: nothing left to remove
     try { fs.rmSync(oldUpdateStampPath(), { force: true }); } catch {} // best-effort
