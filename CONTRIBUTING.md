@@ -6,7 +6,7 @@ CoalBoard is the consensus & debate board of the [TheColliery](https://github.co
 
 ## 🤝 Proposing a Change
 
-1. **Open an issue first** describing the problem, gap, or proposed feature (especially for changes to `SKILL.md` — the board contract).
+1. **Open an issue first** describing the problem, gap, or proposed feature (especially for changes to `SKILL.md`—the board contract).
 2. Make your code changes and keep the verification gates green.
 3. For board-behavior or `SKILL.md` changes, **dogfood it live** (convene the board on a real task across at least one platform) and document the behavior in your PR.
 
@@ -25,7 +25,7 @@ node scripts/test.mjs     # runs the zero-dependency test suite: each test file 
 
 ### Development Rules
 * **Rebuild the dist after a source change:** edit `skills/`, `hooks/`, `commands/`, `scripts/lib/`, `plugin-src/`, or the manifest, then `node scripts/build-plugin.mjs` to re-sync `plugin/` (verify fails on a stale dist).
-* **`config-schema.mjs` is the single source of truth** for every `.coalboard.json` key — `verify.mjs` validates the factory config against it.
+* **`config-schema.mjs` is the single source of truth** for every `.coalboard.json` key—`verify.mjs` validates the factory config against it.
 * **Keep the conductor Phoenix-pure:** zero dependencies, fail-silent (wrap in try/catch, never exit non-zero), no network, no spawn, no NUL byte.
 * **Add unit tests:** every shared helper gets a `*.test.mjs`; the conductor change gets a hermetic spawn test. Register new files in `scripts/test.mjs` (the runner fails on an unlisted orphan and on a file whose only result line names the file). Open: the runner has no per-file test-count floor, so a test that exits 0 after another test already passed reads as a pass with the tests that completed.
 * **Spawn `git` through `gitEnv()`:** `verify.mjs` runs the shared git-spawn census (the org canon, `SKILL-REPO-PATTERN.md` in the `TheColliery/.github` repo); the room keeps only its pins and file set in `scripts/lib/git-spawn-room.mjs`.
@@ -33,9 +33,9 @@ node scripts/test.mjs     # runs the zero-dependency test suite: each test file 
 
 ### Reading a green check on a docs-only change
 
-Both checks the branch ruleset requires — `all-green` (CI) and `analyze (javascript)` (CodeQL) — now run on **every** push, including one that touches only root docs. On such a push each check reports success **so the ruleset stays satisfiable**, not because anything was verified: the workflows decide per-run, from the changed paths, whether their suite has any work to do.
+Both checks the branch ruleset requires—`all-green` (CI) and `analyze (javascript)` (CodeQL)—now run on **every** push, including one that touches only root docs. On such a push each check reports success **so the ruleset stays satisfiable**, not because anything was verified: the workflows decide per-run, from the changed paths, whether their suite has any work to do.
 
-**So read the job summary, never the green tick alone.** Each check states which of three things happened — the path classifier failed (the check refuses), the suite ran (with its result), or there was nothing to run (naming the changed paths that produced that verdict). A summary saying nothing ran is not a clean bill of health. The two workflows exempt deliberately different path sets: CI still runs on a shipped markdown artifact, because `verify.mjs` checks dist-sync, while CodeQL skips all markdown, because it analyzes JS/TS.
+**So read the job summary, never the green tick alone.** Each check states which of three things happened—the path classifier failed (the check refuses), the suite ran (with its result), or there was nothing to run (naming the changed paths that produced that verdict). A summary saying nothing ran is not a clean bill of health. The two workflows exempt deliberately different path sets: CI still runs on a shipped markdown artifact, because `verify.mjs` checks dist-sync, while CodeQL skips all markdown, because it analyzes JS/TS.
 
 A third workflow, **Skill checks** (`.github/workflows/skill-checks.yml`), is advisory and is not a required check. It runs on pull requests and when started by hand, never on a push to `main`. It runs NVIDIA SkillEvaluator's keyless Tier 1 scan over the skill text, and that scan reports pattern matches on skill text as findings, so a finding there is a prompt to read the line, not a verdict.
 
@@ -43,9 +43,9 @@ A third workflow, **Skill checks** (`.github/workflows/skill-checks.yml`), is ad
 
 ## 🖥️ Supported Platforms
 
-CoalBoard is **cross-agent** — it runs on any platform with concurrent subagents (the board spawns parallel-blind lenses; diversity rides the prompts, not a vendor). **Claude Code** additionally lets it run cheap lenses + a premium judge (a cost bonus) and auto-activates via hooks. A platform with no concurrent fan-out degrades to a sequential pass or off — never a broken board. Verify the platform's current subagent support (it churns).
+CoalBoard is **cross-agent**—it runs on any platform with concurrent subagents (the board spawns parallel-blind lenses; diversity rides the prompts, not a vendor). **Claude Code** additionally lets it run cheap lenses + a premium judge (a cost bonus) and auto-activates via hooks. A platform with no concurrent fan-out degrades to a sequential pass or off—never a broken board. Verify the platform's current subagent support (it churns).
 
-**Two tiers, honestly.** Any subagent platform **works with** CoalBoard — the degrade-safe path runs (conservatively, unverified, design-supported not run end-to-end by us) with no setup, so you can use the board there today. **Claude Code** is **validated** end-to-end; **Antigravity** is **validated (load only)**: measured 2026-10-29 (agy 1.4.8, a report-only load check), the whole skill loads under its 24,000-byte limit and reaches Step 4. On 2026-10-31 (agy 1.4.12) a board run staged its fixes but could not run verify, because headless agy refuses the shell permission. The debate itself last ran end-to-end on Antigravity on 2026-06-22. Validation follows *access*, not a request queue: if you run a platform we haven't, open an issue at [Issues](https://github.com/TheColliery/CoalBoard/issues) and we'll walk you through a one-off capability probe **you run** on your side, then we confirm the result and ship a tuned adapter. The probe prompts stay private, and we never mark a platform "validated" until it's actually been run there — the free degrade-safe path is always there; "validated" is earned by whoever has the platform.
+**Two tiers, honestly.** Any subagent platform **works with** CoalBoard—the degrade-safe path runs (conservatively, unverified, design-supported not run end-to-end by us) with no setup, so you can use the board there today. **Claude Code** is **validated** end-to-end; **Antigravity** is **validated (load only)**: measured 2026-10-29 (agy 1.4.8, a report-only load check), the whole skill loads under its 24,000-byte limit and reaches Step 4. On 2026-10-31 (agy 1.4.12) a board run staged its fixes but could not run verify, because headless agy refuses the shell permission. The debate itself last ran end-to-end on Antigravity on 2026-06-22. Validation follows *access*, not a request queue: if you run a platform we haven't, open an issue at [Issues](https://github.com/TheColliery/CoalBoard/issues) and we'll walk you through a one-off capability probe **you run** on your side, then we confirm the result and ship a tuned adapter. The probe prompts stay private, and we never mark a platform "validated" until it's actually been run there—the free degrade-safe path is always there; "validated" is earned by whoever has the platform.
 
 ---
 
@@ -60,7 +60,7 @@ CoalBoard is **cross-agent** — it runs on any platform with concurrent subagen
 | `hooks/coalboard-conductor.js` | Phoenix-pure conductor hook (SessionStart + UserPromptSubmit). Auto-synced by the build. |
 | `plugin/` | Generated Claude Code plugin distribution. |
 | `platform-configs/.coalboard.json` | Commented factory default configuration. |
-| (benchmark) | The with-the-board-vs-without benchmark lives in the series records — [`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard) — kept out of the clone (clean-clone: a skill repo carries only the skill). |
+| (benchmark) | The with-the-board-vs-without benchmark lives in the series records—[`TheColliery/.github/benchmarks/CoalBoard`](https://github.com/TheColliery/.github/tree/main/benchmarks/CoalBoard)—kept out of the clone (clean-clone: a skill repo carries only the skill). |
 
 ---
 
