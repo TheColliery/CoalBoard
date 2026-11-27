@@ -2,6 +2,19 @@
 
 All notable changes to CoalBoard are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer (the canonical version lives in `.claude-plugin/plugin.json`).
 
+## [2.9.23] - 2026-11-27
+
+Clearer scope for the skill's own writes, and Node 26 in CI
+
+### Fixed
+- The sentence that lists the skill's own writes before the final apply question now names their scope in the same sentence: outside `.coalboard/`. Before, it did not say that, so a reader could take it to cover everything the run writes.
+
+### Changed
+- CI runs the test suite on Node 22, 24 and 26.
+
+### Notes
+- A 35-scenario walk (the 33 of 2.9.22, plus two on writes inside `.coalboard/` before the final apply question) by three Haiku headless rounds scored 35 of 35 each.
+
 ## [2.9.22] - 2026-11-27
 
 A missing start line asks; the task's own change waits for apply
