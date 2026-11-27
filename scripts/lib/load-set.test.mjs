@@ -236,12 +236,38 @@ test('29qi ledger pin: SKILL.md\'s On-disk output ledger names the S2 backup and
 // The pointer sentence is "The skill's own writes are excepted: ..."; every such sentence carries the new words, in steps.md, SKILL.md and the conductor line.
 const M1_PHRASE = 'the change the task asks for is never one of them: it waits for GATE 3';
 const M1_POINTER = 'own writes are excepted';
+// 29qy T-29ql-3: the sentence each pointer sits in, from the last sentence or line break before it to the end of that sentence.
+const pointerSentences = (text) => {
+  const found = [];
+  for (let at = text.indexOf(M1_POINTER); at >= 0; at = text.indexOf(M1_POINTER, at + 1)) {
+    const dot = text.lastIndexOf('. ', at);
+    const nl = text.lastIndexOf('\n', at);
+    const from = Math.max(dot === -1 ? 0 : dot + 2, nl === -1 ? 0 : nl + 1);
+    const stop = /\.(\s|$)/.exec(text.slice(at));
+    found.push(text.slice(from, stop ? at + stop.index + 1 : text.length));
+  }
+  return found;
+};
 test('29qi M1: each pointer to the pre-GATE-3 exceptions also says the task\'s requested change is never excepted and waits for GATE 3, on the source and the plugin copy', () => {
   for (const rel of [...onBoth(STEPS), ...onBoth(SKILL_REL), ...onBoth('hooks/coalboard-conductor.js')]) {
     const text = read(path.join(root, rel));
-    const pointers = text.split(M1_POINTER).length - 1;
-    const withWords = text.split(M1_PHRASE).length - 1;
-    assert.ok(pointers >= 1, `${rel} has no pointer to the exceptions`);
-    assert.equal(withWords, pointers, `${rel}: ${pointers} pointer(s), ${withWords} carrying the GATE 3 words`);
+    const sentences = pointerSentences(text);
+    assert.ok(sentences.length >= 1, `${rel} has no pointer to the exceptions`);
+    sentences.forEach((s, i) => assert.ok(s.includes(M1_PHRASE), `${rel}: pointer ${i + 1} has no GATE 3 words in its own sentence: ${s.slice(0, 160)}`));
+    assert.equal(text.split(M1_PHRASE).length - 1, sentences.length, `${rel}: ${sentences.length} pointer(s), a GATE 3 phrase count that differs`);
+  }
+});
+
+// 29qy T-29ql-2: the ledger sentence that says what the skill itself writes before GATE 3 is scoped to `.coalboard/` in that same sentence.
+// Without the scope, "nothing more" contradicts the bullets above it, which list writes inside `.coalboard/` before GATE 3.
+test('29qy T-29ql-2: the ledger sentence on the skill\'s own pre-GATE-3 writes names `.coalboard/` as its scope in the same sentence, on the source and the plugin copy', () => {
+  for (const rel of onBoth(SKILL_REL)) {
+    const text = read(path.join(root, rel));
+    const at = text.indexOf("skill's own writes before GATE 3 are these copies");
+    assert.ok(at >= 0, `${rel} has no ledger sentence on the skill's own pre-GATE-3 writes`);
+    const from = Math.max(text.lastIndexOf('. ', at) + 2, text.lastIndexOf('\n', at) + 1);
+    const end = text.indexOf('nothing more.', at) + 'nothing more.'.length;
+    const sentence = text.slice(from, end);
+    assert.ok(sentence.includes('Outside `.coalboard/`'), `${rel}: the sentence ending "nothing more." names no scope: ${sentence.slice(0, 160)}`);
   }
 });

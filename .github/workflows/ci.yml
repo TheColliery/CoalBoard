@@ -142,7 +142,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [22, 24]  # supported LTS only (24 Active, 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
+        node: [22, 24, 26]  # supported LTS only (26 Active LTS, 24 and 22 Maintenance); 18/20 are EOL — bump as the Node LTS schedule moves
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15 # job 318 s on windows node 22 at 7e4ade4 (run 44299060104, job 134783692932; test step 294 s); 900/318 ~2.8x headroom
     steps:
@@ -223,7 +223,7 @@ jobs:
             {
               echo "### all-green: the suite RAN"
               echo ""
-              echo "Code paths changed, so the full \`gate\` matrix executed (3 OS x 2 Node)."
+              echo "Code paths changed, so the full \`gate\` matrix executed (3 OS x 3 Node)."
               echo "Result: \`${{ needs.gate.result }}\`."
             } >> "$GITHUB_STEP_SUMMARY"
           else
