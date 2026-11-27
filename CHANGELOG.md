@@ -4,11 +4,11 @@ All notable changes to CoalBoard are documented here. Format follows [Keep a Cha
 
 ## [2.9.24] - 2026-11-27
 
-Earlier backups are named and reported, and a stamp's temporary file is removed only by the run that made it
+Earlier backups are reported; a stamp's temp is cleaned only by its run
 
 ### Fixed
-- The update-check stamp's temporary file is removed only by the run that created it. Before, a run that found another run's temporary file already there could remove it.
-- `scripts/configure.mjs`, a repository checkout tool that is not part of the installed plugin: when it moves a legacy-location config aside, the message now says when that replaced an earlier `.bak` file. When it finds a malformed config and saves a copy beside it as `<config>.bak`, the warning now says when that replaced an earlier backup. Nothing is deleted either way.
+- The update-check stamp's temporary file is removed only by the run that created it, including when its write fails. Before, a run could remove a temporary file another run had just made.
+- `scripts/configure.mjs`, a repository checkout tool that is not part of the installed plugin: when it finds a malformed config and saves a copy beside it as `<config>.bak`, the warning now says when that replaced an earlier backup. Nothing is deleted either way.
 
 ## [2.9.23] - 2026-11-27
 
